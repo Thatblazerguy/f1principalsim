@@ -1,5 +1,6 @@
 import { renderOffseason } from "./offseason.js";
 import { renderWeekend } from "./weekend.js";
+import { calendar } from "../data/calendar.js";
 import { renderCalendar } from "./calendar.js";
 import { renderMarket } from "./market.js";
 import { renderOffice } from "./office.js";
@@ -88,6 +89,8 @@ export function renderDashboard(root) {
   ensureTeamState(state.team);
   const totalRounds = Math.min(state.season.totalRounds || 24, 24);
   const isSeasonOver = state.season.round > totalRounds || (state.weekendProgress?.raceComplete && state.season.round === totalRounds);
+  const currentYear = 2025 + (state.season.year || 1);
+  const nextRound = isSeasonOver ? null : calendar.find(r => r.round === state.season.round);
 
   root.innerHTML = `
     ${buildHubNav("dashboard")}
@@ -95,7 +98,7 @@ export function renderDashboard(root) {
       <div class="dashboard-header glass">
         <div class="flex justify-between items-start w-full">
           <div>
-            <p class="dashboard-eyebrow">Team Command Center • Season ${state.season.year}</p>
+            <p class="dashboard-eyebrow">Team Command Center • ${currentYear} Season</p>
             <h2>${state.team.name}</h2>
             <p class="dashboard-subtitle">
               Direct your race weekends, engineering progress, and team operations from one place.
@@ -142,9 +145,9 @@ export function renderDashboard(root) {
             <span class="menu-card-orb menu-card-orb-bottom"></span>
           </span>
           <div class="menu-card-content glass tile">
-            <p class="menu-card-kicker">Weekend</p>
-            <h3>${isSeasonOver ? "Season Complete" : "Next Race"}</h3>
-            <p>${isSeasonOver ? "Review your performance and prepare for the next year." : "Jump straight into the next Grand Prix weekend and move the season forward."}</p>
+            <p class="menu-card-kicker">Weekend • ${currentYear}</p>
+            <h3>${isSeasonOver ? "Season Complete" : `Next: ${nextRound ? nextRound.name : "Grand Prix"}`}</h3>
+            <p>${isSeasonOver ? "Review your performance and prepare for the next year." : `Prepare for Round ${state.season.round} of the ${currentYear} World Championship.`}</p>
             <button id="wk">${isSeasonOver ? "Open Offseason" : "Race Weekend"}</button>
           </div>
         </div>
