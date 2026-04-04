@@ -196,9 +196,9 @@ export function renderWeekend(root, flashMessage = "") {
     round && weekendProgress && !weekendProgress.qualifyingComplete
   );
   const raceAlreadyRun = Boolean(round && weekendProgress?.raceComplete);
-  const raceLocked = Boolean(
-    round && weekendProgress && (!weekendProgress.qualifyingComplete || weekendProgress.raceComplete)
-  );
+  
+  // The race is locked IF it's already run OR if qualifying hasn't been completed yet.
+  const raceLocked = raceAlreadyRun || !weekendProgress.qualifyingComplete;
 
   const roundStrats = round && strategies[round.round] ? strategies[round.round] : [];
   
@@ -308,7 +308,8 @@ export function renderWeekend(root, flashMessage = "") {
             React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
               roundStrats.map((strat, sIdx) => {
                 const isSelected = currentStratId === strat.id;
-                const isDisabled = !weekendProgress.qualifyingComplete || weekendProgress.raceComplete;
+                // Strategies should only be locked if the race is already complete
+                const isDisabled = weekendProgress.raceComplete;
                 
                 return React.createElement("div", {
                   key: strat.id,
