@@ -18,7 +18,10 @@ import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState, gainTeamXP, gainTeamCarXP, getActiveDrivers } from "../utils/teamState.js";
 import { getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
 import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
+import { AnimatedTabs } from "../components/ui/animated-tabs.tsx";
 import { syncGame } from "../lib/supabaseApi.js";
+import React from "react";
+import { createRoot } from "react-dom/client";
 
 function ensureWeekendProgress(round) {
   if (!state.weekendProgress || state.weekendProgress.round !== round) {
@@ -199,14 +202,12 @@ export function renderWeekend(root, flashMessage = "") {
 
   const roundStrats = round && strategies[round.round] ? strategies[round.round] : [];
   
-  let strategyHtml = "";
   let strategiesValid = false;
   
   if (round) {
     const d1 = activeDrivers[0];
     const d2 = activeDrivers[1];
     
-    // Always initialize correctly
     if (!weekendProgress.selectedStrategies) {
       weekendProgress.selectedStrategies = {};
     }
@@ -214,40 +215,13 @@ export function renderWeekend(root, flashMessage = "") {
     const d1Strat = weekendProgress.selectedStrategies[d1?.name] || "";
     const d2Strat = d2 ? (weekendProgress.selectedStrategies[d2.name] || "") : "N/A";
     
-    // If the data is empty, we force valid to prevent bricking the game, but render UI so it's obvious there's a data load error
     if (roundStrats.length === 0) {
       strategiesValid = true; 
     } else {
       strategiesValid = Boolean(d1Strat && (d2 ? d2Strat : true));
     }
-
-    const stratDisabledAttr = (!weekendProgress.qualifyingComplete || weekendProgress.raceComplete) ? "disabled" : "";
-
-    const buildStratSelect = (d, currentVal) => `
-      <div class="strategy-driver-wrap">
-        <label>${d.name} Strategy</label>
-        <select class="strategy-select" data-driver-strat="${d.name}" ${stratDisabledAttr}>
-          <option value="">-- Assign Strategy --</option>
-          ${roundStrats.map(s => 
-            `<option value="${s.id}" ${currentVal === s.id ? "selected" : ""}>${s.label}</option>`
-          ).join("")}
-        </select>
-      </div>
-    `;
-
-    strategyHtml = `
-      <div class="glass strategy-panel">
-        <p class="menu-card-kicker">Pit Wall</p>
-        <h3>Race Strategy</h3>
-        <p class="dashboard-subtitle">Select a tire compound strategy for each driver. Higher risk strategies offer no win bonus but carry heavy penalty chances. ${roundStrats.length === 0 ? "<b>Warning: No strategy data loaded for round " + round.round + ". You may race default.</b>" : ""}</p>
-        <div class="strategy-grid">
-          ${d1 ? buildStratSelect(d1, d1Strat) : ""}
-          ${d2 ? buildStratSelect(d2, d2Strat) : ""}
-        </div>
-      </div>
-    `;
   } else {
-     strategiesValid = true; // Fallback for end of season
+     strategiesValid = true;
   }
 
   root.innerHTML = `
@@ -290,7 +264,9 @@ export function renderWeekend(root, flashMessage = "") {
           <button id="quali" class="weekend-action" ${round ? "" : "disabled"}>Qualifying</button>
           <button id="race" class="weekend-action weekend-action-primary" ${round && !raceLocked && strategiesValid ? "" : "disabled"}>Race</button>
         </div>
-        ${strategyHtml}
+        
+        <div id="strategy-tabs-root"></div>
+
         ${raceNeedsQuali ? `<p class="weekend-gate-hint weekend-gate-hint--quali">Complete qualifying to unlock the race simulation for this round.</p>` : ""}
         ${raceAlreadyRun ? `<p class="weekend-gate-hint weekend-gate-hint--done">This Grand Prix has been run — the race cannot be simulated again until you advance.</p>` : ""}
 
@@ -308,6 +284,75 @@ export function renderWeekend(root, flashMessage = "") {
       <div id="results" class="result-list"></div>
     </section>
   `;
+
+  // Mount React tabs
+  if (round && activeDrivers.length > 0) {
+    const strategyTabsRoot = root.querySelector("#strategy-tabs-root");
+    if (strategyTabsRoot) {
+      const reactRoot = createRoot(strategyTabsRoot);
+      
+      const tabImages = [
+        "https://images.unsplash.com/photo-1541344485523-289b4f62ca7a?auto=format&fit=crop&q=80&w=600",
+        "https://images.unsplash.com/photo-1506543730435-e2c1d4553a84?q=80&w=600",
+        "https://images.unsplash.com/photo-1522428938647-2baa7c899f2f?q=80&w=600",
+        "https://images.unsplash.com/photo-1493552152660-f915ab47ae9d?q=80&w=600"
+      ];
+
+      const driverTabs = activeDrivers.map((driver, dIdx) => {
+        const currentStratId = weekendProgress.selectedStrategies[driver.name] || "";
+        
+        return {
+          id: `driver-${driver.name}`,
+          label: driver.name,
+          content: React.createElement("div", { className: "flex flex-col gap-4" },
+            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
+              roundStrats.map((strat, sIdx) => {
+                const isSelected = currentStratId === strat.id;
+                const isDisabled = !weekendProgress.qualifyingComplete || weekendProgress.raceComplete;
+                
+                return React.createElement("div", {
+                  key: strat.id,
+                  onClick: () => {
+                    if (isDisabled) return;
+                    weekendProgress.selectedStrategies[driver.name] = strat.id;
+                    syncGame();
+                    renderWeekend(root);
+                  },
+                  className: `cursor-pointer transition-all p-3 rounded-lg border flex flex-col gap-2 ${
+                    isSelected 
+                      ? "bg-red-900/20 border-red-600 ring-1 ring-red-600" 
+                      : "bg-white/5 border-white/10 hover:bg-white/10"
+                  } ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`
+                },
+                  React.createElement("div", { className: "flex justify-between items-start" },
+                    React.createElement("span", { className: "font-bold text-sm" }, strat.label),
+                    isSelected && React.createElement("span", { className: "text-[10px] bg-red-600 px-1.5 py-0.5 rounded uppercase font-bold" }, "Selected")
+                  ),
+                  React.createElement("div", { className: "flex gap-2 text-[10px] text-gray-400" },
+                    React.createElement("span", null, `Rank ${strat.rank}`),
+                    React.createElement("span", null, `•`),
+                    React.createElement("span", null, `Win +${(strat.winModifier * 100).toFixed(0)}%`),
+                    React.createElement("span", null, `•`),
+                    React.createElement("span", null, `Risk ${(strat.riskModifier * 100).toFixed(0)}%`)
+                  )
+                );
+              })
+            )
+          )
+        };
+      });
+
+      reactRoot.render(
+        React.createElement("div", { className: "mt-6 mb-4" },
+          React.createElement("p", { className: "text-xs uppercase tracking-widest text-red-500 font-bold mb-2" }, "Pit Wall Strategy"),
+          React.createElement(AnimatedTabs, { 
+            tabs: driverTabs,
+            className: "max-w-full"
+          })
+        )
+      );
+    }
+  }
 
   wireHubNav(root, {
     navDashboard: () => renderDashboard(root),
@@ -342,14 +387,7 @@ export function renderWeekend(root, flashMessage = "") {
   const continueNextRound = root.querySelector("#continueNextRound");
   const continueHint = root.querySelector(".weekend-continue-hint");
 
-  root.querySelectorAll("[data-driver-strat]").forEach(select => {
-    select.onchange = async () => {
-      const driverName = select.dataset.driverStrat;
-      weekendProgress.selectedStrategies[driverName] = select.value;
-      await syncGame();
-      renderWeekend(root);
-    };
-  });
+  // Removed old event listener for [data-driver-strat] as we use React now
 
   const advanceRound = async () => {
     if (!weekendProgress.raceComplete) return;
