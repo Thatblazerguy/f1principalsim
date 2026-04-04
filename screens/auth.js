@@ -5,23 +5,43 @@ import { hydrateState } from "../state.js";
 
 // Session check up front
 export async function checkAuthAndRoute(root) {
-  const { session } = await getCurrentUserSession();
-  if (session) {
-    const { data } = await loadUserGameState();
-    if (data && data.game_data) {
-      hydrateState(data.game_data);
-      // check if it successfully restored the team object natively
-      import("../state.js").then(({ state }) => {
+  console.log("DEBUG: checkAuthAndRoute called.");
+  try {
+    const { session, error: sessionError } = await getCurrentUserSession();
+    if (sessionError) {
+      console.error("DEBUG: sessionError:", sessionError);
+    }
+    
+    if (session) {
+      console.log("DEBUG: Session found, loading game state...");
+      const { data, error: loadError } = await loadUserGameState();
+      if (loadError) {
+        console.error("DEBUG: loadError:", loadError);
+      }
+      
+      if (data && data.game_data) {
+        console.log("DEBUG: Game data found, hydrating state...");
+        hydrateState(data.game_data);
+        // check if it successfully restored the team object natively
+        const { state } = await import("../state.js");
         if (state.team) {
+          console.log("DEBUG: Team state restored, rendering dashboard.");
           renderDashboard(root);
         } else {
+          console.log("DEBUG: Team state NOT restored, rendering setup.");
           renderSetup(root);
         }
-      });
-      return;
+        return;
+      }
+      console.log("DEBUG: No game data found, rendering setup.");
+      renderSetup(root);
+    } else {
+      console.log("DEBUG: No session found, rendering auth.");
+      renderAuth(root);
     }
-    renderSetup(root);
-  } else {
+  } catch (err) {
+    console.error("DEBUG: Error in checkAuthAndRoute:", err);
+    // Even on error, try to show the auth screen so the user isn't stuck
     renderAuth(root);
   }
 }
@@ -122,8 +142,8 @@ export function renderAuth(root) {
     submitAuth.disabled = true;
     submitAuth.textContent = 'Authenticating...';
 
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+    const email = root.querySelector('#email').value;
+    const password = root.querySelector('#password').value;
     
     try {
       if (mode === 'login') {
@@ -143,7 +163,7 @@ export function renderAuth(root) {
           renderSetup(root);
         }
       } else {
-        const username = document.getElementById('username').value || 'Principal';
+        const username = root.querySelector('#username').value || 'Principal';
         const { error } = await signUpUser(email, password, username);
         if (error) throw error;
         renderSetup(root); // Advance to setup safely on fresh register

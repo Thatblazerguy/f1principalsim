@@ -2,7 +2,7 @@ import { checkAuthAndRoute } from "./auth.js";
 
 export function renderLanding(root) {
   root.innerHTML = `
-    <section class="landing-shell">
+    <section class="landing-shell animation-fade-in">
       <div class="landing-backdrop" aria-hidden="true">
         <div class="landing-noise"></div>
         <div class="landing-orb landing-orb-left"></div>
@@ -27,7 +27,7 @@ export function renderLanding(root) {
         </div>
 
         <div class="landing-actions">
-          <button id="start" class="landing-primary">
+          <button id="startLandingBtn" class="landing-primary">
             <span>Start Your Team</span>
             <span class="landing-arrow" aria-hidden="true">→</span>
           </button>
@@ -51,8 +51,17 @@ export function renderLanding(root) {
       </div>
     </section>
   `;
-  const startBtn = root.querySelector("#start");
+
+  // Use a more specific ID and add an event listener with logging
+  const startBtn = root.querySelector("#startLandingBtn");
   if (startBtn) {
-    startBtn.onclick = () => checkAuthAndRoute(root);
+    console.log("DEBUG: Landing button found, attaching listener.");
+    startBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      console.log("DEBUG: Landing button clicked, routing to auth/setup.");
+      checkAuthAndRoute(root);
+    });
+  } else {
+    console.error("DEBUG: Landing button NOT found in root.");
   }
 }
