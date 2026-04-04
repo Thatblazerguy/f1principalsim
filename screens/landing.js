@@ -51,5 +51,8 @@ export function renderLanding(root) {
       </div>
     </section>
   `;
-  document.getElementById("start").onclick = () => checkAuthAndRoute(root);
+  const startBtn = root.querySelector("#start");
+  if (startBtn) {
+    startBtn.onclick = () => checkAuthAndRoute(root);
+  }
 }

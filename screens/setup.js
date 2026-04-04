@@ -233,20 +233,20 @@ export function renderSetup(root) {
     </section>
   `;
 
-  const list = document.getElementById("drivers");
-  const teamNameInput = document.getElementById("teamName");
-  const budgetSelect = document.getElementById("budget");
-  const seasonLengthSelect = document.getElementById("seasonLength");
-  const confirmBtn = document.getElementById("confirm");
-  const driverCount = document.getElementById("driverCount");
-  const budgetRemaining = document.getElementById("budgetRemaining");
-  const setupError = document.getElementById("setupError");
-  const originTier = document.getElementById("originTier");
-  const originPreview = document.getElementById("originPreview");
-  const teamOriginsGrid = document.getElementById("teamOrigins");
-  const enginePrice = document.getElementById("enginePrice");
-  const enginePreview = document.getElementById("enginePreview");
-  const engineProvidersGrid = document.getElementById("engineProviders");
+  const list = root.querySelector("#drivers");
+  const teamNameInput = root.querySelector("#teamName");
+  const budgetSelect = root.querySelector("#budget");
+  const seasonLengthSelect = root.querySelector("#seasonLength");
+  const confirmBtn = root.querySelector("#confirm");
+  const driverCount = root.querySelector("#driverCount");
+  const budgetRemaining = root.querySelector("#budgetRemaining");
+  const setupError = root.querySelector("#setupError");
+  const originTier = root.querySelector("#originTier");
+  const originPreview = root.querySelector("#originPreview");
+  const teamOriginsGrid = root.querySelector("#teamOrigins");
+  const enginePrice = root.querySelector("#enginePrice");
+  const enginePreview = root.querySelector("#enginePreview");
+  const engineProvidersGrid = root.querySelector("#engineProviders");
 
   let selectedTier = defaultTier;
   let selectedEngine = defaultEngine;

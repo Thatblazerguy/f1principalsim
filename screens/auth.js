@@ -84,12 +84,12 @@ export function renderAuth(root) {
 
   let mode = 'login'; // 'login' or 'register'
   
-  const tabLogin = document.getElementById('tabLogin');
-  const tabRegister = document.getElementById('tabRegister');
-  const usernameField = document.getElementById('usernameField');
-  const submitAuth = document.getElementById('submitAuth');
-  const authError = document.getElementById('authError');
-  const authForm = document.getElementById('authForm');
+  const tabLogin = root.querySelector('#tabLogin');
+  const tabRegister = root.querySelector('#tabRegister');
+  const usernameField = root.querySelector('#usernameField');
+  const submitAuth = root.querySelector('#submitAuth');
+  const authError = root.querySelector('#authError');
+  const authForm = root.querySelector('#authForm');
 
   function setMode(newMode) {
     mode = newMode;
