@@ -2,11 +2,19 @@ import { SPONSOR_SLOTS, sponsors } from "../data/sponsors.js";
 
 /**
  * Rotates the current season's sponsor offers.
- * Generates 3 random offers from the database.
+ * Generates 3 random offers for EACH placement slot from the database.
  */
 export function rotateSponsorOffers(appState) {
-  const shuffled = [...sponsors].sort(() => 0.5 - Math.random());
-  appState.sponsorOffers = shuffled.slice(0, 3);
+  const allSlots = ["Title", "Kit", "Sidepod", "Rear Wing", "Halo"];
+  let seasonalOffers = [];
+
+  allSlots.forEach(slotType => {
+    const slotPool = sponsors.filter(s => s.slot === slotType);
+    const shuffled = [...slotPool].sort(() => 0.5 - Math.random());
+    seasonalOffers = seasonalOffers.concat(shuffled.slice(0, 3));
+  });
+
+  appState.sponsorOffers = seasonalOffers;
 }
 
 /**
