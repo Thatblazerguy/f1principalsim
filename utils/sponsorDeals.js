@@ -1,4 +1,13 @@
-import { SPONSOR_SLOTS } from "../data/sponsors.js";
+import { SPONSOR_SLOTS, sponsors } from "../data/sponsors.js";
+
+/**
+ * Rotates the current season's sponsor offers.
+ * Generates 3 random offers from the database.
+ */
+export function rotateSponsorOffers(appState) {
+  const shuffled = [...sponsors].sort(() => 0.5 - Math.random());
+  appState.sponsorOffers = shuffled.slice(0, 3);
+}
 
 /**
  * Normalize per-slot sponsor map and migrate legacy single `team.sponsor` to title slot.
@@ -23,7 +32,7 @@ export function getTotalSponsorRaceBonus(team) {
   let sum = 0;
   for (const slot of SPONSOR_SLOTS) {
     const s = team.sponsorSlots[slot.key];
-    if (s && typeof s.raceBonus === "number") sum += s.raceBonus;
+    if (s && typeof s.fee === "number") sum += s.fee;
   }
   return sum;
 }
@@ -59,7 +68,7 @@ export function assignSponsorToSlot(team, slotKey, sponsorId, sponsorsList, appS
 
   let signingBonusPaid = 0;
   if (!appState.signedSponsors[sponsor.id]) {
-    signingBonusPaid = sponsor.signingBonus;
+    signingBonusPaid = sponsor.bonus;
     team.budget += signingBonusPaid;
     appState.signedSponsors[sponsor.id] = true;
   }

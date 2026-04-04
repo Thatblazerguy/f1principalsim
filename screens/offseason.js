@@ -11,6 +11,7 @@ import { renderLeaderboard } from "./leaderboard.js";
 import { renderTeams } from "./teams.js";
 import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState, getTeamRoster, getActiveDrivers, setTeamActiveDrivers } from "../utils/teamState.js";
+import { rotateSponsorOffers } from "../utils/sponsorDeals.js";
 import { syncGame } from "../lib/supabaseApi.js";
 
 function removeDriverFromTeam(team, driverName) {
@@ -161,7 +162,7 @@ function getOffseasonCandidates() {
     .sort((a, b) => b.market - a.market || b.pace - a.pace);
 }
 
-async function startNextSeason(root) {
+async function startNextSeason(root, keepSponsors = true) {
   ensureTeamState(state.team);
   const roster = getTeamRoster(state.team);
   if (roster.length < 2) {
@@ -173,6 +174,15 @@ async function startNextSeason(root) {
   if (active.length < 2) {
     setTeamActiveDrivers(state.team, roster.slice(0, 2).map(driver => driver.name));
   }
+
+  // Handle sponsor decision
+  if (!keepSponsors) {
+    state.team.sponsorSlots = {}; // Clear all active sponsors
+    state.team.sponsor = null;
+  }
+  
+  // Rotate offers for the new season
+  rotateSponsorOffers(state);
 
   // Infinite season loop: increment year and reset round
   state.season = {
@@ -230,6 +240,18 @@ export function renderOffseason(root, flashMessage = "") {
       <div class="glass dashboard-feature-panel">
         <div>
           <p class="dashboard-eyebrow">Next Step</p>
+          <h3>Sponsor Commitment</h3>
+          <p class="dashboard-subtitle">Would you like to continue with your current sponsors for the next season, or clear your roster to sign new ones?</p>
+        </div>
+        <div class="dashboard-feature-actions">
+          <button id="keepSponsors">Keep Current Sponsors</button>
+          <button id="newSponsors">Clear & New Sponsors</button>
+        </div>
+      </div>
+
+      <div class="glass dashboard-feature-panel">
+        <div>
+          <p class="dashboard-eyebrow">Next Step</p>
           <h3>Continue Or Reshape</h3>
           <p class="dashboard-subtitle">You can keep the current lineup, release drivers, sign replacements, and then start the next season when ready.</p>
         </div>
@@ -268,11 +290,36 @@ export function renderOffseason(root, flashMessage = "") {
     navSponsors: () => renderSponsors(root),
     navMarket: () => renderMarket(root),
     navCalendar: () => renderCalendar(root),
-    navStandings: () => renderLeaderboard(root),
+  navStandings: () => renderLeaderboard(root),
   });
 
-  document.getElementById("keepLineup").onclick = () => startNextSeason(root);
-  document.getElementById("startSeason").onclick = () => startNextSeason(root);
+  let sponsorDecision = true; // Default to keeping sponsors
+
+  const updateDecisionUI = () => {
+    const keepBtn = document.getElementById("keepSponsors");
+    const newBtn = document.getElementById("newSponsors");
+    if (sponsorDecision) {
+      keepBtn.style.background = "linear-gradient(90deg, #e10600, #b00500)";
+      newBtn.style.background = "rgba(255,255,255,0.05)";
+    } else {
+      newBtn.style.background = "linear-gradient(90deg, #e10600, #b00500)";
+      keepBtn.style.background = "rgba(255,255,255,0.05)";
+    }
+  };
+
+  document.getElementById("keepSponsors").onclick = () => {
+    sponsorDecision = true;
+    updateDecisionUI();
+  };
+  document.getElementById("newSponsors").onclick = () => {
+    sponsorDecision = false;
+    updateDecisionUI();
+  };
+
+  updateDecisionUI();
+
+  document.getElementById("keepLineup").onclick = () => startNextSeason(root, sponsorDecision);
+  document.getElementById("startSeason").onclick = () => startNextSeason(root, sponsorDecision);
 
   root.querySelectorAll("[data-offseason-release]").forEach(button => {
     button.addEventListener("click", async event => {

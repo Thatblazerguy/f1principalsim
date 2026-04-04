@@ -9,6 +9,8 @@ export const state = {
   standings: { drivers: {}, teams: {} },
   bestFinishes: {},
   signedSponsors: {},
+  /** Current season's sponsor offers (max 3) */
+  sponsorOffers: [],
   /** Per-round weekend flow: qualifying must run before race. */
   weekendProgress: null
 };
@@ -62,6 +64,7 @@ export function hydrateState(payload) {
     state.standings = rawData.standings || { drivers: {}, teams: {} };
     state.bestFinishes = rawData.bestFinishes || {};
     state.signedSponsors = rawData.signedSponsors || {};
+    state.sponsorOffers = rawData.sponsorOffers || [];
     state.weekendProgress = rawData.weekendProgress || null;
 
     return true;

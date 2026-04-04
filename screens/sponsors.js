@@ -18,12 +18,15 @@ import {
 } from "../utils/sponsorDeals.js";
 import { syncGame } from "../lib/supabaseApi.js";
 
+import { rotateSponsorOffers } from "../utils/sponsorDeals.js";
+
 function buildSlotSelect(slotKey, currentId) {
+  const currentOffers = state.sponsorOffers || [];
   const options = [
     `<option value="">— Vacant —</option>`,
-    ...sponsors.map(
+    ...currentOffers.map(
       (s) =>
-        `<option value="${s.id}" ${currentId === s.id ? "selected" : ""}>${s.name} · +$${s.raceBonus}M/race</option>`
+        `<option value="${s.id}" ${currentId === s.id ? "selected" : ""}>${s.name} (${s.slot}) · +$${s.fee}M/race</option>`
     ),
   ];
   return `
@@ -52,6 +55,10 @@ export function renderSponsors(root, flashMessage = "") {
       </section>
     `;
     return;
+  }
+
+  if (state.sponsorOffers.length === 0) {
+    rotateSponsorOffers(state);
   }
 
   ensureSponsorSlots(state.team);
@@ -107,29 +114,29 @@ export function renderSponsors(root, flashMessage = "") {
         </div>
       </div>
 
-      <h3 class="sponsor-catalog-heading">Partner roster</h3>
-      <p class="dashboard-subtitle">Commercial packages you can assign to any slot above.</p>
+      <h3 class="sponsor-catalog-heading">Seasonal Offers</h3>
+      <p class="dashboard-subtitle">The board has presented these 3 commercial offers for this season. You can assign them to any compatible slot above.</p>
       <div class="market-grid">
-        ${sponsors
+        ${state.sponsorOffers
           .map(
             (sponsor) => `
               <article class="market-driver-card sponsor-catalog-card">
                 <div class="market-driver-card-top">
                   <div>
-                    <p class="menu-card-kicker">${sponsor.category}</p>
+                    <p class="menu-card-kicker">${sponsor.slot} Slot · ${sponsor.industry}</p>
                     <h3>${sponsor.name}</h3>
-                    <p class="detail-card-meta">${sponsor.description}</p>
+                    <p class="detail-card-meta">${sponsor.perk}</p>
                   </div>
                   <span class="detail-badge">${state.signedSponsors[sponsor.id] ? "Signed before" : "New brand"}</span>
                 </div>
                 <div class="detail-card-stats">
                   <div class="driver-detail-stat">
                     <span>Signing bonus (first time)</span>
-                    <strong>$${sponsor.signingBonus}M</strong>
+                    <strong>$${sponsor.bonus}M</strong>
                   </div>
                   <div class="driver-detail-stat">
                     <span>Per race (per slot)</span>
-                    <strong>$${sponsor.raceBonus}M</strong>
+                    <strong>$${sponsor.fee}M</strong>
                   </div>
                 </div>
               </article>
@@ -160,7 +167,7 @@ export function renderSponsors(root, flashMessage = "") {
         state.team,
         slotKey,
         sponsorId,
-        sponsors,
+        state.sponsorOffers,
         state
       );
 
@@ -168,10 +175,10 @@ export function renderSponsors(root, flashMessage = "") {
       if (cleared) {
         msg = `${SPONSOR_SLOTS.find((s) => s.key === slotKey)?.label || slotKey} cleared.`;
       } else if (signingBonusPaid > 0) {
-        const sp = sponsors.find((s) => s.id === sponsorId);
+        const sp = state.sponsorOffers.find((s) => s.id === sponsorId);
         msg = `${sp.name} added to ${SPONSOR_SLOTS.find((s) => s.key === slotKey)?.label || slotKey}. Signing bonus: $${signingBonusPaid}M.`;
       } else {
-        const sp = sponsors.find((s) => s.id === sponsorId);
+        const sp = state.sponsorOffers.find((s) => s.id === sponsorId);
         msg = `${sp.name} assigned to ${SPONSOR_SLOTS.find((s) => s.key === slotKey)?.label || slotKey}. (Signing bonus already paid for this brand.)`;
       }
 
