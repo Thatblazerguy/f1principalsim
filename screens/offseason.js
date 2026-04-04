@@ -232,13 +232,13 @@ async function startNextSeason(root, keepSponsors = true) {
       const stats = ["pace", "quali", "racecraft", "tyre", "wet", "consistency"];
       stats.forEach(s => {
         if (typeof d[s] === "number") {
-          d[s] = Math.min(99, Math.max(40, d[s] + ratingChange));
+          d[s] = parseFloat(Math.min(99, Math.max(40, d[s] + ratingChange)).toFixed(1));
         }
       });
       
       // Update market value based on performance
       if (typeof d.market === "number") {
-        d.market = Math.min(99, Math.max(10, d.market + ratingChange * 2));
+        d.market = parseFloat(Math.min(99, Math.max(10, d.market + ratingChange * 2)).toFixed(1));
       }
     });
   });

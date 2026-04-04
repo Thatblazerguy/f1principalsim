@@ -73,13 +73,13 @@ function buildDriverCard(driver, role, isActive) {
       </div>
 
       <div class="detail-card-stats">
-        ${buildStat("Pace", driver.pace)}
-        ${buildStat("Quali", driver.quali)}
-        ${buildStat("Racecraft", driver.racecraft)}
-        ${buildStat("Tyre Mgmt", driver.tyre)}
-        ${buildStat("Wet Weather", driver.wet)}
-        ${buildStat("Consistency", driver.consistency)}
-        ${buildStat("Market Value", driver.market)}
+        ${buildStat("Pace", (driver.pace || 0).toFixed(1))}
+        ${buildStat("Quali", (driver.quali || 0).toFixed(1))}
+        ${buildStat("Racecraft", (driver.racecraft || 0).toFixed(1))}
+        ${buildStat("Tyre Mgmt", (driver.tyre || 0).toFixed(1))}
+        ${buildStat("Wet Weather", (driver.wet || 0).toFixed(1))}
+        ${buildStat("Consistency", (driver.consistency || 0).toFixed(1))}
+        ${buildStat("Market Value", (driver.market || 0).toFixed(1))}
         ${buildStat("Salary", `$${driver.salary}M`)}
       </div>
 

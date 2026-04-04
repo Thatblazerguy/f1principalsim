@@ -85,10 +85,10 @@ export function renderMarket(root = document.getElementById("app")) {
                 </div>
 
                 <div class="market-driver-stats">
-                  <span>Pace ${d.pace}</span>
-                  <span>Quali ${d.quali}</span>
-                  <span>Racecraft ${d.racecraft}</span>
-                  <span>Consistency ${d.consistency}</span>
+                  <span>Pace ${(d.pace || 0).toFixed(1)}</span>
+                  <span>Quali ${(d.quali || 0).toFixed(1)}</span>
+                  <span>Racecraft ${(d.racecraft || 0).toFixed(1)}</span>
+                  <span>Consistency ${(d.consistency || 0).toFixed(1)}</span>
                 </div>
 
                 <button
