@@ -184,6 +184,64 @@ async function startNextSeason(root, keepSponsors = true) {
   // Rotate offers for the new season
   rotateSponsorOffers(state);
 
+  // --- New: Driver Progression and AI Team Growth ---
+  const driverStandings = Object.entries(state.standings.drivers || {})
+    .sort(([, a], [, b]) => b - a);
+  
+  const totalDrivers = driverStandings.length;
+
+  // Process all drivers in the game (Player team + AI teams)
+  const allTeams = [state.team, ...(state.aiTeams || [])];
+  
+  allTeams.forEach(t => {
+    // 1. Team Growth (AI teams grow car performance slightly more)
+    if (t !== state.team) {
+      // AI growth: 3-6 points of car performance per season
+      const aiGrowth = 3 + Math.random() * 3;
+      t.carPerformance += aiGrowth;
+      // Also slightly upgrade specific car parts for visual consistency
+      const parts = ["aero", "engine", "chassis", "reliability"];
+      parts.forEach(p => {
+        if (t.car && t.car[p]) t.car[p] += Math.floor(Math.random() * 2);
+      });
+    }
+
+    // 2. Driver Aging and Progression
+    const teamDrivers = [...t.drivers, ...(t.reserveDriver ? [t.reserveDriver] : [])];
+    teamDrivers.forEach(d => {
+      // Age every driver by 1
+      if (typeof d.age === "number") d.age += 1;
+
+      // Progression based on standings
+      const rankIndex = driverStandings.findIndex(([name]) => name === d.name);
+      let ratingChange = 0;
+
+      if (rankIndex !== -1) {
+        const percentile = (totalDrivers - rankIndex) / totalDrivers;
+        if (percentile > 0.8) ratingChange = 1 + Math.random(); // Top 20%: +1 to +2
+        else if (percentile > 0.5) ratingChange = 0.5 + Math.random() * 0.5; // Top 50%: +0.5 to +1
+        else if (percentile < 0.2) ratingChange = -1 - Math.random(); // Bottom 20%: -1 to -2
+        else ratingChange = Math.random() * 0.5 - 0.25; // Middle: slight drift
+      } else {
+        // Drivers who didn't score or race (reserves): slight decline/stagnation
+        ratingChange = -0.5 + Math.random() * 0.5;
+      }
+
+      // Apply changes to main stats (don't exceed 99 or drop below 40)
+      const stats = ["pace", "quali", "racecraft", "tyre", "wet", "consistency"];
+      stats.forEach(s => {
+        if (typeof d[s] === "number") {
+          d[s] = Math.min(99, Math.max(40, d[s] + ratingChange));
+        }
+      });
+      
+      // Update market value based on performance
+      if (typeof d.market === "number") {
+        d.market = Math.min(99, Math.max(10, d.market + ratingChange * 2));
+      }
+    });
+  });
+
   // Infinite season loop: increment year and reset round
   state.season = {
     round: 1,
