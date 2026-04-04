@@ -265,9 +265,9 @@ export function renderDashboard(root) {
   const wk = root.querySelector("#wk");
   const office = root.querySelector("#office");
   const market = root.querySelector("#market");
-  const teams = root.querySelector("#teams");
-  const calendar = root.querySelector("#calendar");
-  const standings = root.querySelector("#standings");
+  const teamsBtn = root.querySelector("#teams");
+  const calendarBtn = root.querySelector("#calendar");
+  const standingsBtn = root.querySelector("#standings");
   const myDriversCard = root.querySelector("#myDriversCard");
   const featureWeekend = root.querySelector("#featureWeekend");
   const featureUpgrade = root.querySelector("#featureUpgrade");
@@ -287,9 +287,9 @@ export function renderDashboard(root) {
   wk.onclick = () => isSeasonOver ? renderOffseason(root) : renderWeekend(root);
   office.onclick = () => renderOffice(root);
   market.onclick = () => renderMarket(root);
-  teams.onclick = () => renderTeams(root);
-  calendar.onclick = () => renderCalendar(root);
-  standings.onclick = () => renderLeaderboard(root);
+  teamsBtn.onclick = () => renderTeams(root);
+  calendarBtn.onclick = () => renderCalendar(root);
+  standingsBtn.onclick = () => renderLeaderboard(root);
   myDriversCard.onclick = () => renderMyDrivers(root);
   featureWeekend.onclick = () => renderWeekend(root);
   featureUpgrade.onclick = () => renderOffice(root);

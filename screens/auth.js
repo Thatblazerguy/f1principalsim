@@ -1,7 +1,7 @@
 import { renderSetup } from "./setup.js";
 import { renderDashboard } from "./dashboard.js";
 import { signUpUser, loginUser, getCurrentUserSession, loadUserGameState } from "../lib/supabaseApi.js";
-import { hydrateState } from "../state.js";
+import { hydrateState, state } from "../state.js";
 
 // Session check up front
 export async function checkAuthAndRoute(root) {
@@ -23,7 +23,6 @@ export async function checkAuthAndRoute(root) {
         console.log("DEBUG: Game data found, hydrating state...");
         hydrateState(data.game_data);
         // check if it successfully restored the team object natively
-        const { state } = await import("../state.js");
         if (state.team) {
           console.log("DEBUG: Team state restored, rendering dashboard.");
           renderDashboard(root);
@@ -153,7 +152,6 @@ export function renderAuth(root) {
         const { data } = await loadUserGameState();
         if (data && data.game_data) {
           hydrateState(data.game_data);
-          const { state } = await import("../state.js");
           if (state.team) {
             renderDashboard(root);
           } else {

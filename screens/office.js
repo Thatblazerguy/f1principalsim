@@ -54,12 +54,12 @@ function renderUpgradeCard(part) {
 }
 
 function showUpgradeLoading(done) {
-  const l = document.createElement("div");
-  l.className = "loading-screen";
-  l.innerHTML = `<div class="spinner"></div>`;
-  document.body.appendChild(l);
+  const loader = document.createElement("div");
+  loader.className = "loading-screen";
+  loader.innerHTML = `<div class="spinner"></div>`;
+  document.body.appendChild(loader);
   setTimeout(() => {
-    l.remove();
+    loader.remove();
     done();
   }, 900);
 }

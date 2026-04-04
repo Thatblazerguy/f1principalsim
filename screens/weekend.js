@@ -44,11 +44,11 @@ function ensureWeekendProgress(round) {
 }
 
 function showLoading(cb) {
-  const l = document.createElement("div");
-  l.className = "loading-screen";
-  l.innerHTML = `<div class="spinner"></div>`;
-  document.body.appendChild(l);
-  setTimeout(() => { l.remove(); cb(); }, 1500);
+  const loader = document.createElement("div");
+  loader.className = "loading-screen";
+  loader.innerHTML = `<div class="spinner"></div>`;
+  document.body.appendChild(loader);
+  setTimeout(() => { loader.remove(); cb(); }, 1500);
 }
 
 function updateBestFinishes(results) {
