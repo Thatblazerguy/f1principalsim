@@ -403,30 +403,40 @@ export function renderOffseason(root, flashMessage = "") {
   let sponsorDecision = true; // Default to keeping sponsors
 
   const updateDecisionUI = () => {
-    const keepBtn = document.getElementById("keepSponsors");
-    const newBtn = document.getElementById("newSponsors");
+    const keepBtn = root.querySelector("#keepSponsors");
+    const newBtn = root.querySelector("#newSponsors");
     if (sponsorDecision) {
-      keepBtn.style.background = "linear-gradient(90deg, #e10600, #b00500)";
-      newBtn.style.background = "rgba(255,255,255,0.05)";
+      if (keepBtn) keepBtn.style.background = "linear-gradient(90deg, #e10600, #b00500)";
+      if (newBtn) newBtn.style.background = "rgba(255,255,255,0.05)";
     } else {
-      newBtn.style.background = "linear-gradient(90deg, #e10600, #b00500)";
-      keepBtn.style.background = "rgba(255,255,255,0.05)";
+      if (newBtn) newBtn.style.background = "linear-gradient(90deg, #e10600, #b00500)";
+      if (keepBtn) keepBtn.style.background = "rgba(255,255,255,0.05)";
     }
   };
 
-  document.getElementById("keepSponsors").onclick = () => {
-    sponsorDecision = true;
-    updateDecisionUI();
-  };
-  document.getElementById("newSponsors").onclick = () => {
-    sponsorDecision = false;
-    updateDecisionUI();
-  };
+  const keepSponsorsBtn = root.querySelector("#keepSponsors");
+  if (keepSponsorsBtn) {
+    keepSponsorsBtn.onclick = () => {
+      sponsorDecision = true;
+      updateDecisionUI();
+    };
+  }
+
+  const newSponsorsBtn = root.querySelector("#newSponsors");
+  if (newSponsorsBtn) {
+    newSponsorsBtn.onclick = () => {
+      sponsorDecision = false;
+      updateDecisionUI();
+    };
+  }
 
   updateDecisionUI();
 
-  document.getElementById("keepLineup").onclick = () => startNextSeason(root, sponsorDecision);
-  document.getElementById("startSeason").onclick = () => startNextSeason(root, sponsorDecision);
+  const keepLineupBtn = root.querySelector("#keepLineup");
+  if (keepLineupBtn) keepLineupBtn.onclick = () => startNextSeason(root, sponsorDecision);
+  
+  const startSeasonBtn = root.querySelector("#startSeason");
+  if (startSeasonBtn) startSeasonBtn.onclick = () => startNextSeason(root, sponsorDecision);
 
   root.querySelectorAll("[data-offseason-release]").forEach(button => {
     button.addEventListener("click", async event => {

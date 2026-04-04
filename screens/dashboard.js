@@ -262,15 +262,15 @@ export function renderDashboard(root) {
     </div>
   `;
 
-  const wk = document.getElementById("wk");
-  const office = document.getElementById("office");
-  const market = document.getElementById("market");
-  const teams = document.getElementById("teams");
-  const calendar = document.getElementById("calendar");
-  const standings = document.getElementById("standings");
-  const myDriversCard = document.getElementById("myDriversCard");
-  const featureWeekend = document.getElementById("featureWeekend");
-  const featureUpgrade = document.getElementById("featureUpgrade");
+  const wk = root.querySelector("#wk");
+  const office = root.querySelector("#office");
+  const market = root.querySelector("#market");
+  const teams = root.querySelector("#teams");
+  const calendar = root.querySelector("#calendar");
+  const standings = root.querySelector("#standings");
+  const myDriversCard = root.querySelector("#myDriversCard");
+  const featureWeekend = root.querySelector("#featureWeekend");
+  const featureUpgrade = root.querySelector("#featureUpgrade");
 
   wireHubNav(root, {
     navDashboard: () => renderDashboard(root),

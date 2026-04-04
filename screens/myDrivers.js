@@ -189,7 +189,8 @@ export function renderMyDrivers(root, notice = "") {
     navStandings: () => renderLeaderboard(root),
   });
 
-  document.getElementById("backToDashboard").onclick = () => renderDashboard(root);
+  const backToDashboard = root.querySelector("#backToDashboard");
+  if (backToDashboard) backToDashboard.onclick = () => renderDashboard(root);
 
   const slotOneSelect = root.querySelector("#activeSlot1");
   const slotTwoSelect = root.querySelector("#activeSlot2");

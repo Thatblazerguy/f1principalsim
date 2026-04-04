@@ -400,6 +400,18 @@ export function renderWeekend(root, flashMessage = "") {
     return;
   }
 
+  wireHubNav(root, {
+    navDashboard: () => renderDashboard(root),
+    navWeekend: () => renderWeekend(root),
+    navUpgrade: () => renderOffice(root),
+    navDrivers: () => renderMyDrivers(root),
+    navTeams: () => renderTeams(root),
+    navSponsors: () => renderSponsors(root),
+    navMarket: () => renderMarket(root),
+    navCalendar: () => renderCalendar(root),
+    navStandings: () => renderLeaderboard(root),
+  });
+
   const fp = root.querySelector("#fp");
   const quali = root.querySelector("#quali");
   const race = root.querySelector("#race");
@@ -520,16 +532,4 @@ export function renderWeekend(root, flashMessage = "") {
       }
     });
   };
-
-  wireHubNav(root, {
-    navDashboard: () => renderDashboard(root),
-    navWeekend: () => renderWeekend(root),
-    navUpgrade: () => renderOffice(root),
-    navDrivers: () => renderMyDrivers(root),
-    navTeams: () => renderTeams(root),
-    navSponsors: () => renderSponsors(root),
-    navMarket: () => renderMarket(root),
-    navCalendar: () => renderCalendar(root),
-    navStandings: () => renderLeaderboard(root),
-  });
 }
