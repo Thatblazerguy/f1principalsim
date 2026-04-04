@@ -1,3 +1,4 @@
+import { renderOffseason } from "./offseason.js";
 import { renderWeekend } from "./weekend.js";
 import { renderCalendar } from "./calendar.js";
 import { renderMarket } from "./market.js";
@@ -85,16 +86,26 @@ function refreshMyDriversCard() {
 
 export function renderDashboard(root) {
   ensureTeamState(state.team);
+  const totalRounds = Math.min(state.season.totalRounds || 24, 24);
+  const isSeasonOver = state.season.round > totalRounds || (state.weekendProgress?.raceComplete && state.season.round === totalRounds);
+
   root.innerHTML = `
     ${buildHubNav("dashboard")}
     <div class="dashboard-shell">
       <div class="dashboard-header glass">
-        <div>
-          <p class="dashboard-eyebrow">Team Command Center</p>
-          <h2>${state.team.name}</h2>
-          <p class="dashboard-subtitle">
-            Direct your race weekends, engineering progress, and team operations from one place.
-          </p>
+        <div class="flex justify-between items-start w-full">
+          <div>
+            <p class="dashboard-eyebrow">Team Command Center • Season ${state.season.year}</p>
+            <h2>${state.team.name}</h2>
+            <p class="dashboard-subtitle">
+              Direct your race weekends, engineering progress, and team operations from one place.
+            </p>
+          </div>
+          ${isSeasonOver ? `
+            <div class="season-complete-pill bg-red-600/20 border border-red-600 px-4 py-2 rounded-xl animate-pulse">
+              <span class="text-xs font-black uppercase tracking-tighter text-red-500">Season Complete</span>
+            </div>
+          ` : ""}
         </div>
         <div class="dashboard-overview">
           <div class="dashboard-overview-item">
@@ -132,9 +143,9 @@ export function renderDashboard(root) {
           </span>
           <div class="menu-card-content glass tile">
             <p class="menu-card-kicker">Weekend</p>
-            <h3>Next Race</h3>
-            <p>Jump straight into the next Grand Prix weekend and move the season forward.</p>
-            <button id="wk">Race Weekend</button>
+            <h3>${isSeasonOver ? "Season Complete" : "Next Race"}</h3>
+            <p>${isSeasonOver ? "Review your performance and prepare for the next year." : "Jump straight into the next Grand Prix weekend and move the season forward."}</p>
+            <button id="wk">${isSeasonOver ? "Open Offseason" : "Race Weekend"}</button>
           </div>
         </div>
 
@@ -270,7 +281,7 @@ export function renderDashboard(root) {
     navStandings: () => renderLeaderboard(root),
   });
 
-  wk.onclick = () => renderWeekend(root);
+  wk.onclick = () => isSeasonOver ? renderOffseason(root) : renderWeekend(root);
   office.onclick = () => renderOffice(root);
   market.onclick = () => renderMarket(root);
   teams.onclick = () => renderTeams(root);

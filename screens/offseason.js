@@ -174,13 +174,20 @@ async function startNextSeason(root) {
     setTeamActiveDrivers(state.team, roster.slice(0, 2).map(driver => driver.name));
   }
 
+  // Infinite season loop: increment year and reset round
   state.season = {
     round: 1,
     year: (state.season.year || 1) + 1,
     totalRounds: state.season.totalRounds || 24,
   };
+  
+  // Reset weekend progress for the new season
+  state.weekendProgress = null;
+  
+  // Clear seasonal data while keeping career stats (if any were separate)
   state.standings = { drivers: {}, teams: {} };
   state.bestFinishes = {};
+  
   await syncGame();
   renderDashboard(root);
 }
