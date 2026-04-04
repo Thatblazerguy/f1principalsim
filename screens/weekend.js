@@ -318,22 +318,32 @@ export function renderWeekend(root, flashMessage = "") {
                     syncGame();
                     renderWeekend(root);
                   },
-                  className: `cursor-pointer transition-all p-3 rounded-lg border flex flex-col gap-2 ${
+                  className: `cursor-pointer transition-all p-4 rounded-xl border-2 flex flex-col gap-3 group ${
                     isSelected 
-                      ? "bg-red-900/20 border-red-600 ring-1 ring-red-600" 
-                      : "bg-white/5 border-white/10 hover:bg-white/10"
+                      ? "bg-red-600/20 border-red-600 shadow-[0_0_15px_rgba(225,6,0,0.3)]" 
+                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
                   } ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`
                 },
-                  React.createElement("div", { className: "flex justify-between items-start" },
-                    React.createElement("span", { className: "font-bold text-sm" }, strat.label),
-                    isSelected && React.createElement("span", { className: "text-[10px] bg-red-600 px-1.5 py-0.5 rounded uppercase font-bold" }, "Selected")
+                  React.createElement("div", { className: "flex justify-between items-center" },
+                    React.createElement("span", { className: `font-bold text-base ${isSelected ? "text-white" : "text-gray-200"}` }, strat.label),
+                    isSelected && React.createElement("div", { className: "flex items-center gap-1.5" },
+                      React.createElement("span", { className: "w-2 h-2 rounded-full bg-red-600 animate-pulse" }),
+                      React.createElement("span", { className: "text-[10px] text-red-500 uppercase font-black tracking-tighter" }, "Selected")
+                    )
                   ),
-                  React.createElement("div", { className: "flex gap-2 text-[10px] text-gray-400" },
-                    React.createElement("span", null, `Rank ${strat.rank}`),
-                    React.createElement("span", null, `•`),
-                    React.createElement("span", null, `Win +${(strat.winModifier * 100).toFixed(0)}%`),
-                    React.createElement("span", null, `•`),
-                    React.createElement("span", null, `Risk ${(strat.riskModifier * 100).toFixed(0)}%`)
+                  React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+                    React.createElement("div", { className: "flex flex-col" },
+                      React.createElement("span", { className: "text-[9px] text-gray-500 uppercase font-bold" }, "Rank"),
+                      React.createElement("span", { className: "text-sm font-mono text-white" }, strat.rank)
+                    ),
+                    React.createElement("div", { className: "flex flex-col" },
+                      React.createElement("span", { className: "text-[9px] text-gray-500 uppercase font-bold" }, "Win Bonus"),
+                      React.createElement("span", { className: "text-sm font-mono text-green-400" }, `+${(strat.winModifier * 100).toFixed(0)}%`)
+                    ),
+                    React.createElement("div", { className: "flex flex-col" },
+                      React.createElement("span", { className: "text-[9px] text-gray-500 uppercase font-bold" }, "Risk Level"),
+                      React.createElement("span", { className: "text-sm font-mono text-orange-400" }, `${(strat.riskModifier * 100).toFixed(0)}%`)
+                    )
                   )
                 );
               })

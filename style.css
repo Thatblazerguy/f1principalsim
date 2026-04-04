@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --f1-red: #e10600;
   --f1-red-soft: #ff3b30;

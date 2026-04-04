@@ -79,8 +79,10 @@ export function simulateRaceEvent(teams, track, laps, qualifyingGrid = null, pla
       let retired = false;
       const plannedPitLap = Math.floor(laps * (0.45 + Math.random() * 0.2));
 
+      // Risk implementation: high risk increases lap variance (errors) and adds a chance for major incidents
       const riskTriggered = Math.random() < riskMod;
-      const riskPenaltyApplied = riskTriggered ? (Math.random() < 0.4 ? "DNF" : "+40s") : false;
+      const riskPenaltyApplied = riskTriggered ? (Math.random() < 0.35 ? "DNF" : "+40s") : false;
+      const riskVarianceMultiplier = 1 + (riskMod * 2.5); // 10% risk = 25% more variance
 
       if (riskPenaltyApplied === "DNF") {
          retired = true;
@@ -89,12 +91,17 @@ export function simulateRaceEvent(teams, track, laps, qualifyingGrid = null, pla
 
       for (let lap = 1; lap <= laps; lap++) {
         if (retired) break;
-        if (Math.random() < Math.max(0.0005, driver.errorChance() * 0.012 + getRetirementModifier(team))) {
+        
+        // Base retirement chance + driver error chance + team reliability
+        const baseRetirementChance = Math.max(0.0005, driver.errorChance() * 0.012 + getRetirementModifier(team));
+        if (Math.random() < baseRetirementChance) {
           retired = true;
           break;
         }
 
-        totalTime += adjustedBaseLap + lapVariance(driver, track, isWet);
+        // Apply increased variance for high-risk strategies
+        const lapVar = lapVariance(driver, track, isWet) * riskVarianceMultiplier;
+        totalTime += adjustedBaseLap + lapVar;
 
         if (lap === plannedPitLap) {
           totalTime += pitStopLoss(driver, lap, laps);
