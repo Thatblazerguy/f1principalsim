@@ -154,11 +154,12 @@ function buildCandidateCard(driver) {
 function getOffseasonCandidates() {
   const playerDrivers = new Set(getTeamRoster(state.team).map(driver => driver.name));
   const aiDrivers = state.aiTeams.flatMap(team => team.drivers);
-  const freeDrivers = drivers.filter(driver => (driver.category === "FREE" || driver.category === "F2") && !playerDrivers.has(driver.name));
+  
+  // Show ALL drivers in the game that are not in the player's team
+  const allAvailableDrivers = drivers.filter(driver => !playerDrivers.has(driver.name));
 
-  return [...aiDrivers, ...freeDrivers]
+  return [...aiDrivers, ...allAvailableDrivers]
     .filter((driver, index, array) => array.findIndex(entry => entry.name === driver.name) === index)
-    .filter(driver => !playerDrivers.has(driver.name))
     .sort((a, b) => b.market - a.market || b.pace - a.pace);
 }
 

@@ -12,8 +12,19 @@ import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
 
-function hasDriverSigned(team, name) {
-  return team.drivers.some(driver => driver.name === name) || team.reserveDriver?.name === name;
+function isDriverEmployed(name) {
+  // Check player team
+  if (state.team.drivers.some(d => d.name === name)) return true;
+  if (state.team.reserveDriver?.name === name) return true;
+
+  // Check AI teams
+  if (state.aiTeams) {
+    for (const aiTeam of state.aiTeams) {
+      if (aiTeam.drivers.some(d => d.name === name)) return true;
+      if (aiTeam.reserveDriver?.name === name) return true;
+    }
+  }
+  return false;
 }
 
 export function renderMarket(root = document.getElementById("app")) {
@@ -60,7 +71,7 @@ export function renderMarket(root = document.getElementById("app")) {
 
       <div class="market-grid">
         ${drivers
-          .filter(d => d.category !== "F1")
+          .filter(d => !isDriverEmployed(d.name))
           .map(
             d => `
               <article class="market-driver-card">
@@ -83,12 +94,10 @@ export function renderMarket(root = document.getElementById("app")) {
                 <button
                   data-sign="${d.name}"
                   class="market-sign-button"
-                  ${hasDriverSigned(state.team, d.name) || state.team.reserveDriver ? "disabled" : ""}
+                  ${state.team.reserveDriver ? "disabled" : ""}
                 >
                   ${
-                    hasDriverSigned(state.team, d.name)
-                      ? "Already Signed"
-                      : state.team.reserveDriver
+                    state.team.reserveDriver
                         ? "Reserve Seat Full"
                         : "Sign As Reserve"
                   }
@@ -116,7 +125,7 @@ export function renderMarket(root = document.getElementById("app")) {
   root.querySelectorAll("[data-sign]").forEach(button => {
     button.onclick = async () => {
       const d = drivers.find(x => x.name === button.dataset.sign);
-      if (!d || hasDriverSigned(state.team, d.name)) {
+      if (!d || isDriverEmployed(d.name)) {
         renderMarket(root);
         return;
       }

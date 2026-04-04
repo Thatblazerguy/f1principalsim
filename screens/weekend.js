@@ -384,6 +384,18 @@ export function renderWeekend(root, flashMessage = "") {
         </div>
       `;
       document.getElementById("openOffseason").onclick = () => renderOffseason(root);
+
+      wireHubNav(root, {
+        navDashboard: () => renderDashboard(root),
+        navWeekend: () => renderWeekend(root),
+        navUpgrade: () => renderOffice(root),
+        navDrivers: () => renderMyDrivers(root),
+        navTeams: () => renderTeams(root),
+        navSponsors: () => renderSponsors(root),
+        navMarket: () => renderMarket(root),
+        navCalendar: () => renderCalendar(root),
+        navStandings: () => renderLeaderboard(root),
+      });
     }
     return;
   }
@@ -508,4 +520,16 @@ export function renderWeekend(root, flashMessage = "") {
       }
     });
   };
+
+  wireHubNav(root, {
+    navDashboard: () => renderDashboard(root),
+    navWeekend: () => renderWeekend(root),
+    navUpgrade: () => renderOffice(root),
+    navDrivers: () => renderMyDrivers(root),
+    navTeams: () => renderTeams(root),
+    navSponsors: () => renderSponsors(root),
+    navMarket: () => renderMarket(root),
+    navCalendar: () => renderCalendar(root),
+    navStandings: () => renderLeaderboard(root),
+  });
 }
