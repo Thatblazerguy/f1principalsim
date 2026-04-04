@@ -256,6 +256,50 @@ async function startNextSeason(root, keepSponsors = true) {
   // Clear seasonal data while keeping career stats (if any were separate)
   state.standings = { drivers: {}, teams: {} };
   state.bestFinishes = {};
+
+  // --- New: AI Driver Transfers and Market Optimization ---
+  const allDriversInPool = [...drivers];
+  const getOvr = (d) => Math.round((d.pace + d.quali + d.racecraft + d.consistency) / 4);
+
+  // 1. AI Teams seek high-rated free agents (85+)
+  state.aiTeams.forEach(aiTeam => {
+    ensureTeamState(aiTeam);
+    const available85Plus = allDriversInPool.filter(d => 
+      getOvr(d) >= 85 && !isDriverEmployed(d.name)
+    ).sort((a, b) => getOvr(b) - getOvr(a));
+
+    if (available85Plus.length > 0) {
+      // Find the lowest rated driver on this AI team
+      const teamDrivers = [...aiTeam.drivers];
+      teamDrivers.sort((a, b) => getOvr(a) - getOvr(b));
+      const weakest = teamDrivers[0];
+
+      if (weakest && getOvr(available85Plus[0]) > getOvr(weakest) + 2) {
+        // AI team upgrades: release weakest, sign the top free agent
+        aiTeam.drivers = aiTeam.drivers.filter(d => d.name !== weakest.name);
+        aiTeam.drivers.push(available85Plus[0]);
+      }
+    }
+  });
+
+  // 2. Occasional Driver Transfers between AI teams
+  state.aiTeams.forEach((aiTeam, idx) => {
+    if (Math.random() < 0.15) { // 15% chance for a team to attempt a transfer
+      const otherTeamIdx = (idx + Math.floor(Math.random() * (state.aiTeams.length - 1)) + 1) % state.aiTeams.length;
+      const otherTeam = state.aiTeams[otherTeamIdx];
+      
+      if (otherTeam) {
+        const myDriver = aiTeam.drivers[Math.floor(Math.random() * aiTeam.drivers.length)];
+        const theirDriver = otherTeam.drivers[Math.floor(Math.random() * otherTeam.drivers.length)];
+
+        if (myDriver && theirDriver && Math.abs(getOvr(myDriver) - getOvr(theirDriver)) < 5) {
+          // Swap drivers between teams
+          aiTeam.drivers = aiTeam.drivers.map(d => d.name === myDriver.name ? theirDriver : d);
+          otherTeam.drivers = otherTeam.drivers.map(d => d.name === theirDriver.name ? myDriver : d);
+        }
+      }
+    }
+  });
   
   await syncGame();
   renderDashboard(root);
