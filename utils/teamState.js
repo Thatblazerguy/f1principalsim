@@ -96,6 +96,6 @@ export function gainTeamCarXP(team, amount) {
   while (team.carXP >= 100) {
     team.carXP -= 100;
     team.carLevel++;
-    team.carPerformance += 2;
+    team.carPerformance = parseFloat((team.carPerformance + 2).toFixed(1));
   }
 }

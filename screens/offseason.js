@@ -199,7 +199,7 @@ async function startNextSeason(root, keepSponsors = true) {
     if (t !== state.team) {
       // AI growth: 3-6 points of car performance per season
       const aiGrowth = 3 + Math.random() * 3;
-      t.carPerformance += aiGrowth;
+      t.carPerformance = parseFloat((t.carPerformance + aiGrowth).toFixed(1));
       // Also slightly upgrade specific car parts for visual consistency
       const parts = ["aero", "engine", "chassis", "reliability"];
       parts.forEach(p => {
@@ -337,7 +337,7 @@ export function renderOffseason(root, flashMessage = "") {
           </div>
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Budget</span>
-            <strong>$${state.team.budget}M</strong>
+            <strong>$${(state.team.budget || 0).toFixed(1)}M</strong>
           </div>
         </div>
       </div>
@@ -471,7 +471,7 @@ export function renderOffseason(root, flashMessage = "") {
         fillAiSeat(oldTeam);
       }
 
-      state.team.budget -= moveCost;
+      state.team.budget = parseFloat((state.team.budget - moveCost).toFixed(1));
       addDriverToTeam(state.team, driver);
       setTeamActiveDrivers(state.team, getTeamRoster(state.team).slice(0, 2).map(entry => entry.name));
       await syncGame();

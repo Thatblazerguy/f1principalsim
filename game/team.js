@@ -58,16 +58,16 @@ export class Team {
     while (this.carXP >= 100) {
       this.carXP -= 100;
       this.carLevel++;
-      this.carPerformance += 2;
+      this.carPerformance = parseFloat((this.carPerformance + 2).toFixed(1));
     }
   }
 
   upgrade(p) {
     const cost = 50 * this.car[p];
     if (this.budget >= cost) {
-      this.budget -= cost;
+      this.budget = parseFloat((this.budget - cost).toFixed(1));
       this.car[p]++;
-      this.carPerformance += 1.5;
+      this.carPerformance = parseFloat((this.carPerformance + 1.5).toFixed(1));
     }
   }
 }

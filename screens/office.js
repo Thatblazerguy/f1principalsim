@@ -38,11 +38,11 @@ function renderUpgradeCard(part) {
         </div>
         <div class="driver-detail-stat">
           <span>Budget After</span>
-          <strong>$${Math.max(0, state.team.budget - cost)}M</strong>
+          <strong>$${Math.max(0, state.team.budget - cost).toFixed(1)}M</strong>
         </div>
         <div class="driver-detail-stat">
           <span>Car Performance</span>
-          <strong>${state.team.carPerformance.toFixed(1)}</strong>
+          <strong>${(state.team.carPerformance || 0).toFixed(1)}</strong>
         </div>
       </div>
 
@@ -80,11 +80,11 @@ export function renderOffice(root, flashMessage = "") {
         <div class="dashboard-overview">
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Budget</span>
-            <strong>$${state.team.budget}M</strong>
+            <strong>$${(state.team.budget || 0).toFixed(1)}M</strong>
           </div>
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Car Perf.</span>
-            <strong>${state.team.carPerformance.toFixed(1)}</strong>
+            <strong>${(state.team.carPerformance || 0).toFixed(1)}</strong>
           </div>
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Team Level</span>

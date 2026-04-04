@@ -117,8 +117,8 @@ export function renderDashboard(root) {
             <strong>Lv ${state.team.carLevel}</strong>
           </div>
           <div class="dashboard-overview-item">
-            <span class="dashboard-overview-label">Budget</span>
-            <strong>$${state.team.budget}M</strong>
+            <span class="dashboard-overview-label">Team Budget</span>
+            <strong>$${(state.team.budget || 0).toFixed(1)}M</strong>
           </div>
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Sponsors</span>

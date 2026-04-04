@@ -60,7 +60,7 @@ export function renderMarket(root = document.getElementById("app")) {
         <div class="dashboard-overview">
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Budget</span>
-            <strong>$${state.team.budget}M</strong>
+            <strong>$${(state.team.budget || 0).toFixed(1)}M</strong>
           </div>
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Lineup</span>
