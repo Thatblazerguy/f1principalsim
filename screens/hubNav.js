@@ -1,7 +1,7 @@
 import { logoutUser } from "../lib/supabaseApi.js";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import NavHeader from "../components/ui/nav-header.tsx";
+import { SlideTabs } from "../components/ui/slide-tabs.tsx";
 
 export function buildHubNav(active) {
   return `
@@ -39,7 +39,7 @@ export function wireHubNav(root, handlers) {
 
   const rootReact = createRoot(navMount);
   rootReact.render(
-    React.createElement(NavHeader, {
+    React.createElement(SlideTabs, {
       items: navItems,
       activeKey,
       onSelect: key => {

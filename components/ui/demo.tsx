@@ -1,21 +1,19 @@
-import NavHeader from "@/components/ui/nav-header";
+import { SlideTabs } from "./slide-tabs";
 
-function HomeDemo() {
+export default function DemoOne() {
   return (
-    <header className="flex h-screen items-center justify-center p-10">
-      <NavHeader
+    <div className="w-full grid h-screen place-content-center bg-white dark:bg-black">
+      <SlideTabs
         items={[
           { key: "home", label: "Home" },
           { key: "pricing", label: "Pricing" },
-          { key: "about", label: "About" },
-          { key: "services", label: "Services" },
-          { key: "contact", label: "Contact" },
+          { key: "features", label: "Features" },
+          { key: "docs", label: "Docs" },
+          { key: "blog", label: "Blog" },
         ]}
         activeKey="home"
         onSelect={() => {}}
       />
-    </header>
+    </div>
   );
 }
-
-export { HomeDemo };
