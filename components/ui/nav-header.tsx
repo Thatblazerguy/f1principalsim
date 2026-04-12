@@ -19,14 +19,11 @@ function NavHeader({ items, activeKey, onSelect, onLogout }: NavHeaderProps) {
   const [position, setPosition] = useState({
     left: 0,
     width: 0,
-    opacity: 1,
+    opacity: 0,
   });
 
   return (
-    <ul
-      className="hub-nav-header relative mx-auto flex w-fit flex-wrap items-center justify-center rounded-full border border-white/10 bg-black/35 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-md"
-      onMouseLeave={() => setPosition(pv => ({ ...pv, opacity: 1 }))}
-    >
+    <ul className="hub-nav-header" onMouseLeave={() => setPosition(pv => ({ ...pv, opacity: 0 }))}>
       {items.map(item => (
         <Tab
           key={item.key}
@@ -37,7 +34,7 @@ function NavHeader({ items, activeKey, onSelect, onLogout }: NavHeaderProps) {
           {item.label}
         </Tab>
       ))}
-      <li className="relative z-10">
+      <li className="hub-nav-item">
         <button type="button" className="hub-nav-pill hub-nav-pill-logout" onClick={onLogout}>
           Logout
         </button>
@@ -62,6 +59,7 @@ const Tab = ({
   return (
     <li
       ref={ref}
+      className="hub-nav-item"
       onMouseEnter={() => {
         if (!ref.current) return;
         const { width } = ref.current.getBoundingClientRect();
@@ -72,11 +70,15 @@ const Tab = ({
         });
       }}
       onClick={onClick}
-      className={`hub-nav-pill relative z-10 block cursor-pointer whitespace-nowrap px-3 py-2 text-xs font-extrabold uppercase tracking-[0.02em] text-white md:px-4 ${
+    >
+      <button
+        type="button"
+        className={`hub-nav-pill ${
         isActive ? "hub-nav-pill-active" : ""
       }`}
-    >
-      {children}
+      >
+        {children}
+      </button>
     </li>
   );
 };
