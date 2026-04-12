@@ -45,6 +45,7 @@ export function ensureTeamState(team) {
   if (!("carLevel" in team)) team.carLevel = 1;
   if (!("carXP" in team)) team.carXP = 0;
   if (!("car" in team)) team.car = { aero: 1, engine: 1, chassis: 1, reliability: 1 };
+  if (!Array.isArray(team.pendingUpgrades)) team.pendingUpgrades = [];
 
   if (team.drivers.length > 2) {
     if (!team.reserveDriver) {

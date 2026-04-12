@@ -5,10 +5,11 @@ import { Driver } from "./game/driver.js";
 export const state = {
   team: null,
   aiTeams: createAiTeams(),
-  season: { round: 1, year: 1, totalRounds: 24 },
+  season: { round: 1, year: 1, totalRounds: 24, currentDay: 1 },
   standings: { drivers: {}, teams: {} },
   bestFinishes: {},
   signedSponsors: {},
+  notifications: [],
   /** Current season's sponsor offers (max 3) */
   sponsorOffers: [],
   /** Per-round weekend flow: qualifying must run before race. */
@@ -60,10 +61,11 @@ export function hydrateState(payload) {
       }
     }
 
-    state.season = rawData.season || { round: 1, year: 1, totalRounds: 24 };
+    state.season = rawData.season || { round: 1, year: 1, totalRounds: 24, currentDay: 1 };
     state.standings = rawData.standings || { drivers: {}, teams: {} };
     state.bestFinishes = rawData.bestFinishes || {};
     state.signedSponsors = rawData.signedSponsors || {};
+    state.notifications = rawData.notifications || [];
     state.sponsorOffers = rawData.sponsorOffers || [];
     state.weekendProgress = rawData.weekendProgress || null;
 

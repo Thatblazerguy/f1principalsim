@@ -9,9 +9,12 @@ import { renderMarket } from "./market.js";
 import { renderLeaderboard } from "./leaderboard.js";
 import { renderTeams } from "./teams.js";
 import { buildHubNav, wireHubNav } from "./hubNav.js";
+import { ensureSeasonTimeline, getRoundRaceDay, formatSeasonDate } from "../utils/seasonTimeline.js";
 
 export function renderCalendar(root) {
+  ensureSeasonTimeline(state);
   const totalRounds = Math.min(state.season.totalRounds || calendar.length, calendar.length);
+  const currentDay = state.season.currentDay;
   root.innerHTML = `
     ${buildHubNav("calendar")}
     <section class="market-panel">
@@ -25,8 +28,8 @@ export function renderCalendar(root) {
         </div>
         <div class="dashboard-overview">
           <div class="dashboard-overview-item">
-            <span class="dashboard-overview-label">Current Round</span>
-            <strong>${state.season.round}</strong>
+            <span class="dashboard-overview-label">Current Day</span>
+            <strong>Day ${currentDay}</strong>
           </div>
           <div class="dashboard-overview-item">
             <span class="dashboard-overview-label">Rounds Total</span>
@@ -43,9 +46,15 @@ export function renderCalendar(root) {
               <article class="market-driver-card calendar-card">
                 <p class="menu-card-kicker">Round ${r.round}</p>
                 <h3>${r.name}</h3>
-                <p class="detail-card-meta">${r.laps} laps</p>
+                <p class="detail-card-meta">${formatSeasonDate(state.season.year || 1, getRoundRaceDay(r.round))} • ${r.laps} laps</p>
                 <span class="detail-badge">
-                  ${r.round < state.season.round ? "Completed" : r.round === state.season.round ? "Current" : "Upcoming"}
+                  ${
+                    currentDay > getRoundRaceDay(r.round)
+                      ? "Completed"
+                      : currentDay === getRoundRaceDay(r.round)
+                        ? "Race Day"
+                        : `Upcoming • ${getRoundRaceDay(r.round) - currentDay}d`
+                  }
                 </span>
               </article>
             `

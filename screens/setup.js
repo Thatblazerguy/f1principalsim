@@ -4,6 +4,7 @@ import { assignReplacementReserve } from "../data/teams.js";
 import { state, resetAiTeams } from "../state.js";
 import { renderDashboard } from "./dashboard.js";
 import { syncGame } from "../lib/supabaseApi.js";
+import { getRoundRaceDay } from "../utils/seasonTimeline.js";
 
 const teamTiers = [
   {
@@ -419,13 +420,15 @@ export function renderSetup(root) {
       };
       team.originTemplate = selectedTier.name;
       team.engineProfile = selectedEngine;
+      team.pendingUpgrades = [];
       selectedDrivers.forEach(driver => team.signDriver(driver));
 
       state.team = team;
-      state.season = { round: 1, year: 1, totalRounds };
+      state.season = { round: 1, year: 1, totalRounds, currentDay: getRoundRaceDay(1) };
       state.standings = { drivers: {}, teams: {} };
       state.bestFinishes = {};
       state.signedSponsors = {};
+      state.notifications = [];
 
       // Cloud save the state so if they log out, it's not lost
       await syncGame();

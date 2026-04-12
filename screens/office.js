@@ -10,11 +10,28 @@ import { renderTeams } from "./teams.js";
 import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
+import {
+  ensureSeasonTimeline,
+  requestTimedUpgrade,
+  getPendingUpgradeForPart,
+  getNextUpgradeAvailability,
+  formatSeasonDate,
+  getRoundRaceDay,
+} from "../utils/seasonTimeline.js";
+
+function getRoundFromDay(day) {
+  return Math.floor((Math.max(1, day) - 1) / 14) + 1;
+}
 
 function renderUpgradeCard(part) {
+  ensureSeasonTimeline(state);
   const currentLevel = state.team.car[part];
+  const currentDay = state.season.currentDay;
+  const pending = getPendingUpgradeForPart(state.team, part);
   const cost = 50 * currentLevel;
-  const canAfford = state.team.budget >= cost;
+  const canAfford = state.team.budget >= cost && !pending;
+  const etaDays = pending ? Math.max(0, pending.readyDay - currentDay) : 0;
+  const etaRound = pending ? getRoundFromDay(pending.readyDay) : null;
 
   return `
     <article class="glass upgrade-card">
@@ -22,9 +39,17 @@ function renderUpgradeCard(part) {
         <div>
           <p class="menu-card-kicker">Component</p>
           <h3>${part.toUpperCase()}</h3>
-          <p class="detail-card-meta">Current Level ${currentLevel} • Next cost $${cost}M</p>
+          <p class="detail-card-meta">
+            ${
+              pending
+                ? `In development • Ready in ${etaDays} day${etaDays === 1 ? "" : "s"} (${formatSeasonDate(state.season.year || 1, pending.readyDay)})`
+                : `Current Level ${currentLevel} • Next cost $${cost}M`
+            }
+          </p>
         </div>
-        <span class="detail-badge">${canAfford ? "Ready" : "Insufficient Budget"}</span>
+        <span class="detail-badge">
+          ${pending ? `ETA Round ${etaRound}` : canAfford ? "Ready" : "Insufficient Budget"}
+        </span>
       </div>
 
       <div class="detail-card-stats">
@@ -33,21 +58,23 @@ function renderUpgradeCard(part) {
           <strong>Lv ${currentLevel}</strong>
         </div>
         <div class="driver-detail-stat">
-          <span>Upgrade Cost</span>
-          <strong>$${cost}M</strong>
+          <span>${pending ? "Project Cost" : "Upgrade Cost"}</span>
+          <strong>$${pending ? pending.cost : cost}M</strong>
         </div>
         <div class="driver-detail-stat">
           <span>Budget After</span>
           <strong>$${Math.max(0, state.team.budget - cost).toFixed(1)}M</strong>
         </div>
         <div class="driver-detail-stat">
-          <span>Car Performance</span>
-          <strong>${(state.team.carPerformance || 0).toFixed(1)}</strong>
+          <span>${pending ? "Ready Date" : "Car Performance"}</span>
+          <strong>
+            ${pending ? `${formatSeasonDate(state.season.year || 1, pending.readyDay)} (R${etaRound})` : (state.team.carPerformance || 0).toFixed(1)}
+          </strong>
         </div>
       </div>
 
       <button class="upgrade-button" data-upgrade="${part}" ${canAfford ? "" : "disabled"}>
-        Upgrade ${part.toUpperCase()}
+        ${pending ? "Project In Progress" : `Start ${part.toUpperCase()} Upgrade`}
       </button>
     </article>
   `;
@@ -66,6 +93,13 @@ function showUpgradeLoading(done) {
 
 export function renderOffice(root, flashMessage = "") {
   ensureTeamState(state.team);
+  ensureSeasonTimeline(state);
+  const currentDay = state.season.currentDay;
+  const nextUpgrade = getNextUpgradeAvailability(state.team, currentDay);
+  const nextRaceRound = state.season.round;
+  const nextRaceDay = getRoundRaceDay(nextRaceRound);
+  const daysUntilRace = Math.max(0, nextRaceDay - currentDay);
+
   root.innerHTML = `
     ${buildHubNav("upgrade")}
     <section class="upgrade-page">
@@ -90,7 +124,23 @@ export function renderOffice(root, flashMessage = "") {
             <span class="dashboard-overview-label">Team Level</span>
             <strong>Lv ${state.team.level}</strong>
           </div>
+          <div class="dashboard-overview-item">
+            <span class="dashboard-overview-label">Today</span>
+            <strong>${formatSeasonDate(state.season.year || 1, currentDay)} (Day ${currentDay})</strong>
+          </div>
         </div>
+      </div>
+
+      <div class="glass weekend-status-card">
+        <p class="menu-card-kicker">Development Timeline</p>
+        <p class="dashboard-subtitle">
+          Next race: Round ${nextRaceRound} in ${daysUntilRace} day${daysUntilRace === 1 ? "" : "s"}.
+          ${
+            nextUpgrade
+              ? ` Next upgrade available in ${nextUpgrade.daysRemaining} day${nextUpgrade.daysRemaining === 1 ? "" : "s"} (${nextUpgrade.part.toUpperCase()}).`
+              : " No active upgrade projects."
+          }
+        </p>
       </div>
 
       ${flashMessage ? `<p class="setup-error upgrade-flash">${flashMessage}</p>` : ""}
@@ -116,15 +166,18 @@ export function renderOffice(root, flashMessage = "") {
   root.querySelectorAll("[data-upgrade]").forEach(button => {
     button.onclick = () => {
       const part = button.dataset.upgrade;
-      const currentCost = 50 * state.team.car[part];
-      if (state.team.budget < currentCost) {
-        renderOffice(root, "Not enough budget for that upgrade.");
-        return;
-      }
       showUpgradeLoading(async () => {
-        state.team.upgrade(part);
+        const request = requestTimedUpgrade(state.team, part, state.season.currentDay, state.season.round);
+        if (!request.ok) {
+          renderOffice(root, request.reason);
+          return;
+        }
         await syncGame();
-        renderOffice(root, `${part.toUpperCase()} upgraded to Lv ${state.team.car[part]}.`);
+        const etaRound = getRoundFromDay(request.entry.readyDay);
+        renderOffice(
+          root,
+          `${part.toUpperCase()} project started. Completion expected by ${formatSeasonDate(state.season.year || 1, request.entry.readyDay)} (Round ${etaRound}).`
+        );
       });
     };
   });

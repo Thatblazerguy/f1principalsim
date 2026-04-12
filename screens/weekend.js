@@ -21,6 +21,14 @@ import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
 import { AnimatedTabs } from "../components/ui/animated-tabs.tsx";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getDriverHeadshotUrl } from "../data/drivers.js";
+import {
+  ensureSeasonTimeline,
+  getRoundRaceDay,
+  getDaysUntilRound,
+  formatSeasonDate,
+  simulateNextDay,
+  canSimulateNextDay,
+} from "../utils/seasonTimeline.js";
 import React from "react";
 import { createRoot } from "react-dom/client";
 
@@ -190,8 +198,15 @@ function setWeekendStatus(message, actionLabel = "") {
 
 export function renderWeekend(root, flashMessage = "") {
   ensureTeamState(state.team);
+  ensureSeasonTimeline(state);
   const totalRounds = Math.min(state.season.totalRounds || calendar.length, calendar.length);
   const round = state.season.round <= totalRounds ? calendar[state.season.round - 1] : null;
+  const currentDay = state.season.currentDay;
+  const raceDay = round ? getRoundRaceDay(round.round) : null;
+  const raceDateLabel = round ? formatSeasonDate(state.season.year || 1, raceDay) : "";
+  const daysUntilRace = round ? getDaysUntilRound(round.round, currentDay) : 0;
+  const raceWindowOpen = Boolean(round) && daysUntilRace === 0;
+  const canAdvanceDay = canSimulateNextDay(state);
   const activeDrivers = getActiveDrivers(state.team);
   const teams = [
     { ...state.team, drivers: activeDrivers },
@@ -203,9 +218,9 @@ export function renderWeekend(root, flashMessage = "") {
     round && weekendProgress && !weekendProgress.qualifyingComplete
   );
   const raceAlreadyRun = Boolean(round && weekendProgress?.raceComplete);
-  
-  // The race is locked IF it's already run OR if qualifying hasn't been completed yet.
-  const raceLocked = raceAlreadyRun || !weekendProgress.qualifyingComplete;
+
+  // The race is locked if race day is not active, race already run, or qualifying is incomplete.
+  const raceLocked = !raceWindowOpen || raceAlreadyRun || !weekendProgress.qualifyingComplete;
 
   const roundStrats = round && strategies[round.round] ? strategies[round.round] : [];
   const activeLineupMarkup = activeDrivers
@@ -274,25 +289,40 @@ export function renderWeekend(root, flashMessage = "") {
         <div class="weekend-head">
           <p class="weekend-kicker">Grand Prix Weekend</p>
           <h3>${round ? round.name : "No More Rounds"}</h3>
-          <p class="weekend-meta">${round ? `Round ${round.round} • ${round.laps} laps` : "You completed the season."}</p>
+          <p class="weekend-meta">
+            ${
+              round
+                ? `Round ${round.round} • ${round.laps} laps • ${raceDateLabel} • ${daysUntilRace === 0 ? "Race day is live" : `${daysUntilRace} day${daysUntilRace === 1 ? "" : "s"} to go`}`
+                : "You completed the season."
+            }
+          </p>
         </div>
 
         <div class="weekend-actions">
-          <button id="fp" class="weekend-action" ${round ? "" : "disabled"}>Practice</button>
-          <button id="quali" class="weekend-action" ${round ? "" : "disabled"}>Qualifying</button>
+          <button id="fp" class="weekend-action" ${round && raceWindowOpen ? "" : "disabled"}>Practice</button>
+          <button id="quali" class="weekend-action" ${round && raceWindowOpen ? "" : "disabled"}>Qualifying</button>
           <button id="race" class="weekend-action weekend-action-primary" ${round && !raceLocked && strategiesValid ? "" : "disabled"}>Race</button>
         </div>
         
         <div id="strategy-tabs-root"></div>
 
+        ${round && !raceWindowOpen ? `<p class="weekend-gate-hint weekend-gate-hint--quali">Race weekend is not open yet. Simulate days until ${raceDateLabel}.</p>` : ""}
         ${raceNeedsQuali ? `<p class="weekend-gate-hint weekend-gate-hint--quali">Complete qualifying to unlock the race simulation for this round.</p>` : ""}
         ${raceAlreadyRun ? `<p class="weekend-gate-hint weekend-gate-hint--done">This Grand Prix has been run — the race cannot be simulated again until you advance.</p>` : ""}
 
         <div class="weekend-continue-wrap">
-          <button type="button" id="continueNextRound" class="weekend-action weekend-continue-btn" ${raceAlreadyRun ? "" : "disabled"}>
-            Continue to next round
+          <button type="button" id="simulateNextDay" class="weekend-action weekend-continue-btn" ${round && canAdvanceDay ? "" : "disabled"}>
+            Simulate 1 day
           </button>
-          <p class="weekend-continue-hint">${raceAlreadyRun ? "Proceed to the next Grand Prix on the calendar." : "Enabled after you complete the race for this weekend."}</p>
+          <p class="weekend-continue-hint">
+            ${
+              !round
+                ? "Season complete."
+                : canAdvanceDay
+                  ? "Advance one calendar day to process R&D and approach the next race."
+                  : "Day simulation is locked while a race weekend is active and incomplete."
+            }
+          </p>
         </div>
       </div>
 
@@ -433,24 +463,30 @@ export function renderWeekend(root, flashMessage = "") {
   const fp = root.querySelector("#fp");
   const quali = root.querySelector("#quali");
   const race = root.querySelector("#race");
-  const continueNextRound = root.querySelector("#continueNextRound");
+  const simulateDayButton = root.querySelector("#simulateNextDay");
   const continueHint = root.querySelector(".weekend-continue-hint");
 
   // Removed old event listener for [data-driver-strat] as we use React now
 
-  const advanceRound = async () => {
-    if (!weekendProgress.raceComplete) return;
-    state.season.round++;
-    applyRoundCarDevelopmentAll(state);
+  const advanceDay = async () => {
+    const tick = simulateNextDay(state);
+    if (!tick.advanced) return;
     await syncGame();
-    renderWeekend(root, "All teams have developed their cars slightly for the next round.");
+    const completedText = tick.completedUpgrades.length
+      ? ` Upgrade complete: ${tick.completedUpgrades.map(entry => entry.part.toUpperCase()).join(", ")}.`
+      : "";
+    renderWeekend(root, `Advanced to Day ${state.season.currentDay}.${completedText}`);
   };
 
-  if (continueNextRound) {
-    continueNextRound.onclick = advanceRound;
+  if (simulateDayButton) {
+    simulateDayButton.onclick = advanceDay;
   }
 
   fp.onclick = () => showLoading(async () => {
+    if (!raceWindowOpen) {
+      setWeekendStatus(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
+      return;
+    }
     try {
       gainTeamCarXP(state.team, 5);
       show(simulatePractice(teams, round), "bestLap");
@@ -462,6 +498,10 @@ export function renderWeekend(root, flashMessage = "") {
   });
 
   quali.onclick = () => showLoading(async () => {
+    if (!raceWindowOpen) {
+      setWeekendStatus(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
+      return;
+    }
     try {
       gainTeamCarXP(state.team, 8);
       const { grid } = simulateQualifying(teams, round);
@@ -485,9 +525,13 @@ export function renderWeekend(root, flashMessage = "") {
   });
 
   race.onclick = () => {
+    if (!raceWindowOpen) {
+      setWeekendStatus(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
+      return;
+    }
     if (weekendProgress.raceComplete) {
       setWeekendStatus(
-        "This Grand Prix race has already been completed. Continue to the next round to start a new weekend."
+        "This Grand Prix race has already been completed. Simulate days to progress the calendar toward the next race weekend."
       );
       return;
     }
@@ -518,12 +562,14 @@ export function renderWeekend(root, flashMessage = "") {
         }
 
         weekendProgress.raceComplete = true;
+        applyRoundCarDevelopmentAll(state);
+        state.season.round += 1;
         show(res, "time", weekendProgress.grid);
         const raceBtnAfter = root.querySelector("#race");
         if (raceBtnAfter) raceBtnAfter.disabled = true;
 
         setWeekendStatus(
-          `${round.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${state.team.carXP}/100.`
+          `${round.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${state.team.carXP}/100. Day simulation is now unlocked for the gap to the next race.`
         );
 
         const doneHint = document.createElement("p");
@@ -535,13 +581,13 @@ export function renderWeekend(root, flashMessage = "") {
           pageCard.appendChild(doneHint);
         }
 
-        const continueBtn = root.querySelector("#continueNextRound");
+        const continueBtn = root.querySelector("#simulateNextDay");
         if (continueBtn) {
           continueBtn.disabled = false;
-          continueBtn.onclick = advanceRound;
+          continueBtn.onclick = advanceDay;
         }
         if (continueHint) {
-          continueHint.textContent = "Proceed to the next Grand Prix on the calendar.";
+          continueHint.textContent = "Advance one day at a time to reach the next Grand Prix.";
         }
         
         syncGame(); // background save

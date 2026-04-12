@@ -13,6 +13,7 @@ import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState, getTeamRoster, getActiveDrivers, setTeamActiveDrivers } from "../utils/teamState.js";
 import { rotateSponsorOffers } from "../utils/sponsorDeals.js";
 import { syncGame } from "../lib/supabaseApi.js";
+import { getRoundRaceDay } from "../utils/seasonTimeline.js";
 
 function removeDriverFromTeam(team, driverName) {
   ensureTeamState(team);
@@ -254,7 +255,10 @@ async function startNextSeason(root, keepSponsors = true) {
     round: 1,
     year: (state.season.year || 1) + 1,
     totalRounds: state.season.totalRounds || 24,
+    currentDay: getRoundRaceDay(1),
   };
+  state.notifications = [];
+  state.team.pendingUpgrades = [];
   
   // Reset weekend progress for the new season
   state.weekendProgress = null;
