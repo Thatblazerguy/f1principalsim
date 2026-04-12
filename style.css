@@ -1137,24 +1137,27 @@ input:not([type="checkbox"]), select {
 
 .dashboard-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 280px));
-  justify-content: center;
-  justify-items: center;
-  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+  width: 100%;
 }
 
 .menu-card-group {
   position: relative;
-  min-height: 360px;
-  width: 280px;
-  max-width: 100%;
+  min-height: 400px;
+  width: 100%;
   margin: 0;
-  transition: transform 0.35s ease;
-  cursor: default;
+  border-radius: 22px;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .menu-card-group:hover {
-  transform: translateY(-6px);
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  z-index: 10;
 }
 
 .menu-card-gradient {
@@ -1173,9 +1176,10 @@ input:not([type="checkbox"]), select {
 }
 
 .menu-card-group:hover .menu-card-gradient {
-  left: 20px;
-  width: calc(100% - 90px);
+  left: 0;
+  width: 100%;
   transform: skewX(0deg);
+  opacity: 0.8;
 }
 
 .menu-card-glow {
@@ -1207,21 +1211,21 @@ input:not([type="checkbox"]), select {
 }
 
 .menu-card-group:hover .menu-card-orb-top {
-  top: -34px;
-  left: 34px;
-  width: 92px;
-  height: 92px;
-  opacity: 1;
-  animation: dashboardBlob 2.2s ease-in-out infinite;
+  top: -10px;
+  left: 10px;
+  width: 120px;
+  height: 120px;
+  opacity: 0.6;
+  animation: dashboardBlob 3s ease-in-out infinite;
 }
 
 .menu-card-group:hover .menu-card-orb-bottom {
-  right: 32px;
-  bottom: -34px;
-  width: 92px;
-  height: 92px;
-  opacity: 1;
-  animation: dashboardBlob 2.2s ease-in-out -1s infinite;
+  right: 10px;
+  bottom: -10px;
+  width: 120px;
+  height: 120px;
+  opacity: 0.6;
+  animation: dashboardBlob 3s ease-in-out -1.5s infinite;
 }
 
 .menu-card-content {
@@ -1237,9 +1241,7 @@ input:not([type="checkbox"]), select {
 }
 
 .menu-card-group:hover .menu-card-content {
-  left: -16px;
-  padding-top: 34px;
-  padding-bottom: 34px;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .menu-card-kicker {
