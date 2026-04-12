@@ -1,18 +1,9 @@
 import { logoutUser } from "../lib/supabaseApi.js";
+import React from "react";
+import { createRoot } from "react-dom/client";
+import NavHeader from "../components/ui/nav-header.tsx";
 
 export function buildHubNav(active) {
-  const items = [
-    { id: "navDashboard", label: "Dashboard", key: "dashboard" },
-    { id: "navWeekend", label: "Race Weekend", key: "weekend" },
-    { id: "navUpgrade", label: "Upgrade Car", key: "upgrade" },
-    { id: "navDrivers", label: "My Drivers", key: "drivers" },
-    { id: "navTeams", label: "Teams", key: "teams" },
-    { id: "navSponsors", label: "Sponsors", key: "sponsors" },
-    { id: "navMarket", label: "Driver Market", key: "market" },
-    { id: "navCalendar", label: "Calendar", key: "calendar" },
-    { id: "navStandings", label: "Standings", key: "standings" },
-  ];
-
   return `
     <header class="hub-nav glass">
       <div class="hub-nav-brand">
@@ -23,38 +14,43 @@ export function buildHubNav(active) {
         </div>
       </div>
       <nav class="hub-nav-links">
-        ${items
-          .map(
-            item => `
-              <button
-                id="${item.id}"
-                class="hub-nav-link ${active === item.key ? "hub-nav-link-active" : ""}"
-              >
-                ${item.label}
-              </button>
-            `
-          )
-          .join("")}
-          <button id="navLogout" class="hub-nav-link" style="color: #ff8f8a; border-color: rgba(255, 143, 138, 0.2);">
-            Logout
-          </button>
+        <div id="hubNavReact" data-active="${active}"></div>
       </nav>
     </header>
   `;
 }
 
 export function wireHubNav(root, handlers) {
-  Object.entries(handlers).forEach(([id, handler]) => {
-    const el = root.querySelector(`#${id}`);
-    if (el) el.onclick = handler;
-  });
+  const navMount = root.querySelector("#hubNavReact");
+  if (!navMount) return;
 
-  const logoutBtn = root.querySelector("#navLogout");
-  if (logoutBtn) {
-    logoutBtn.onclick = async () => {
-      logoutBtn.textContent = "Logging out...";
-      await logoutUser();
-      window.location.reload();
-    };
-  }
+  const activeKey = navMount.getAttribute("data-active") || "dashboard";
+  const navItems = [
+    { key: "dashboard", label: "Dashboard" },
+    { key: "weekend", label: "Race Weekend" },
+    { key: "upgrade", label: "Upgrade Car" },
+    { key: "drivers", label: "My Drivers" },
+    { key: "teams", label: "Teams" },
+    { key: "sponsors", label: "Sponsors" },
+    { key: "market", label: "Driver Market" },
+    { key: "calendar", label: "Calendar" },
+    { key: "standings", label: "Standings" },
+  ];
+
+  const rootReact = createRoot(navMount);
+  rootReact.render(
+    React.createElement(NavHeader, {
+      items: navItems,
+      activeKey,
+      onSelect: key => {
+        const handlerId = `nav${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+        const handler = handlers[handlerId];
+        if (typeof handler === "function") handler();
+      },
+      onLogout: async () => {
+        await logoutUser();
+        window.location.reload();
+      },
+    })
+  );
 }
