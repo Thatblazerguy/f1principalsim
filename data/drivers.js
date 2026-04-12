@@ -35,6 +35,12 @@ const STATIC_DRIVER_NUMBERS = {
 };
 
 const driverProfileByName = new Map();
+const DRIVER_NAME_ALIASES = new Map([
+  ["kimi antonelli", "andrea kimi antonelli"],
+  ["andrea kimi antonelli", "andrea kimi antonelli"],
+  ["alexander albon", "alex albon"],
+  ["alex albon", "alex albon"],
+]);
 
 function normalizeDriverName(name = "") {
   return String(name)
@@ -44,6 +50,11 @@ function normalizeDriverName(name = "") {
     .replace(/[^\w\s-]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function resolveCanonicalDriverKey(name = "") {
+  const normalized = normalizeDriverName(name);
+  return DRIVER_NAME_ALIASES.get(normalized) ?? normalized;
 }
 
 function buildInitialsAvatar(name = "Driver") {
@@ -77,7 +88,9 @@ function applyOpenF1Profile(driver, profile) {
   if (Number.isFinite(profile.driver_number)) {
     driver.permanentNumber = profile.driver_number;
   }
-  driverProfileByName.set(normalizeDriverName(driver.name), profile);
+  [driver.name, profile.full_name, profile.broadcast_name]
+    .filter(Boolean)
+    .forEach(name => driverProfileByName.set(resolveCanonicalDriverKey(name), profile));
   return driver;
 }
 
@@ -89,7 +102,10 @@ function createDriverFromOpenF1(profile) {
   const estimatedConsistency = 80;
   const estimatedSalary = 12;
   const estimatedAge = Number(profile?.age) || 26;
-  const name = profile?.full_name || profile?.broadcast_name || "Unknown Driver";
+  const rawName = profile?.full_name || profile?.broadcast_name || "Unknown Driver";
+  const canonicalKey = resolveCanonicalDriverKey(rawName);
+  const canonicalLocal = drivers.find(entry => resolveCanonicalDriverKey(entry.name) === canonicalKey);
+  const name = canonicalLocal?.name || rawName;
 
   const driver = createDriver({
     name,
@@ -218,9 +234,11 @@ export function getDriverHeadshotUrl(nameOrDriver) {
   const name = typeof nameOrDriver === "string" ? nameOrDriver : nameOrDriver?.name;
   if (!name) return buildInitialsAvatar("Driver");
 
-  const normalized = normalizeDriverName(name);
-  const localDriver = typeof nameOrDriver === "object" ? nameOrDriver : drivers.find(entry => normalizeDriverName(entry.name) === normalized);
-  const profile = driverProfileByName.get(normalized);
+  const canonical = resolveCanonicalDriverKey(name);
+  const localDriver = typeof nameOrDriver === "object"
+    ? nameOrDriver
+    : drivers.find(entry => resolveCanonicalDriverKey(entry.name) === canonical);
+  const profile = driverProfileByName.get(canonical);
 
   return localDriver?.headshotUrl || profile?.headshot_url || buildInitialsAvatar(name);
 }
@@ -229,9 +247,11 @@ export function getDriverNumber(nameOrDriver) {
   const name = typeof nameOrDriver === "string" ? nameOrDriver : nameOrDriver?.name;
   if (!name) return "--";
 
-  const normalized = normalizeDriverName(name);
-  const localDriver = typeof nameOrDriver === "object" ? nameOrDriver : drivers.find(entry => normalizeDriverName(entry.name) === normalized);
-  const profile = driverProfileByName.get(normalized);
+  const canonical = resolveCanonicalDriverKey(name);
+  const localDriver = typeof nameOrDriver === "object"
+    ? nameOrDriver
+    : drivers.find(entry => resolveCanonicalDriverKey(entry.name) === canonical);
+  const profile = driverProfileByName.get(canonical);
 
   const number = localDriver?.permanentNumber ?? profile?.driver_number ?? STATIC_DRIVER_NUMBERS[name];
   return Number.isFinite(number) ? String(number) : "--";
@@ -251,24 +271,24 @@ export async function syncDriversFromOpenF1() {
     const apiDrivers = await response.json();
     if (!Array.isArray(apiDrivers) || !apiDrivers.length) return false;
 
-    const existingByName = new Map(drivers.map(driver => [normalizeDriverName(driver.name), driver]));
+    const existingByName = new Map(drivers.map(driver => [resolveCanonicalDriverKey(driver.name), driver]));
     const openF1BackedDrivers = [];
     const seen = new Set();
 
     apiDrivers.forEach(profile => {
       const rawName = profile?.full_name || profile?.broadcast_name;
-      const normalized = normalizeDriverName(rawName);
-      if (!normalized || seen.has(normalized)) return;
-      seen.add(normalized);
+      const canonical = resolveCanonicalDriverKey(rawName);
+      if (!canonical || seen.has(canonical)) return;
+      seen.add(canonical);
 
-      const existing = existingByName.get(normalized);
+      const existing = existingByName.get(canonical);
       const merged = existing ? applyOpenF1Profile(existing, profile) : createDriverFromOpenF1(profile);
       merged.startupEligible = true;
       if (merged.category === "FREE") merged.category = "F1";
       openF1BackedDrivers.push(merged);
     });
 
-    const extras = drivers.filter(driver => !seen.has(normalizeDriverName(driver.name)));
+    const extras = drivers.filter(driver => !seen.has(resolveCanonicalDriverKey(driver.name)));
     drivers.splice(0, drivers.length, ...openF1BackedDrivers, ...extras);
     return true;
   } catch (error) {
