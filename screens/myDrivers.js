@@ -10,38 +10,7 @@ import { state } from "../state.js";
 import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState, getTeamRoster, getActiveDrivers, setTeamActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
-
-const driverNumbers = {
-  "Max Verstappen": 1,
-  "Sergio Perez": 11,
-  "Charles Leclerc": 16,
-  "Carlos Sainz": 55,
-  "Lewis Hamilton": 44,
-  "George Russell": 63,
-  "Lando Norris": 4,
-  "Oscar Piastri": 81,
-  "Fernando Alonso": 14,
-  "Lance Stroll": 18,
-  "Esteban Ocon": 31,
-  "Pierre Gasly": 10,
-  "Alex Albon": 23,
-  "Logan Sargeant": 2,
-  "Yuki Tsunoda": 22,
-  "Daniel Ricciardo": 3,
-  "Valtteri Bottas": 77,
-  "Zhou Guanyu": 24,
-  "Kevin Magnussen": 20,
-  "Nico Hulkenberg": 27,
-  "Mick Schumacher": 47,
-  "Antonio Giovinazzi": 99,
-  "Nyck de Vries": 21,
-  "Andrea Kimi Antonelli": 12,
-  "Oliver Bearman": 87,
-  "Theo Pourchaire": 5,
-  "Jack Doohan": 7,
-  "Liam Lawson": 40,
-  "Felipe Drugovich": 43,
-};
+import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 
 function buildStat(label, value) {
   return `
@@ -55,14 +24,17 @@ function buildStat(label, value) {
 function buildDriverCard(driver, role, isActive) {
   const points = state.standings.drivers[driver.name] ?? 0;
   const bestFinish = state.bestFinishes[driver.name] ? `P${state.bestFinishes[driver.name]}` : "--";
-  const raceNumber = driverNumbers[driver.name] ?? "--";
+  const raceNumber = getDriverNumber(driver);
 
   return `
     <article class="glass detail-card driver-card--yours">
       <div class="detail-card-top">
         <div>
           <p class="menu-card-kicker">${role} Driver</p>
-          <h3>#${raceNumber} ${driver.name}</h3>
+          <div class="driver-nameplate">
+            <img class="driver-face driver-face--lg" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+            <h3>#${raceNumber} ${driver.name}</h3>
+          </div>
           <p class="detail-card-meta">${driver.category} driver • Age ${driver.age}</p>
         </div>
         <div class="detail-card-badges">
@@ -112,6 +84,16 @@ function buildActiveDriversCard(team) {
       )
       .join("");
 
+  const buildPreview = selectedName => {
+    if (!selectedName) return `<span class="active-driver-preview">No driver selected</span>`;
+    return `
+      <span class="active-driver-preview">
+        <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(selectedName)}" alt="${selectedName}" loading="lazy" />
+        <span>${selectedName}</span>
+      </span>
+    `;
+  };
+
   return `
     <article class="glass detail-card active-drivers-card driver-card--yours">
       <div class="detail-card-top">
@@ -130,10 +112,12 @@ function buildActiveDriversCard(team) {
         <label class="active-driver-slot">
           <span>Seat 1</span>
           <select id="activeSlot1">${buildOptions(slotOne)}</select>
+          ${buildPreview(slotOne)}
         </label>
         <label class="active-driver-slot">
           <span>Seat 2</span>
           <select id="activeSlot2">${buildOptions(slotTwo)}</select>
+          ${buildPreview(slotTwo)}
         </label>
       </div>
     </article>

@@ -9,6 +9,7 @@ import { renderCalendar } from "./calendar.js";
 import { renderTeams } from "./teams.js";
 import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState, getTeamRoster } from "../utils/teamState.js";
+import { getDriverHeadshotUrl } from "../data/drivers.js";
 
 function buildStandingsTable(title, subtitle, rows, type) {
   return `
@@ -27,7 +28,10 @@ function buildStandingsTable(title, subtitle, rows, type) {
             (row, idx) => `
               <div class="standings-table-row${row.isYours ? " standings-table-row--yours" : ""}">
                 <span class="standings-table-pos">P${idx + 1}</span>
-                <span class="standings-table-name">${row.name}${row.isYours ? ` <span class="standings-you-pill">You</span>` : ""}</span>
+                <span class="standings-table-name">
+                  ${type === "drivers" ? `<span class="driver-nameplate"><img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(row.name)}" alt="${row.name}" loading="lazy" /><span>${row.name}</span></span>` : row.name}
+                  ${row.isYours ? ` <span class="standings-you-pill">You</span>` : ""}
+                </span>
                 <span class="standings-table-meta">${row.meta}</span>
                 <span class="standings-table-points">${row.points}</span>
               </div>

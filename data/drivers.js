@@ -1,5 +1,113 @@
 import { Driver } from "../game/driver.js";
 
+const OPEN_F1_DRIVERS_ENDPOINT = "https://api.openf1.org/v1/drivers?session_key=latest";
+
+const STATIC_DRIVER_NUMBERS = {
+  "Max Verstappen": 1,
+  "Sergio Perez": 11,
+  "Charles Leclerc": 16,
+  "Carlos Sainz": 55,
+  "Lewis Hamilton": 44,
+  "George Russell": 63,
+  "Lando Norris": 4,
+  "Oscar Piastri": 81,
+  "Fernando Alonso": 14,
+  "Lance Stroll": 18,
+  "Esteban Ocon": 31,
+  "Pierre Gasly": 10,
+  "Alex Albon": 23,
+  "Logan Sargeant": 2,
+  "Yuki Tsunoda": 22,
+  "Daniel Ricciardo": 3,
+  "Valtteri Bottas": 77,
+  "Zhou Guanyu": 24,
+  "Kevin Magnussen": 20,
+  "Nico Hulkenberg": 27,
+  "Mick Schumacher": 47,
+  "Antonio Giovinazzi": 99,
+  "Nyck de Vries": 21,
+  "Andrea Kimi Antonelli": 12,
+  "Oliver Bearman": 87,
+  "Theo Pourchaire": 5,
+  "Jack Doohan": 7,
+  "Liam Lawson": 40,
+  "Felipe Drugovich": 43,
+};
+
+const driverProfileByName = new Map();
+
+function normalizeDriverName(name = "") {
+  return String(name)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildInitialsAvatar(name = "Driver") {
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() || "")
+    .join("") || "DR";
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="grad" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#e10600"/>
+      <stop offset="100%" stop-color="#5e0d0d"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="20" fill="url(#grad)"/>
+  <text x="50%" y="54%" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="44" font-weight="700">${initials}</text>
+</svg>
+  `.trim();
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function applyOpenF1Profile(driver, profile) {
+  if (!driver || !profile) return driver;
+  if (profile.headshot_url) driver.headshotUrl = profile.headshot_url;
+  if (profile.team_name) driver.teamName = profile.team_name;
+  if (Number.isFinite(profile.driver_number)) {
+    driver.permanentNumber = profile.driver_number;
+  }
+  driverProfileByName.set(normalizeDriverName(driver.name), profile);
+  return driver;
+}
+
+function createDriverFromOpenF1(profile) {
+  const estimatedMarket = 72;
+  const estimatedPace = 82;
+  const estimatedQuali = 82;
+  const estimatedRacecraft = 82;
+  const estimatedConsistency = 80;
+  const estimatedSalary = 12;
+  const estimatedAge = Number(profile?.age) || 26;
+  const name = profile?.full_name || profile?.broadcast_name || "Unknown Driver";
+
+  const driver = createDriver({
+    name,
+    roleLabel: profile?.team_name ? `${profile.team_name} Race` : "F1 Driver",
+    pace: estimatedPace,
+    quali: estimatedQuali,
+    racecraft: estimatedRacecraft,
+    consistency: estimatedConsistency,
+    market: estimatedMarket,
+    salary: estimatedSalary,
+    age: estimatedAge,
+    category: "F1",
+    startupEligible: true,
+  });
+
+  return applyOpenF1Profile(driver, profile);
+}
+
 function estimateTyre(pace, racecraft, consistency) {
   return Math.round((pace + racecraft + consistency) / 3);
 }
@@ -105,3 +213,66 @@ export const drivers = [
   createDriver({ name: "Logan Sargeant", roleLabel: "Free Agent", pace: 78, quali: 78, racecraft: 77, consistency: 76, market: 62, salary: 6, age: 25, category: "FREE", signingFee: 8 }),
   createDriver({ name: "Felipe Drugovich", roleLabel: "Free Agent", pace: 80, quali: 79, racecraft: 80, consistency: 79, market: 66, salary: 7, age: 25, category: "FREE", signingFee: 9 }),
 ];
+
+export function getDriverHeadshotUrl(nameOrDriver) {
+  const name = typeof nameOrDriver === "string" ? nameOrDriver : nameOrDriver?.name;
+  if (!name) return buildInitialsAvatar("Driver");
+
+  const normalized = normalizeDriverName(name);
+  const localDriver = typeof nameOrDriver === "object" ? nameOrDriver : drivers.find(entry => normalizeDriverName(entry.name) === normalized);
+  const profile = driverProfileByName.get(normalized);
+
+  return localDriver?.headshotUrl || profile?.headshot_url || buildInitialsAvatar(name);
+}
+
+export function getDriverNumber(nameOrDriver) {
+  const name = typeof nameOrDriver === "string" ? nameOrDriver : nameOrDriver?.name;
+  if (!name) return "--";
+
+  const normalized = normalizeDriverName(name);
+  const localDriver = typeof nameOrDriver === "object" ? nameOrDriver : drivers.find(entry => normalizeDriverName(entry.name) === normalized);
+  const profile = driverProfileByName.get(normalized);
+
+  const number = localDriver?.permanentNumber ?? profile?.driver_number ?? STATIC_DRIVER_NUMBERS[name];
+  return Number.isFinite(number) ? String(number) : "--";
+}
+
+export async function syncDriversFromOpenF1() {
+  if (typeof fetch !== "function") return false;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    const response = await fetch(OPEN_F1_DRIVERS_ENDPOINT, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) return false;
+
+    const apiDrivers = await response.json();
+    if (!Array.isArray(apiDrivers) || !apiDrivers.length) return false;
+
+    const existingByName = new Map(drivers.map(driver => [normalizeDriverName(driver.name), driver]));
+    const openF1BackedDrivers = [];
+    const seen = new Set();
+
+    apiDrivers.forEach(profile => {
+      const rawName = profile?.full_name || profile?.broadcast_name;
+      const normalized = normalizeDriverName(rawName);
+      if (!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+
+      const existing = existingByName.get(normalized);
+      const merged = existing ? applyOpenF1Profile(existing, profile) : createDriverFromOpenF1(profile);
+      merged.startupEligible = true;
+      if (merged.category === "FREE") merged.category = "F1";
+      openF1BackedDrivers.push(merged);
+    });
+
+    const extras = drivers.filter(driver => !seen.has(normalizeDriverName(driver.name)));
+    drivers.splice(0, drivers.length, ...openF1BackedDrivers, ...extras);
+    return true;
+  } catch (error) {
+    console.warn("OpenF1 driver sync failed, using local data.", error);
+    return false;
+  }
+}

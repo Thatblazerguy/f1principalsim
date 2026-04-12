@@ -1,4 +1,4 @@
-import { drivers } from "../data/drivers.js";
+import { drivers, getDriverHeadshotUrl } from "../data/drivers.js";
 import { state } from "../state.js";
 import { renderDashboard } from "./dashboard.js";
 import { renderWeekend } from "./weekend.js";
@@ -78,7 +78,10 @@ export function renderMarket(root = document.getElementById("app")) {
                 <div class="market-driver-card-top">
                   <div>
                     <p class="menu-card-kicker">${d.category}</p>
-                    <h3>${d.name}</h3>
+                    <div class="driver-nameplate">
+                      <img class="driver-face" src="${getDriverHeadshotUrl(d)}" alt="${d.name}" loading="lazy" />
+                      <h3>${d.name}</h3>
+                    </div>
                     <p class="detail-card-meta">Age ${d.age} • Salary $${d.salary}M</p>
                   </div>
                   <span class="detail-badge">Market ${d.market}</span>

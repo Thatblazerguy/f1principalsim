@@ -1,5 +1,5 @@
 import { Team } from "../game/team.js";
-import { drivers } from "../data/drivers.js";
+import { drivers, getDriverHeadshotUrl } from "../data/drivers.js";
 import { assignReplacementReserve } from "../data/teams.js";
 import { state, resetAiTeams } from "../state.js";
 import { renderDashboard } from "./dashboard.js";
@@ -255,9 +255,12 @@ export function renderSetup(root) {
     list.innerHTML += `
       <label class="driver-item setup-driver-item">
         <input type="checkbox" value="${driver.name}" />
-        <span class="setup-driver-meta">
-          <strong>${driver.name}</strong>
-          <span>${driver.roleLabel} · Fee $${driver.signingFee}M · Salary $${driver.salary}M</span>
+        <span class="driver-nameplate">
+          <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+          <span class="setup-driver-meta">
+            <strong>${driver.name}</strong>
+            <span>${driver.roleLabel} · Fee $${driver.signingFee}M · Salary $${driver.salary}M</span>
+          </span>
         </span>
       </label>
     `;

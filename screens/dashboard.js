@@ -12,43 +12,12 @@ import { state } from "../state.js";
 import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState } from "../utils/teamState.js";
 import { countActiveSponsorDeals, getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
-
-const driverNumbers = {
-  "Max Verstappen": 1,
-  "Sergio Perez": 11,
-  "Charles Leclerc": 16,
-  "Carlos Sainz": 55,
-  "Lewis Hamilton": 44,
-  "George Russell": 63,
-  "Lando Norris": 4,
-  "Oscar Piastri": 81,
-  "Fernando Alonso": 14,
-  "Lance Stroll": 18,
-  "Esteban Ocon": 31,
-  "Pierre Gasly": 10,
-  "Alex Albon": 23,
-  "Logan Sargeant": 2,
-  "Yuki Tsunoda": 22,
-  "Daniel Ricciardo": 3,
-  "Valtteri Bottas": 77,
-  "Zhou Guanyu": 24,
-  "Kevin Magnussen": 20,
-  "Nico Hulkenberg": 27,
-  "Mick Schumacher": 47,
-  "Antonio Giovinazzi": 99,
-  "Nyck de Vries": 21,
-  "Andrea Kimi Antonelli": 12,
-  "Oliver Bearman": 87,
-  "Theo Pourchaire": 5,
-  "Jack Doohan": 7,
-  "Liam Lawson": 40,
-  "Felipe Drugovich": 43,
-};
+import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 
 function buildMyDriversMarkup() {
   return state.team.drivers
     .map(driver => {
-      const number = driverNumbers[driver.name] ?? "--";
+      const number = getDriverNumber(driver);
       const points = state.standings.drivers[driver.name] ?? 0;
       const bestFinish = state.bestFinishes[driver.name]
         ? `P${state.bestFinishes[driver.name]}`
@@ -58,9 +27,12 @@ function buildMyDriversMarkup() {
         <div class="driver-summary-row driver-summary-row--yours">
           <div class="driver-summary-identity">
             <span class="driver-summary-number">#${number}</span>
-            <div>
+            <div class="driver-nameplate">
+              <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+              <div class="driver-name-copy">
               <strong>${driver.name}</strong>
               <span class="driver-summary-meta">${driver.category} driver</span>
+              </div>
             </div>
           </div>
           <div class="driver-summary-stats">

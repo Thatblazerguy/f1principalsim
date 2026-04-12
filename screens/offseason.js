@@ -1,5 +1,5 @@
 import { state } from "../state.js";
-import { drivers } from "../data/drivers.js";
+import { drivers, getDriverHeadshotUrl } from "../data/drivers.js";
 import { renderDashboard } from "./dashboard.js";
 import { renderWeekend } from "./weekend.js";
 import { renderOffice } from "./office.js";
@@ -94,7 +94,10 @@ function buildRosterCard(driver) {
       <div class="market-driver-card-top">
         <div>
           <p class="menu-card-kicker">${state.team.activeDrivers.includes(driver.name) ? "Active Driver" : "Squad Driver"}</p>
-          <h3>${driver.name}</h3>
+          <div class="driver-nameplate">
+            <img class="driver-face" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+            <h3>${driver.name}</h3>
+          </div>
           <p class="detail-card-meta">Age ${driver.age} • ${driver.category} • Salary $${driver.salary}M</p>
         </div>
         <span class="detail-badge">Market ${driver.market}</span>
@@ -122,7 +125,10 @@ function buildCandidateCard(driver) {
       <div class="market-driver-card-top">
         <div>
           <p class="menu-card-kicker">${currentTeam ? "Poach Opportunity" : driver.category}</p>
-          <h3>${driver.name}</h3>
+          <div class="driver-nameplate">
+            <img class="driver-face" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+            <h3>${driver.name}</h3>
+          </div>
           <p class="detail-card-meta">
             ${currentTeam ? `Currently at ${currentTeam.name}` : "Available immediately"} • Salary $${driver.salary}M
           </p>

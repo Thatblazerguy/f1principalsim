@@ -1166,6 +1166,47 @@ input:not([type="checkbox"]), select {
   margin-top: 18px;
 }
 
+.driver-nameplate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.driver-face {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.28);
+  flex-shrink: 0;
+}
+
+.driver-face--sm {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.driver-face--lg {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+
+.driver-name-copy {
+  min-width: 0;
+}
+
+.driver-lineup-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
 .driver-summary-row {
   display: flex;
   align-items: center;
@@ -1452,6 +1493,14 @@ input:not([type="checkbox"]), select {
   background: rgba(0, 0, 0, 0.22);
   border-radius: 14px;
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+.active-driver-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(245, 245, 245, 0.82);
+  font-size: 0.9rem;
 }
 
 .market-driver-stats,

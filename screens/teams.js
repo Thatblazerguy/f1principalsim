@@ -9,49 +9,21 @@ import { renderCalendar } from "./calendar.js";
 import { renderLeaderboard } from "./leaderboard.js";
 import { buildHubNav, wireHubNav } from "./hubNav.js";
 import { ensureTeamState, getTeamRoster, getActiveDrivers } from "../utils/teamState.js";
-
-const driverNumbers = {
-  "Max Verstappen": 1,
-  "Sergio Perez": 11,
-  "Charles Leclerc": 16,
-  "Carlos Sainz": 55,
-  "Lewis Hamilton": 44,
-  "George Russell": 63,
-  "Lando Norris": 4,
-  "Oscar Piastri": 81,
-  "Fernando Alonso": 14,
-  "Lance Stroll": 18,
-  "Esteban Ocon": 31,
-  "Pierre Gasly": 10,
-  "Alex Albon": 23,
-  "Logan Sargeant": 2,
-  "Yuki Tsunoda": 22,
-  "Daniel Ricciardo": 3,
-  "Valtteri Bottas": 77,
-  "Zhou Guanyu": 24,
-  "Kevin Magnussen": 20,
-  "Nico Hulkenberg": 27,
-  "Mick Schumacher": 47,
-  "Antonio Giovinazzi": 99,
-  "Nyck de Vries": 21,
-  "Andrea Kimi Antonelli": 12,
-  "Oliver Bearman": 87,
-  "Theo Pourchaire": 5,
-  "Jack Doohan": 7,
-  "Liam Lawson": 40,
-  "Felipe Drugovich": 43,
-};
+import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 
 function buildDriverRow(driver, role, active = false, highlightPlayer = false) {
-  const number = driverNumbers[driver.name] ?? "--";
+  const number = getDriverNumber(driver);
   const rowClass = highlightPlayer ? "team-lineup-row team-lineup-row--yours" : "team-lineup-row";
   return `
     <div class="${rowClass}">
       <div class="team-lineup-main">
         <span class="driver-summary-number">#${number}</span>
-        <div>
-          <strong>${driver.name}</strong>
-          <span class="driver-summary-meta">${role}${active ? " • Active" : ""}</span>
+        <div class="driver-nameplate">
+          <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+          <div class="driver-name-copy">
+            <strong>${driver.name}</strong>
+            <span class="driver-summary-meta">${role}${active ? " • Active" : ""}</span>
+          </div>
         </div>
       </div>
       <span class="detail-badge">Market ${driver.market}</span>
@@ -95,7 +67,16 @@ function buildTeamCard(team, isPlayerTeam = false) {
 
       <div class="team-section-block">
         <p class="menu-card-kicker">Contracted Drivers</p>
-        <p class="detail-card-meta">${contracted.map(driver => driver.name).join(" • ")}</p>
+        <div class="team-lineup-list">
+          ${contracted.map(driver => `
+            <div class="team-lineup-row">
+              <div class="driver-nameplate">
+                <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+                <span>${driver.name}</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
       </div>
     </article>
   `;

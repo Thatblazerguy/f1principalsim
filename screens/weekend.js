@@ -20,6 +20,7 @@ import { getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
 import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
 import { AnimatedTabs } from "../components/ui/animated-tabs.tsx";
 import { syncGame } from "../lib/supabaseApi.js";
+import { getDriverHeadshotUrl } from "../data/drivers.js";
 import React from "react";
 import { createRoot } from "react-dom/client";
 
@@ -142,7 +143,13 @@ function show(res, metric, qualiGrid = null) {
         <div class="result-row${highlight}">
           <div class="result-row-main">
             <strong>P${i + 1}</strong>
-            <span class="result-row-driver-name">${r.driver.name}${isPlayerDriver ? `<span class="result-row-you-pill">Your driver</span>` : ""}</span>
+            <span class="result-row-driver-name">
+              <span class="driver-nameplate">
+                <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(r.driver)}" alt="${r.driver.name}" loading="lazy" />
+                <span>${r.driver.name}</span>
+              </span>
+              ${isPlayerDriver ? `<span class="result-row-you-pill">Your driver</span>` : ""}
+            </span>
             <span class="result-row-team">${r.team.name}</span>
           </div>
           <div class="result-row-meta">
@@ -201,6 +208,16 @@ export function renderWeekend(root, flashMessage = "") {
   const raceLocked = raceAlreadyRun || !weekendProgress.qualifyingComplete;
 
   const roundStrats = round && strategies[round.round] ? strategies[round.round] : [];
+  const activeLineupMarkup = activeDrivers
+    .map(
+      driver => `
+        <span class="driver-nameplate">
+          <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+          <span>${driver.name}</span>
+        </span>
+      `
+    )
+    .join('<span class="detail-card-meta">and</span>');
   
   let strategiesValid = false;
   
@@ -234,7 +251,8 @@ export function renderWeekend(root, flashMessage = "") {
           <p class="dashboard-subtitle">
             Run the full weekend flow and build both team progression and sponsor income after every race.
           </p>
-          <p class="detail-card-meta">Active lineup: ${activeDrivers.map(driver => driver.name).join(" and ")}</p>
+          <p class="detail-card-meta">Active lineup:</p>
+          <div class="driver-lineup-inline">${activeLineupMarkup || '<span class="detail-card-meta">No active drivers selected.</span>'}</div>
         </div>
         <div class="dashboard-overview">
           <div class="dashboard-overview-item">
