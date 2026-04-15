@@ -8,7 +8,7 @@ import { renderSponsors } from "./sponsors.js";
 import { renderMarket } from "./market.js";
 import { renderLeaderboard } from "./leaderboard.js";
 import { renderTeams } from "./teams.js";
-import { buildHubNav, wireHubNav } from "./hubNav.js";
+import { buildHubNav, wireHubNav } from "./hubNav";
 import { ensureSeasonTimeline, getRoundRaceDay, formatSeasonDate } from "../utils/seasonTimeline.js";
 
 export function renderCalendar(root) {

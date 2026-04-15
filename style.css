@@ -1078,6 +1078,62 @@ input:not([type="checkbox"]), select {
 .dashboard-shell {
   display: grid;
   gap: 18px;
+  width: min(100%, 1160px);
+  margin: 0 auto;
+}
+
+.dashboard-eight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.dashboard-eight-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 260px;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 140% at 88% 0%, rgba(225, 6, 0, 0.42) 0%, rgba(225, 6, 0, 0.12) 42%, rgba(0, 0, 0, 0.16) 78%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 34px rgba(0, 0, 0, 0.34);
+}
+
+.dashboard-eight-card .menu-card-kicker {
+  margin-top: 0;
+}
+
+.dashboard-eight-card h3 {
+  font-size: 2rem;
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+
+.dashboard-eight-card .dashboard-subtitle {
+  font-size: 0.94rem;
+  line-height: 1.6;
+  max-width: none;
+}
+
+.dashboard-eight-card .stat {
+  margin: 0 0 10px;
+  font-size: 2.2rem;
+  font-family: Sora, sans-serif;
+  color: #fff;
+}
+
+.dashboard-drivers-summary-card .driver-summary-list {
+  margin-top: 12px;
+}
+
+.dashboard-mini-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .dashboard-header {
@@ -2461,6 +2517,14 @@ input:not([type="checkbox"]), select {
     margin: 0;
   }
 
+  .dashboard-eight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-eight-card {
+    min-height: 0;
+  }
+
   .driver-card-group {
     min-height: 420px;
   }
@@ -2520,5 +2584,11 @@ input:not([type="checkbox"]), select {
 
   .dashboard-race-card {
     width: min(82vw, 230px);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+  .dashboard-eight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

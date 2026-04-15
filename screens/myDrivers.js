@@ -7,7 +7,7 @@ import { renderLeaderboard } from "./leaderboard.js";
 import { renderSponsors } from "./sponsors.js";
 import { renderTeams } from "./teams.js";
 import { state } from "../state.js";
-import { buildHubNav, wireHubNav } from "./hubNav.js";
+import { buildHubNav, wireHubNav } from "./hubNav";
 import { ensureTeamState, getTeamRoster, getActiveDrivers, setTeamActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";

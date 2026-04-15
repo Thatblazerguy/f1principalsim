@@ -9,9 +9,8 @@ import { renderMyDrivers } from "./myDrivers.js";
 import { renderSponsors } from "./sponsors.js";
 import { renderTeams } from "./teams.js";
 import { state } from "../state.js";
-import { buildHubNav, wireHubNav } from "./hubNav.js";
-import { ensureTeamState } from "../utils/teamState.js";
-import { countActiveSponsorDeals, getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
+import { buildHubNav, wireHubNav } from "./hubNav";
+import { ensureTeamState, getActiveDrivers } from "../utils/teamState.js";
 import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import {
@@ -27,7 +26,8 @@ import { createRoot } from "react-dom/client";
 import { RaceCalendarScroll } from "../components/ui/race-calendar-scroll.tsx";
 
 function buildMyDriversMarkup() {
-  return state.team.drivers
+  const activeDrivers = getActiveDrivers(state.team);
+  return activeDrivers
     .map(driver => {
       const number = getDriverNumber(driver);
       const points = state.standings.drivers[driver.name] ?? 0;
@@ -63,10 +63,59 @@ function buildMyDriversMarkup() {
     .join("");
 }
 
-function refreshMyDriversCard() {
-  const myDriversList = document.getElementById("myDriversList");
-  if (!myDriversList) return;
-  myDriversList.innerHTML = buildMyDriversMarkup() || '<p class="driver-summary-empty">No drivers signed yet.</p>';
+function buildDriverProfileCard(driver, slotLabel) {
+  if (!driver) {
+    return `
+      <article class="glass dashboard-eight-card">
+        <p class="menu-card-kicker">${slotLabel}</p>
+        <h3>Driver Profile</h3>
+        <p class="dashboard-subtitle">No active driver assigned.</p>
+      </article>
+    `;
+  }
+
+  const points = state.standings.drivers[driver.name] ?? 0;
+  const bestFinish = state.bestFinishes[driver.name] ? `P${state.bestFinishes[driver.name]}` : "--";
+  const driverNumber = getDriverNumber(driver);
+
+  return `
+    <article class="glass dashboard-eight-card">
+      <p class="menu-card-kicker">${slotLabel}</p>
+      <div class="driver-nameplate">
+        <img class="driver-face driver-face--sm" src="${getDriverHeadshotUrl(driver)}" alt="${driver.name}" loading="lazy" />
+        <div class="driver-name-copy">
+          <h3>#${driverNumber} ${driver.name}</h3>
+          <p class="detail-card-meta">${driver.category} • Age ${driver.age}</p>
+        </div>
+      </div>
+      <div class="detail-card-stats">
+        <div class="driver-detail-stat"><span>Pace</span><strong>${(driver.pace || 0).toFixed(1)}</strong></div>
+        <div class="driver-detail-stat"><span>Quali</span><strong>${(driver.quali || 0).toFixed(1)}</strong></div>
+        <div class="driver-detail-stat"><span>Racecraft</span><strong>${(driver.racecraft || 0).toFixed(1)}</strong></div>
+        <div class="driver-detail-stat"><span>Consistency</span><strong>${(driver.consistency || 0).toFixed(1)}</strong></div>
+      </div>
+      <div class="dashboard-mini-row">
+        <span class="detail-badge">Pts ${points}</span>
+        <span class="detail-badge">Best ${bestFinish}</span>
+      </div>
+    </article>
+  `;
+}
+
+function getTeamStandingPosition() {
+  const teams = [state.team, ...(state.aiTeams || [])].filter(Boolean);
+  const sorted = teams
+    .map(team => ({
+      name: team.name,
+      points: state.standings.teams?.[team.name] ?? 0,
+    }))
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  const position = sorted.findIndex(entry => entry.name === state.team.name);
+  return {
+    position: position >= 0 ? position + 1 : teams.length,
+    total: teams.length,
+    points: state.standings.teams?.[state.team.name] ?? 0,
+  };
 }
 
 export function renderDashboard(root) {
@@ -93,163 +142,75 @@ export function renderDashboard(root) {
     };
   });
   const latestNotifications = (state.notifications || []).slice(0, 4);
+  const activeDrivers = getActiveDrivers(state.team).slice(0, 2);
+  const teamStanding = getTeamStandingPosition();
 
   root.innerHTML = `
     ${buildHubNav("dashboard")}
     <div class="dashboard-shell">
-      <div class="dashboard-header glass">
-        <div class="flex justify-between items-start w-full">
-          <div>
-            <p class="dashboard-eyebrow">Team Command Center • ${currentYear} Season</p>
-            <h2>${state.team.name}</h2>
-            <p class="dashboard-subtitle">
-              Direct your race weekends, engineering progress, and team operations from one place.
-            </p>
-          </div>
-          ${isSeasonOver ? `
-            <div class="season-complete-pill bg-red-600/20 border border-red-600 px-4 py-2 rounded-xl animate-pulse">
-              <span class="text-xs font-black uppercase tracking-tighter text-red-500">Season Complete</span>
-            </div>
-          ` : ""}
-        </div>
-        <div class="dashboard-overview">
-          <div class="dashboard-overview-item">
-            <span class="dashboard-overview-label">Level</span>
-            <strong>Lv ${state.team.level}</strong>
-          </div>
-          <div class="dashboard-overview-item">
-            <span class="dashboard-overview-label">Car Level</span>
-            <strong>Lv ${state.team.carLevel}</strong>
-          </div>
-          <div class="dashboard-overview-item">
-            <span class="dashboard-overview-label">Team Budget</span>
-            <strong>$${(state.team.budget || 0).toFixed(1)}M</strong>
-          </div>
-          <div class="dashboard-overview-item">
-            <span class="dashboard-overview-label">Sponsors</span>
-            <strong>${countActiveSponsorDeals(state.team)} deals · $${getTotalSponsorRaceBonus(state.team)}M/race</strong>
-          </div>
-        </div>
-      </div>
+      <div class="dashboard-eight-grid">
+        <article class="glass dashboard-eight-card">
+          <p class="menu-card-kicker">Weekend • ${currentYear}</p>
+          <h3>${isSeasonOver ? "Season Complete" : `Next: ${nextRound ? nextRound.name : "Grand Prix"}`}</h3>
+          <p class="dashboard-subtitle">
+            ${
+              isSeasonOver
+                ? "Review your performance and prepare for the next year."
+                : `Prepare for Round ${state.season.round}. Race date: ${formatSeasonDate(state.season.year || 1, raceDay)} (${daysUntilRace} day${daysUntilRace === 1 ? "" : "s"}).`
+            }
+          </p>
+          <button id="wk">${isSeasonOver ? "Open Offseason" : "Race Weekend"}</button>
+        </article>
 
-      <div class="dashboard-grid dashboard-card-grid">
-        <div class="menu-card-group">
-          <span
-            class="menu-card-gradient"
-            style="background: linear-gradient(315deg, #531010, #ff3b30);"
-          ></span>
-          <span
-            class="menu-card-gradient menu-card-gradient-blur"
-            style="background: linear-gradient(315deg, #531010, #ff3b30);"
-          ></span>
-          <span class="menu-card-glow">
-            <span class="menu-card-orb menu-card-orb-top"></span>
-            <span class="menu-card-orb menu-card-orb-bottom"></span>
-          </span>
-          <div class="menu-card-content glass tile">
-            <p class="menu-card-kicker">Weekend • ${currentYear}</p>
-            <h3>${isSeasonOver ? "Season Complete" : `Next: ${nextRound ? nextRound.name : "Grand Prix"}`}</h3>
-            <p>
-              ${
-                isSeasonOver
-                  ? "Review your performance and prepare for the next year."
-                  : `Prepare for Round ${state.season.round} of the ${currentYear} World Championship. Race date: ${formatSeasonDate(state.season.year || 1, raceDay)} (${daysUntilRace} day${daysUntilRace === 1 ? "" : "s"}).`
-              }
-            </p>
-            <button id="wk">${isSeasonOver ? "Open Offseason" : "Race Weekend"}</button>
-          </div>
-        </div>
+        <article class="glass dashboard-eight-card">
+          <p class="menu-card-kicker">Progress</p>
+          <h3>Team Level</h3>
+          <p class="stat">Lv ${state.team.level}</p>
+          <p class="dashboard-subtitle">Budget available: $${state.team.budget}M</p>
+        </article>
 
-        <div class="menu-card-group">
-          <span
-            class="menu-card-gradient"
-            style="background: linear-gradient(315deg, #160606, #e10600);"
-          ></span>
-          <span
-            class="menu-card-gradient menu-card-gradient-blur"
-            style="background: linear-gradient(315deg, #160606, #e10600);"
-          ></span>
-          <span class="menu-card-glow">
-            <span class="menu-card-orb menu-card-orb-top"></span>
-            <span class="menu-card-orb menu-card-orb-bottom"></span>
-          </span>
-          <div class="menu-card-content glass tile">
-            <p class="menu-card-kicker">Progress</p>
-            <h3>Team Level</h3>
-            <p class="stat">Lv ${state.team.level}</p>
-            <p>Budget available: $${state.team.budget}M</p>
-          </div>
-        </div>
+        <article class="glass dashboard-eight-card">
+          <p class="menu-card-kicker">Engineering</p>
+          <h3>R&amp;D</h3>
+          <p class="dashboard-subtitle">Invest in upgrades, raise component levels, and prepare the car for the long season.</p>
+          <button id="office">Upgrade Car</button>
+        </article>
 
-        <div class="menu-card-group">
-          <span
-            class="menu-card-gradient"
-            style="background: linear-gradient(315deg, #1b0b0b, #ff5f52);"
-          ></span>
-          <span
-            class="menu-card-gradient menu-card-gradient-blur"
-            style="background: linear-gradient(315deg, #1b0b0b, #ff5f52);"
-          ></span>
-          <span class="menu-card-glow">
-            <span class="menu-card-orb menu-card-orb-top"></span>
-            <span class="menu-card-orb menu-card-orb-bottom"></span>
-          </span>
-          <div class="menu-card-content glass tile">
-            <p class="menu-card-kicker">Engineering</p>
-            <h3>R&amp;D</h3>
-            <p>Invest in upgrades, raise component levels, and prepare the car for the long season.</p>
-            <button id="office">Upgrade Car</button>
+        <article class="glass dashboard-eight-card">
+          <p class="menu-card-kicker">Operations</p>
+          <h3>Operations</h3>
+          <p class="dashboard-subtitle">Manage drivers, review the calendar, and keep an eye on the championship picture.</p>
+          <div class="menu-card-actions">
+            <button id="market">Drivers</button>
+            <button id="teams">Teams</button>
+            <button id="calendar">Calendar</button>
+            <button id="standings">Standings</button>
           </div>
-        </div>
+        </article>
 
-        <div class="menu-card-group">
-          <span
-            class="menu-card-gradient"
-            style="background: linear-gradient(315deg, #280909, #ff2a1d);"
-          ></span>
-          <span
-            class="menu-card-gradient menu-card-gradient-blur"
-            style="background: linear-gradient(315deg, #280909, #ff2a1d);"
-          ></span>
-          <span class="menu-card-glow">
-            <span class="menu-card-orb menu-card-orb-top"></span>
-            <span class="menu-card-orb menu-card-orb-bottom"></span>
-          </span>
-          <div class="menu-card-content glass tile">
-            <p class="menu-card-kicker">Operations</p>
-            <h3>Operations</h3>
-            <p>Manage drivers, review the calendar, and keep an eye on the championship picture.</p>
-            <div class="menu-card-actions">
-              <button id="market">Drivers</button>
-              <button id="teams">Teams</button>
-              <button id="calendar">Calendar</button>
-              <button id="standings">Standings</button>
-            </div>
+        <article id="myDriversCard" class="glass dashboard-eight-card dashboard-drivers-summary-card">
+          <p class="menu-card-kicker">Lineup</p>
+          <h3>My Drivers</h3>
+          <p class="dashboard-subtitle">Active drivers and their current championship output.</p>
+          <div class="driver-summary-list">
+            ${buildMyDriversMarkup() || '<p class="driver-summary-empty">No active drivers selected.</p>'}
           </div>
-        </div>
+        </article>
 
-        <div id="myDriversCard" class="menu-card-group driver-card-group">
-          <span
-            class="menu-card-gradient"
-            style="background: linear-gradient(315deg, #0c0404, #e10600);"
-          ></span>
-          <span
-            class="menu-card-gradient menu-card-gradient-blur"
-            style="background: linear-gradient(315deg, #0c0404, #e10600);"
-          ></span>
-          <span class="menu-card-glow">
-            <span class="menu-card-orb menu-card-orb-top"></span>
-            <span class="menu-card-orb menu-card-orb-bottom"></span>
-          </span>
-          <div class="menu-card-content glass tile">
-            <p class="menu-card-kicker">Lineup</p>
-            <h3>My Drivers</h3>
-            <p>Your current pairing with race numbers, season points, and best finish.</p>
-            <div id="myDriversList" class="driver-summary-list">
-              ${buildMyDriversMarkup() || '<p class="driver-summary-empty">No drivers signed yet.</p>'}
-            </div>
+        ${buildDriverProfileCard(activeDrivers[0], "Driver Profile 1")}
+        ${buildDriverProfileCard(activeDrivers[1], "Driver Profile 2")}
+
+        <article class="glass dashboard-eight-card">
+          <p class="menu-card-kicker">Constructors Table</p>
+          <h3>Team Standing</h3>
+          <div class="detail-card-stats">
+            <div class="driver-detail-stat"><span>Current Position</span><strong>P${teamStanding.position}/${teamStanding.total}</strong></div>
+            <div class="driver-detail-stat"><span>Team Points</span><strong>${teamStanding.points}</strong></div>
+            <div class="driver-detail-stat"><span>Season Round</span><strong>R${state.season.round}</strong></div>
+            <div class="driver-detail-stat"><span>Current Day</span><strong>D${currentDay}</strong></div>
           </div>
-        </div>
+          <button id="openStandingsCard">Open Standings</button>
+        </article>
       </div>
 
       <section class="dashboard-day-controls glass">
@@ -315,6 +276,7 @@ export function renderDashboard(root) {
   const teamsBtn = root.querySelector("#teams");
   const calendarBtn = root.querySelector("#calendar");
   const standingsBtn = root.querySelector("#standings");
+  const openStandingsCardBtn = root.querySelector("#openStandingsCard");
   const myDriversCard = root.querySelector("#myDriversCard");
   const featureWeekend = root.querySelector("#featureWeekend");
   const featureUpgrade = root.querySelector("#featureUpgrade");
@@ -352,9 +314,16 @@ export function renderDashboard(root) {
   teamsBtn.onclick = () => renderTeams(root);
   calendarBtn.onclick = () => renderCalendar(root);
   standingsBtn.onclick = () => renderLeaderboard(root);
+  if (openStandingsCardBtn) {
+    openStandingsCardBtn.onclick = () => renderLeaderboard(root);
+  }
   myDriversCard.onclick = () => renderMyDrivers(root);
-  featureWeekend.onclick = () => renderWeekend(root);
-  featureUpgrade.onclick = () => renderOffice(root);
+  if (featureWeekend) {
+    featureWeekend.onclick = () => renderWeekend(root);
+  }
+  if (featureUpgrade) {
+    featureUpgrade.onclick = () => renderOffice(root);
+  }
   if (simulateDayBtn) {
     simulateDayBtn.onclick = async () => {
       const result = simulateNextDay(state);

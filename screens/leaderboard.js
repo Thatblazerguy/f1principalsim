@@ -7,7 +7,7 @@ import { renderSponsors } from "./sponsors.js";
 import { renderMarket } from "./market.js";
 import { renderCalendar } from "./calendar.js";
 import { renderTeams } from "./teams.js";
-import { buildHubNav, wireHubNav } from "./hubNav.js";
+import { buildHubNav, wireHubNav } from "./hubNav";
 import { ensureTeamState, getTeamRoster } from "../utils/teamState.js";
 import { getDriverHeadshotUrl } from "../data/drivers.js";
 

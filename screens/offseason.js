@@ -9,7 +9,7 @@ import { renderMarket } from "./market.js";
 import { renderCalendar } from "./calendar.js";
 import { renderLeaderboard } from "./leaderboard.js";
 import { renderTeams } from "./teams.js";
-import { buildHubNav, wireHubNav } from "./hubNav.js";
+import { buildHubNav, wireHubNav } from "./hubNav";
 import { ensureTeamState, getTeamRoster, getActiveDrivers, setTeamActiveDrivers } from "../utils/teamState.js";
 import { rotateSponsorOffers } from "../utils/sponsorDeals.js";
 import { syncGame } from "../lib/supabaseApi.js";

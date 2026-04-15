@@ -14,7 +14,7 @@ import { renderLeaderboard } from "./leaderboard.js";
 import { renderSponsors } from "./sponsors.js";
 import { renderOffseason } from "./offseason.js";
 import { renderTeams } from "./teams.js";
-import { buildHubNav, wireHubNav } from "./hubNav.js";
+import { buildHubNav, wireHubNav } from "./hubNav";
 import { ensureTeamState, gainTeamXP, gainTeamCarXP, getActiveDrivers } from "../utils/teamState.js";
 import { getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
 import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
