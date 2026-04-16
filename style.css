@@ -1078,8 +1078,17 @@ input:not([type="checkbox"]), select {
 .dashboard-shell {
   display: grid;
   gap: 18px;
-  width: min(100%, 1160px);
+  width: 100%;
   margin: 0 auto;
+  justify-items: center;
+}
+
+.dashboard-shell > * {
+  width: min(100%, 1120px);
+}
+
+#dashboardRaceTimeline {
+  width: min(100%, 1120px);
 }
 
 .dashboard-eight-grid {
@@ -1095,11 +1104,75 @@ input:not([type="checkbox"]), select {
   overflow: hidden;
   min-height: 260px;
   border-radius: 22px;
-  background:
-    radial-gradient(120% 140% at 88% 0%, rgba(225, 6, 0, 0.42) 0%, rgba(225, 6, 0, 0.12) 42%, rgba(0, 0, 0, 0.16) 78%),
-    linear-gradient(165deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 34px rgba(0, 0, 0, 0.34);
+}
+
+.dashboard-eight-card::before,
+.dashboard-eight-card::after,
+.dashboard-day-controls::before,
+.dashboard-day-controls::after,
+.dashboard-notifications::before,
+.dashboard-notifications::after,
+.dashboard-content-panel::before,
+.dashboard-content-panel::after,
+.dashboard-timeline-shell::before,
+.dashboard-timeline-shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50px;
+  width: 54%;
+  height: 100%;
+  border-radius: 18px;
+  transform: skewX(15deg);
+  pointer-events: none;
+  transition: all 0.45s ease;
+  z-index: 0;
+}
+
+.dashboard-eight-card::before,
+.dashboard-day-controls::before,
+.dashboard-notifications::before,
+.dashboard-content-panel::before,
+.dashboard-timeline-shell::before {
+  background: linear-gradient(315deg, var(--card-from, #ffbc00), var(--card-to, #ff0058));
+  opacity: 0.28;
+}
+
+.dashboard-eight-card::after,
+.dashboard-day-controls::after,
+.dashboard-notifications::after,
+.dashboard-content-panel::after,
+.dashboard-timeline-shell::after {
+  background: linear-gradient(315deg, var(--card-from, #ffbc00), var(--card-to, #ff0058));
+  opacity: 0.24;
+  filter: blur(30px);
+}
+
+.dashboard-eight-card:hover::before,
+.dashboard-eight-card:hover::after,
+.dashboard-day-controls:hover::before,
+.dashboard-day-controls:hover::after,
+.dashboard-notifications:hover::before,
+.dashboard-notifications:hover::after,
+.dashboard-content-panel:hover::before,
+.dashboard-content-panel:hover::after,
+.dashboard-timeline-shell:hover::before,
+.dashboard-timeline-shell:hover::after {
+  left: 20px;
+  width: calc(100% - 90px);
+  transform: skewX(0deg);
+}
+
+.dashboard-eight-card > *,
+.dashboard-day-controls > *,
+.dashboard-notifications > *,
+.dashboard-content-panel > *,
+.dashboard-timeline-shell > * {
+  position: relative;
+  z-index: 1;
 }
 
 .dashboard-eight-card .menu-card-kicker {
@@ -1461,6 +1534,9 @@ input:not([type="checkbox"]), select {
 .dashboard-content-panel {
   min-height: 260px;
   border-radius: 24px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
 }
 
 .market-panel,
@@ -1775,11 +1851,17 @@ input:not([type="checkbox"]), select {
   align-items: center;
   border-radius: 20px;
   margin-top: 2px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
 }
 
 .dashboard-timeline-shell {
   border-radius: 20px;
   margin-top: 2px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
 }
 
 .dashboard-timeline-head {
@@ -1877,6 +1959,9 @@ input:not([type="checkbox"]), select {
 
 .dashboard-notifications {
   border-radius: 20px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
 }
 
 .dashboard-notification-list {

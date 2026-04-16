@@ -44,8 +44,8 @@ export default function SkewCards() {
             />
 
             <span className="pointer-events-none absolute inset-0 z-10">
-              <span className="absolute left-0 top-0 h-0 w-0 rounded-lg bg-[rgba(255,255,255,0.1)] opacity-0 shadow-[0_5px_15px_rgba(0,0,0,0.08)] backdrop-blur-[10px] transition-all duration-100 animate-blob group-hover:left-[50px] group-hover:top-[-50px] group-hover:h-[100px] group-hover:w-[100px] group-hover:opacity-100" />
-              <span className="animation-delay-1000 absolute bottom-0 right-0 h-0 w-0 rounded-lg bg-[rgba(255,255,255,0.1)] opacity-0 shadow-[0_5px_15px_rgba(0,0,0,0.08)] backdrop-blur-[10px] transition-all duration-500 animate-blob group-hover:bottom-[-50px] group-hover:right-[50px] group-hover:h-[100px] group-hover:w-[100px] group-hover:opacity-100" />
+              <span className="animate-blob absolute left-0 top-0 h-0 w-0 rounded-lg bg-[rgba(255,255,255,0.1)] opacity-0 shadow-[0_5px_15px_rgba(0,0,0,0.08)] backdrop-blur-[10px] transition-all duration-100 group-hover:left-[50px] group-hover:top-[-50px] group-hover:h-[100px] group-hover:w-[100px] group-hover:opacity-100" />
+              <span className="animate-blob animation-delay-1000 absolute bottom-0 right-0 h-0 w-0 rounded-lg bg-[rgba(255,255,255,0.1)] opacity-0 shadow-[0_5px_15px_rgba(0,0,0,0.08)] backdrop-blur-[10px] transition-all duration-500 group-hover:bottom-[-50px] group-hover:right-[50px] group-hover:h-[100px] group-hover:w-[100px] group-hover:opacity-100" />
             </span>
 
             <div className="relative left-0 z-20 rounded-lg bg-[rgba(255,255,255,0.05)] p-[20px_40px] text-white shadow-lg backdrop-blur-[10px] transition-all duration-500 group-hover:left-[-25px] group-hover:p-[60px_40px]">
@@ -69,7 +69,7 @@ export default function SkewCards() {
         }
         .animate-blob { animation: blob 2s ease-in-out infinite; }
         .animation-delay-1000 { animation-delay: -1s; }
-        .shadow-\\[0_5px_15px_rgba\\(0\\,0\\,0\\,0\\.08\\)\\] { box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+        .shadow-\\[0_5px_15px_rgba\\(0,0,0,0.08\\) { box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
       `}</style>
     </>
   );
