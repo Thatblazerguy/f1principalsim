@@ -72,7 +72,7 @@ export function Header() {
           </div>
 
           {/* Center: Nav links */}
-          <div className="hidden md:flex flex-1 items-center gap-2 whitespace-nowrap ml-8">
+          <div className="flex flex-1 items-center gap-2 whitespace-nowrap ml-8">
             {primaryLinks.map((link, i) => (
               <a key={i} className={buttonVariants({ variant: 'ghost', size: 'sm' })} href={link.href}>
                 {link.label}
