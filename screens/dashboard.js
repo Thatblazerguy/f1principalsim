@@ -213,6 +213,18 @@ export function renderDashboard(root) {
         </article>
       </div>
 
+      <div class="glass tile large dashboard-content-panel" id="content" style="--card-from:#03a9f4;--card-to:#ff0058;">
+        <div class="dashboard-feature-panel">
+          <div>
+            <p class="dashboard-eyebrow">Quick Access</p>
+            <h3>Team Overview</h3>
+            <p class="dashboard-subtitle">
+              Use the navigation above or jump in through the main cards to manage upgrades, scouting, standings, and your race lineup.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <section class="dashboard-day-controls glass" style="--card-from:#ffbc00;--card-to:#ff0058;">
         <div>
           <p class="dashboard-eyebrow">Calendar Simulation</p>
@@ -255,18 +267,6 @@ export function renderDashboard(root) {
           `
           : ""
       }
-
-      <div class="glass tile large dashboard-content-panel" id="content" style="--card-from:#03a9f4;--card-to:#ff0058;">
-        <div class="dashboard-feature-panel">
-          <div>
-            <p class="dashboard-eyebrow">Quick Access</p>
-            <h3>Team Overview</h3>
-            <p class="dashboard-subtitle">
-              Use the navigation above or jump in through the main cards to manage upgrades, scouting, standings, and your race lineup.
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   `;
 
