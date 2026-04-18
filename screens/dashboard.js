@@ -213,7 +213,7 @@ export function renderDashboard(root) {
         </article>
       </div>
 
-      <div class="glass tile large dashboard-content-panel" id="content" style="--card-from:#7a0000;--card-to:#ff4d4d;">
+      <div class="glass dashboard-content-panel" id="content" style="--card-from:#7a0000;--card-to:#ff4d4d;">
         <div class="dashboard-feature-panel">
           <div>
             <p class="dashboard-eyebrow">Quick Access</p>

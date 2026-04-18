@@ -1076,19 +1076,14 @@ input:not([type="checkbox"]), select {
 }
 
 .dashboard-shell {
-  display: grid;
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   width: 100%;
+  max-width: 1280px;
   margin: 0 auto;
-  justify-items: center;
-}
-
-.dashboard-shell > * {
-  width: min(100%, 1120px);
-}
-
-#dashboardRaceTimeline {
-  width: min(100%, 1120px);
+  padding: 0 24px;
+  box-sizing: border-box;
 }
 
 .dashboard-eight-grid {
@@ -1097,33 +1092,21 @@ input:not([type="checkbox"]), select {
   gap: 20px;
   align-items: stretch;
   width: 100%;
-  margin-bottom: 20px;
-}
-
-@media (max-width: 1024px) {
-  .dashboard-eight-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .dashboard-eight-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .dashboard-eight-card {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  height: 200px;
+  height: 260px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 34px rgba(0, 0, 0, 0.34);
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  justify-content: space-between;
+  padding: 22px;
 }
 
 .dashboard-eight-card::before,
@@ -1549,11 +1532,13 @@ input:not([type="checkbox"]), select {
 }
 
 .dashboard-content-panel {
-  min-height: 260px;
-  border-radius: 24px;
+  width: 100%;
+  border-radius: 22px;
+  padding: 30px;
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .market-panel,
@@ -1866,37 +1851,27 @@ input:not([type="checkbox"]), select {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  border-radius: 20px;
-  margin-top: 20px;
+  border-radius: 22px;
   padding: 30px;
   position: relative;
   isolation: isolate;
   overflow: hidden;
   width: 100%;
-}
-
-.dashboard-content-panel {
-  width: 100%;
-  border-radius: 24px;
-  margin-top: 20px;
-  padding: 30px;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
+  box-sizing: border-box;
 }
 
 #dashboardRaceTimeline {
   width: 100%;
-  margin-top: 20px;
 }
 
 .dashboard-timeline-shell {
   width: 100%;
-  border-radius: 20px;
+  border-radius: 22px;
   padding: 30px;
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .dashboard-timeline-head {
@@ -1993,12 +1968,13 @@ input:not([type="checkbox"]), select {
 }
 
 .dashboard-notifications {
-  border-radius: 20px;
-  margin-top: 16px;
-  padding: 24px;
+  width: 100%;
+  border-radius: 22px;
+  padding: 30px;
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .dashboard-notification-list {
@@ -2132,8 +2108,7 @@ input:not([type="checkbox"]), select {
 }
 
 .tile.large {
-  grid-column: span 2;
-  min-height: 320px;
+  min-height: auto;
 }
 
 .stat {
@@ -2644,7 +2619,8 @@ input:not([type="checkbox"]), select {
   }
 
   .dashboard-eight-card {
-    min-height: 0;
+    height: auto;
+    min-height: 200px;
   }
 
   .driver-card-group {
@@ -2707,10 +2683,20 @@ input:not([type="checkbox"]), select {
   .dashboard-race-card {
     width: min(82vw, 230px);
   }
+
+  .dashboard-day-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
-@media (min-width: 769px) and (max-width: 1200px) {
+@media (min-width: 769px) and (max-width: 1024px) {
   .dashboard-eight-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard-eight-card {
+    height: auto;
+    min-height: 220px;
   }
 }
