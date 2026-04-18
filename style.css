@@ -1097,8 +1097,7 @@ input:not([type="checkbox"]), select {
 .dashboard-eight-card {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
-  height: 260px;
+  min-height: 300px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1106,7 +1105,12 @@ input:not([type="checkbox"]), select {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 22px;
+  padding: 24px 24px 20px;
+}
+
+.dashboard-eight-card button,
+.dashboard-eight-card .menu-card-actions {
+  margin-top: auto;
 }
 
 .dashboard-eight-card::before,
