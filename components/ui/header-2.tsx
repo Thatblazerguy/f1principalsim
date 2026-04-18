@@ -86,7 +86,12 @@ export function Header() {
                   <ChevronDown className="opacity-60" size={14} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="min-w-[160px]">
+              <DropdownMenuContent
+                align="center"
+                side="bottom"
+                sideOffset={8}
+                className="min-w-[180px] z-[100] rounded-lg shadow-lg"
+              >
                 {moreLinks.map((link) => (
                   <DropdownMenuItem key={link.label} asChild>
                     <a href={link.href}>{link.label}</a>
