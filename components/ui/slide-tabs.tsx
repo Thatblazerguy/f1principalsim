@@ -5,7 +5,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "../components/ui/dropdown-menu";
+} from "./dropdown-menu";
 import { ChevronDown } from "lucide-react";
 
 export interface SlideTabItem {
