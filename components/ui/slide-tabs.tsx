@@ -72,7 +72,7 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
           setPosition(prev => ({ ...prev, opacity: 0 }));
         }
       }}
-      className="flex items-center gap-2"
+      className="flex flex-row items-center gap-2 whitespace-nowrap"
     >
       {primaryItems.map((tab, i) => (
         <Tab
