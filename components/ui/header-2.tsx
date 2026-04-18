@@ -58,21 +58,21 @@ export function Header() {
     >
       <nav
         className={cn(
-          'flex h-14 w-full items-center md:h-12 md:transition-all md:ease-out',
+          'flex flex-row items-center justify-between w-full h-14 md:h-12 md:transition-all md:ease-out',
           {
             'md:px-2': scrolled,
           },
         )}
       >
-        <div className="max-w-[1300px] mx-auto w-full flex items-center justify-between px-4">
+        <div className="max-w-[1300px] mx-auto flex items-center justify-between px-4">
           {/* Left: Logo */}
           <div className="flex items-center gap-2">
              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#7e0c0c] to-[#e10600] flex items-center justify-center text-white font-bold text-xs">F1</div>
-             <span className="font-bold text-sm tracking-tight">Command Hub</span>
+             <span className="font-bold text-sm tracking-tight whitespace-nowrap">Command Hub</span>
           </div>
 
           {/* Center: Nav links */}
-          <div className="hidden md:flex flex-1 justify-center items-center gap-2 whitespace-nowrap">
+          <div className="hidden md:flex flex-1 items-center gap-2 whitespace-nowrap ml-8">
             {primaryLinks.map((link, i) => (
               <a key={i} className={buttonVariants({ variant: 'ghost', size: 'sm' })} href={link.href}>
                 {link.label}
