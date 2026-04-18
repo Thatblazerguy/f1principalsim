@@ -4,22 +4,34 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { useScroll } from '@/components/ui/use-scroll';
+import {
+	DropdownMenu,
+	DropdownMenuTrigger,
+	DropdownMenuContent,
+	DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-react';
 
 export function Header() {
 	const [open, setOpen] = React.useState(false);
 	const scrolled = useScroll(10);
 
-	const links = [
+	const primaryLinks = [
 		{ label: 'Dashboard', href: '#' },
 		{ label: 'Race Weekend', href: '#' },
 		{ label: 'Upgrade Car', href: '#' },
 		{ label: 'My Drivers', href: '#' },
+	];
+
+	const moreLinks = [
 		{ label: 'Teams', href: '#' },
 		{ label: 'Sponsors', href: '#' },
 		{ label: 'Driver Market', href: '#' },
 		{ label: 'Calendar', href: '#' },
 		{ label: 'Standings', href: '#' },
 	];
+
+	const allLinks = [...primaryLinks, ...moreLinks];
 
 	React.useEffect(() => {
 		if (open) {
@@ -64,8 +76,8 @@ export function Header() {
 				</div>
 
 				{/* Desktop Nav Links */}
-				<div className="hidden lg:flex items-center gap-1 overflow-x-auto flex-nowrap">
-					{links.map((link, i) => (
+				<div className="hidden lg:flex items-center justify-center flex-1 gap-2">
+					{primaryLinks.map((link, i) => (
 						<a
 							key={i}
 							className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/85 border border-white/8 bg-white/[0.04] hover:bg-white/10 hover:border-white/15 transition-colors shrink-0"
@@ -74,6 +86,33 @@ export function Header() {
 							{link.label}
 						</a>
 					))}
+
+					{/* More Dropdown */}
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button
+								className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/85 border border-white/8 bg-white/[0.04] hover:bg-white/10 hover:border-white/15 transition-colors shrink-0 gap-1"
+							>
+								More
+								<ChevronDown size={14} className="opacity-70" />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							className="hub-dropdown-content"
+							sideOffset={8}
+							align="center"
+						>
+							{moreLinks.map((link) => (
+								<DropdownMenuItem
+									key={link.label}
+									className="hub-dropdown-item"
+									asChild
+								>
+									<a href={link.href}>{link.label}</a>
+								</DropdownMenuItem>
+							))}
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 
 				{/* Desktop Logout */}
@@ -110,7 +149,7 @@ export function Header() {
 					)}
 				>
 					<div className="grid gap-y-1">
-						{links.map((link) => (
+						{allLinks.map((link) => (
 							<a
 								key={link.label}
 								className="flex items-center justify-start rounded-xl px-4 py-3 text-sm font-semibold text-white/85 hover:bg-white/8 hover:text-white transition-colors"
