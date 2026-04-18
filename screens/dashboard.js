@@ -149,7 +149,7 @@ export function renderDashboard(root) {
     ${buildHubNav("dashboard")}
     <div class="dashboard-shell">
       <div class="dashboard-eight-grid">
-        <article class="glass dashboard-eight-card" style="--card-from:#ffbc00;--card-to:#ff0058;">
+        <article class="glass dashboard-eight-card" style="--card-from:#7a0000;--card-to:#ff4d4d;">
           <p class="menu-card-kicker">Weekend • ${currentYear}</p>
           <h3>${isSeasonOver ? "Season Complete" : `Next: ${nextRound ? nextRound.name : "Grand Prix"}`}</h3>
           <p class="dashboard-subtitle">
@@ -162,21 +162,21 @@ export function renderDashboard(root) {
           <button id="wk">${isSeasonOver ? "Open Offseason" : "Race Weekend"}</button>
         </article>
 
-        <article class="glass dashboard-eight-card" style="--card-from:#03a9f4;--card-to:#ff0058;">
+        <article class="glass dashboard-eight-card" style="--card-from:#7a0000;--card-to:#ff4d4d;">
           <p class="menu-card-kicker">Progress</p>
           <h3>Team Level</h3>
           <p class="stat">Lv ${state.team.level}</p>
           <p class="dashboard-subtitle">Budget available: $${state.team.budget}M</p>
         </article>
 
-        <article class="glass dashboard-eight-card" style="--card-from:#ff4d4d;--card-to:#ff9966;">
+        <article class="glass dashboard-eight-card" style="--card-from:#7a0000;--card-to:#ff4d4d;">
           <p class="menu-card-kicker">Engineering</p>
           <h3>R&amp;D</h3>
           <p class="dashboard-subtitle">Invest in upgrades, raise component levels, and prepare the car for the long season.</p>
           <button id="office">Upgrade Car</button>
         </article>
 
-        <article class="glass dashboard-eight-card" style="--card-from:#4dff03;--card-to:#00d0ff;">
+        <article class="glass dashboard-eight-card" style="--card-from:#7a0000;--card-to:#ff4d4d;">
           <p class="menu-card-kicker">Operations</p>
           <h3>Operations</h3>
           <p class="dashboard-subtitle">Manage drivers, review the calendar, and keep an eye on the championship picture.</p>
@@ -188,7 +188,7 @@ export function renderDashboard(root) {
           </div>
         </article>
 
-        <article id="myDriversCard" class="glass dashboard-eight-card dashboard-drivers-summary-card" style="--card-from:#00ffa3;--card-to:#dc1fff;">
+        <article id="myDriversCard" class="glass dashboard-eight-card dashboard-drivers-summary-card" style="--card-from:#7a0000;--card-to:#ff4d4d;">
           <p class="menu-card-kicker">Lineup</p>
           <h3>My Drivers</h3>
           <p class="dashboard-subtitle">Active drivers and their current championship output.</p>
@@ -197,10 +197,10 @@ export function renderDashboard(root) {
           </div>
         </article>
 
-        ${buildDriverProfileCard(activeDrivers[0], "Driver Profile 1")}
-        ${buildDriverProfileCard(activeDrivers[1], "Driver Profile 2")}
+        ${buildDriverProfileCard(activeDrivers[0], "Driver Profile 1").replace('--card-from:#6d5dfc;--card-to:#00d0ff;', '--card-from:#7a0000;--card-to:#ff4d4d;')}
+        ${buildDriverProfileCard(activeDrivers[1], "Driver Profile 2").replace('--card-from:#6d5dfc;--card-to:#00d0ff;', '--card-from:#7a0000;--card-to:#ff4d4d;')}
 
-        <article class="glass dashboard-eight-card" style="--card-from:#6d5dfc;--card-to:#00d0ff;">
+        <article class="glass dashboard-eight-card" style="--card-from:#7a0000;--card-to:#ff4d4d;">
           <p class="menu-card-kicker">Constructors Table</p>
           <h3>Team Standing</h3>
           <div class="detail-card-stats">
@@ -213,7 +213,7 @@ export function renderDashboard(root) {
         </article>
       </div>
 
-      <div class="glass tile large dashboard-content-panel" id="content" style="--card-from:#03a9f4;--card-to:#ff0058;">
+      <div class="glass tile large dashboard-content-panel" id="content" style="--card-from:#7a0000;--card-to:#ff4d4d;">
         <div class="dashboard-feature-panel">
           <div>
             <p class="dashboard-eyebrow">Quick Access</p>
@@ -225,7 +225,9 @@ export function renderDashboard(root) {
         </div>
       </div>
 
-      <section class="dashboard-day-controls glass" style="--card-from:#ffbc00;--card-to:#ff0058;">
+      <div id="dashboardRaceTimeline" style="--card-from:#7a0000;--card-to:#ff4d4d;"></div>
+
+      <section class="dashboard-day-controls glass" style="--card-from:#7a0000;--card-to:#ff4d4d;">
         <div>
           <p class="dashboard-eyebrow">Calendar Simulation</p>
           <h3>Day ${currentDay} • ${formatSeasonDate(state.season.year || 1, currentDay)}</h3>
@@ -244,12 +246,10 @@ export function renderDashboard(root) {
         </div>
       </section>
 
-      <div id="dashboardRaceTimeline" style="--card-from:#4dff03;--card-to:#00d0ff;"></div>
-
       ${
         latestNotifications.length
           ? `
-            <section class="glass dashboard-notifications" style="--card-from:#4dff03;--card-to:#00d0ff;">
+            <section class="glass dashboard-notifications" style="--card-from:#7a0000;--card-to:#ff4d4d;">
               <p class="menu-card-kicker">Team Inbox</p>
               <div class="dashboard-notification-list">
                 ${latestNotifications
