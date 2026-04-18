@@ -187,20 +187,10 @@ body {
 .hub-slide-tabs {
   position: relative;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   width: fit-content;
   max-width: 100%;
-  margin: 0 auto;
-  padding: 4px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.35);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(10px);
-  list-style: none;
-  gap: 4px;
 }
 
 .hub-slide-tab-item {

@@ -32,7 +32,7 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
     width: 0,
     opacity: 0,
   });
-  const tabsRef = useRef<Array<HTMLLIElement | null>>([]);
+  const tabsRef = useRef<Array<HTMLDivElement | null>>([]);
 
   const selected = Math.max(
     0,
@@ -46,7 +46,7 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
         const { width } = selectedTab.getBoundingClientRect();
         setPosition({
           left: selectedTab.offsetLeft,
-          width,
+          width: width,
           opacity: 1,
         });
       }
@@ -56,7 +56,7 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
   }, [selected, primaryItems.length, isDropdownActive]);
 
   return (
-    <ul
+    <div
       onMouseLeave={() => {
         if (!isDropdownActive) {
           const selectedTab = tabsRef.current[selected];
@@ -64,7 +64,7 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
             const { width } = selectedTab.getBoundingClientRect();
             setPosition({
               left: selectedTab.offsetLeft,
-              width,
+              width: width,
               opacity: 1,
             });
           }
@@ -72,7 +72,7 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
           setPosition(prev => ({ ...prev, opacity: 0 }));
         }
       }}
-      className="hub-slide-tabs"
+      className="flex items-center gap-2"
     >
       {primaryItems.map((tab, i) => (
         <Tab
@@ -89,7 +89,7 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
       ))}
 
       {dropdownItems.length > 0 && (
-        <li className="hub-slide-tab-item">
+        <div className="hub-slide-tab-item">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -116,21 +116,21 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-        </li>
+        </div>
       )}
 
       <Cursor position={position} />
-      <li className="hub-slide-tab-item">
+      <div className="hub-slide-tab-item">
         <button type="button" className="hub-slide-tab hub-slide-tab-logout" onClick={onLogout}>
           Logout
         </button>
-      </li>
-    </ul>
+      </div>
+    </div>
   );
 };
 
 const Tab = React.forwardRef<
-  HTMLLIElement,
+  HTMLDivElement,
   {
     children: React.ReactNode;
     setPosition: (position: { left: number; width: number; opacity: number }) => void;
@@ -138,12 +138,12 @@ const Tab = React.forwardRef<
     isActive: boolean;
   }
 >(({ children, setPosition, onClick, isActive }, ref) => {
-  const localRef = useRef<HTMLLIElement | null>(null);
+  const localRef = useRef<HTMLDivElement | null>(null);
 
-  React.useImperativeHandle(ref, () => localRef.current as HTMLLIElement, []);
+  React.useImperativeHandle(ref, () => localRef.current as HTMLDivElement, []);
 
   return (
-    <li
+    <div
       ref={localRef}
       onClick={onClick}
       onMouseEnter={() => {
@@ -160,7 +160,7 @@ const Tab = React.forwardRef<
       <button type="button" className={`hub-slide-tab ${isActive ? "hub-slide-tab-active" : ""}`}>
         {children}
       </button>
-    </li>
+    </div>
   );
 });
 
@@ -168,11 +168,18 @@ Tab.displayName = "Tab";
 
 const Cursor = ({ position }: { position: { left: number; width: number; opacity: number } }) => {
   return (
-    <motion.li
+    <motion.div
       animate={{
         ...position,
       }}
       className="hub-slide-cursor"
+      style={{
+        position: "absolute",
+        zIndex: 1,
+        pointerEvents: "none",
+        height: "36px", // matching hub-slide-tab min-height
+        top: "auto", // will be aligned by positioning logic if needed
+      }}
     />
   );
 };
