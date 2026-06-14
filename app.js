@@ -1,4 +1,4 @@
-import { renderLanding } from "./screens/landing.js";
+import { renderLanding } from "./screens/landing.tsx";
 import { syncDriversFromOpenF1 } from "./data/drivers.js";
 
 async function boot() {

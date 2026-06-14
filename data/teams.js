@@ -55,6 +55,23 @@ export function assignReplacementReserve(teams, teamName, blockedNames = []) {
   return replacement;
 }
 
+export function fillEmptySeats(teams, teamName, blockedNames = []) {
+  const team = teams.find(entry => entry.name === teamName);
+  if (!team) return;
+
+  // Fill main driver seats until there are 2
+  while (team.drivers.length < 2) {
+    const pool = buildReserveCandidatePool(teams, blockedNames);
+    if (!pool.length) break;
+    team.signDriver(pool[0]); // signs as main driver by default
+  }
+
+  // Fill reserve if missing
+  if (!team.reserveDriver) {
+    assignReplacementReserve(teams, teamName, blockedNames);
+  }
+}
+
 export function createAiTeams() {
   return [
     createTeam(

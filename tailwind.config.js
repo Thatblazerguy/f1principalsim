@@ -20,7 +20,16 @@ export default {
           border: '#2a2a2a',
           text: '#f5f5f5',
           muted: '#b6b6b6',
-        }
+        },
+        primary: "#E10600",
+        surface: "#1A1E2E",
+        background: "#0B0F19",
+        "on-surface": "#FFFFFF",
+        "on-surface-variant": "#94A3B8"
+      },
+      fontFamily: {
+        headline: ["Formula1-Wide", "sans-serif"],
+        data: ["Formula1-Bold", "sans-serif"]
       }
     },
   },
