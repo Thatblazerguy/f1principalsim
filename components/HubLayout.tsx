@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { state } from '../state.js';
 import { canSimulateNextDay, simulateNextDay } from '../utils/seasonTimeline.js';
-import { syncGame } from '../lib/supabaseApi.js';
+import { syncGame, logoutUser } from '../lib/supabaseApi.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageTransition, AnimatedNumber, microTransition } from './ui/motion.tsx';
 
@@ -265,7 +265,15 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
 
         <div style={{padding:'0 16px', marginTop:'auto', display:'flex', flexDirection:'column', gap:'10px'}}>
           <button
-            onClick={() => { unmountLayout(); window.location.reload(); }}
+            onClick={async () => {
+              try {
+                await logoutUser();
+              } catch (err) {
+                console.error("Error signing out:", err);
+              }
+              unmountLayout();
+              window.location.reload();
+            }}
             style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', color:HUB.textMuted, background:'none', border:'none', cursor:'pointer', fontSize:'12px', fontWeight:700, padding:'8px', transition:'color 0.15s', fontFamily:HUB.fontBold}}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.color='#f87171'}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.color=HUB.textMuted}
