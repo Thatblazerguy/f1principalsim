@@ -6,6 +6,9 @@ import { mountLayout, HUB, glassCard, sectionLabel, pageTitle, pageSubtitle } fr
 import { motion } from 'framer-motion';
 import { SlideUp, AnimatedNumber } from '../components/ui/motion.tsx';
 
+let selectedDriver1: string | null = null;
+let selectedDriver2: string | null = null;
+
 // Mock generator for historical data based on points
 const getMockData = (points, isTeam = false) => {
   const divisor = isTeam ? 40 : 25;
@@ -55,6 +58,50 @@ export function renderLeaderboard(root) {
   const gapToP4Label = myTeamIndex > 3 ? `-${gapToP4} PTS` : myTeamIndex < 3 ? `+${gapToP4} PTS` : '0 PTS';
 
   const activeDrivers = getActiveDrivers(state.team);
+
+  const allDriverNames = driverRows.map(d => d.name);
+  if (!selectedDriver1 || !allDriverNames.includes(selectedDriver1)) {
+    selectedDriver1 = activeDrivers[0]?.name || allDriverNames[0] || '';
+  }
+  if (!selectedDriver2 || !allDriverNames.includes(selectedDriver2)) {
+    selectedDriver2 = activeDrivers[1]?.name || allDriverNames[1] || '';
+  }
+
+  const v1_pts = selectedDriver1 ? (state.standings.drivers[selectedDriver1] || 0) : 0;
+  const v2_pts = selectedDriver2 ? (state.standings.drivers[selectedDriver2] || 0) : 0;
+
+  const m1 = getMockData(v1_pts);
+  const m2 = getMockData(v2_pts);
+
+  const comparisonMetrics = [
+     { label: 'PTS', v1: v1_pts, v2: v2_pts, better: 'higher' },
+     { label: 'WINS', v1: m1.wins, v2: m2.wins, better: 'higher' },
+     { label: 'PODS', v1: m1.podiums, v2: m2.podiums, better: 'higher' },
+     { label: 'AVG FIN', v1: m1.avgFin, v2: m2.avgFin, better: 'lower' },
+     { label: 'MOMENTUM', v1: m1.momentum, v2: m2.momentum, better: 'higher' },
+  ];
+
+  const selectStyle = {
+    background: 'rgba(255,255,255,0.03)',
+    border: `1px solid ${HUB.borderMid}`,
+    borderRadius: '6px',
+    color: '#fff',
+    fontSize: '12px',
+    fontFamily: HUB.fontBold,
+    padding: '8px 12px',
+    cursor: 'pointer',
+    outline: 'none',
+    width: '180px',
+    textAlign: 'left' as const,
+    appearance: 'none' as const,
+    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 8px center',
+    backgroundSize: '16px',
+    paddingRight: '30px',
+    textOverflow: 'ellipsis',
+    transition: 'border-color 0.15s, background-color 0.15s',
+  };
 
   const tableHead = (cols, headers) => (
     <div style={{ display:'grid', gridTemplateColumns:cols, padding:'12px 24px', borderBottom: `1px solid ${HUB.border}` }}>
@@ -121,34 +168,92 @@ export function renderLeaderboard(root) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '32px', marginBottom: '32px' }}>
          {/* 3. Driver Battle */}
          <SlideUp delay={0.15}>
-         <div style={{ ...glassCard({ padding: '24px' }), gridColumn: 'span 7', height: '100%' }}>
-            <h3 style={{ fontSize: '12px', fontFamily: HUB.fontBold, color: '#94A3B8', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '24px' }}>Active Driver Battle</h3>
-            {activeDrivers.length === 2 ? (
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 1fr', gap: '16px', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end' }}>
-                     <span style={{ fontSize: '16px', fontFamily: HUB.fontBold, color: '#fff' }}>{activeDrivers[0].name.toUpperCase()}</span>
-                     <img src={getDriverHeadshotUrl(activeDrivers[0].name)} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `1px solid ${HUB.border}` }}/>
+         <div style={{ ...glassCard({ padding: '24px' }), gridColumn: 'span 7', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '12px', fontFamily: HUB.fontBold, color: '#94A3B8', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '24px' }}>Driver Comparison Center</h3>
+            {selectedDriver1 && selectedDriver2 ? (
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 1fr', gap: '16px', alignItems: 'center', flexGrow: 1 }}>
+                  {/* Driver 1 Selector & Profile */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px', justifyContent: 'center' }}>
+                     <select 
+                        value={selectedDriver1} 
+                        onChange={(e) => { selectedDriver1 = e.target.value; renderLeaderboard(root); }}
+                        style={selectStyle}
+                        onMouseEnter={e => {
+                           e.currentTarget.style.borderColor = HUB.accent;
+                           e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                        }}
+                        onMouseLeave={e => {
+                           e.currentTarget.style.borderColor = HUB.borderMid;
+                           e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                        }}
+                     >
+                        {driverRows.map(d => (
+                           <option key={d.name} value={d.name} style={{ background: '#0B0F19', color: '#fff' }}>
+                              {d.name.toUpperCase()}
+                           </option>
+                        ))}
+                     </select>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontBold }}>{knownDriverTeams.get(selectedDriver1)?.toUpperCase() || 'FREE'}</span>
+                        <img src={getDriverHeadshotUrl(selectedDriver1)} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `1px solid ${HUB.border}` }}/>
+                     </div>
                   </div>
+
+                  {/* Stats Comparison Column */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'center' }}>
-                     {[
-                        { label: 'PTS', v1: state.standings.drivers[activeDrivers[0].name]||0, v2: state.standings.drivers[activeDrivers[1].name]||0 },
-                        { label: 'WINS', v1: getMockData(state.standings.drivers[activeDrivers[0].name]||0).wins, v2: getMockData(state.standings.drivers[activeDrivers[1].name]||0).wins },
-                        { label: 'PODS', v1: getMockData(state.standings.drivers[activeDrivers[0].name]||0).podiums, v2: getMockData(state.standings.drivers[activeDrivers[1].name]||0).podiums },
-                     ].map(m => (
-                        <div key={m.label} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 1fr', alignItems: 'center' }}>
-                           <span style={{ fontSize: '14px', fontFamily: HUB.fontMono, color: m.v1 >= m.v2 ? '#10b981' : HUB.textMuted, fontWeight: m.v1 >= m.v2 ? 700 : 400, textAlign: 'right' }}>{m.v1}</span>
-                           <span style={{ fontSize: '9px', color: HUB.textMuted, letterSpacing: '0.05em' }}>{m.label}</span>
-                           <span style={{ fontSize: '14px', fontFamily: HUB.fontMono, color: m.v2 >= m.v1 ? '#10b981' : HUB.textMuted, fontWeight: m.v2 >= m.v1 ? 700 : 400, textAlign: 'left' }}>{m.v2}</span>
-                        </div>
-                     ))}
+                     {comparisonMetrics.map(m => {
+                        const isV1Better = m.better === 'higher' ? m.v1 > m.v2 : m.v1 < m.v2;
+                        const isV2Better = m.better === 'higher' ? m.v2 > m.v1 : m.v2 < m.v1;
+                        
+                        const c1 = isV1Better ? '#10b981' : (m.v1 === m.v2 ? '#fff' : HUB.textMuted);
+                        const c2 = isV2Better ? '#10b981' : (m.v1 === m.v2 ? '#fff' : HUB.textMuted);
+                        
+                        const w1 = isV1Better ? 700 : 400;
+                        const w2 = isV2Better ? 700 : 400;
+                        
+                        return (
+                           <div key={m.label} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 1fr', alignItems: 'center' }}>
+                              <span style={{ fontSize: '13px', fontFamily: HUB.fontMono, color: c1, fontWeight: w1, textAlign: 'right' }}>
+                                 {m.label === 'AVG FIN' ? `P${m.v1}` : m.v1}
+                              </span>
+                              <span style={{ fontSize: '9px', color: HUB.textMuted, letterSpacing: '0.05em' }}>{m.label}</span>
+                              <span style={{ fontSize: '13px', fontFamily: HUB.fontMono, color: c2, fontWeight: w2, textAlign: 'left' }}>
+                                 {m.label === 'AVG FIN' ? `P${m.v2}` : m.v2}
+                              </span>
+                           </div>
+                        );
+                     })}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-start' }}>
-                     <img src={getDriverHeadshotUrl(activeDrivers[1].name)} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `1px solid ${HUB.border}` }}/>
-                     <span style={{ fontSize: '16px', fontFamily: HUB.fontBold, color: '#fff' }}>{activeDrivers[1].name.toUpperCase()}</span>
+
+                  {/* Driver 2 Selector & Profile */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '12px', justifyContent: 'center' }}>
+                     <select 
+                        value={selectedDriver2} 
+                        onChange={(e) => { selectedDriver2 = e.target.value; renderLeaderboard(root); }}
+                        style={selectStyle}
+                        onMouseEnter={e => {
+                           e.currentTarget.style.borderColor = HUB.accent;
+                           e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                        }}
+                        onMouseLeave={e => {
+                           e.currentTarget.style.borderColor = HUB.borderMid;
+                           e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                        }}
+                     >
+                        {driverRows.map(d => (
+                           <option key={d.name} value={d.name} style={{ background: '#0B0F19', color: '#fff' }}>
+                              {d.name.toUpperCase()}
+                           </option>
+                        ))}
+                     </select>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <img src={getDriverHeadshotUrl(selectedDriver2)} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: `1px solid ${HUB.border}` }}/>
+                        <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontBold }}>{knownDriverTeams.get(selectedDriver2)?.toUpperCase() || 'FREE'}</span>
+                     </div>
                   </div>
                </div>
             ) : (
-               <p style={{ fontSize: '13px', color: HUB.textMuted, textAlign: 'center' }}>Insufficient active drivers.</p>
+               <p style={{ fontSize: '13px', color: HUB.textMuted, textAlign: 'center' }}>Insufficient drivers available for comparison.</p>
             )}
          </div>
          </SlideUp>
