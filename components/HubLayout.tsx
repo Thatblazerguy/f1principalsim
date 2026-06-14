@@ -204,7 +204,17 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
         display:'flex', flexDirection:'column', padding:'28px 0',
       }}>
         <div style={{padding:'0 28px', marginBottom:'40px'}}>
-          <h1 style={{fontSize:'18px', fontWeight:800, letterSpacing:'-0.04em', color:'#fff', margin:0, fontFamily:HUB.fontWide}}>
+          <h1 style={{
+            fontSize: `${Math.max(10, Math.min(18, 200 / Math.max(1, state.team.name.length * 1.15)))}px`, 
+            fontWeight: 800, 
+            letterSpacing: '-0.04em', 
+            color: '#fff', 
+            margin: 0, 
+            fontFamily: HUB.fontWide,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
             {state.team.name.toUpperCase()}
           </h1>
           <p style={{fontSize:'10px', fontWeight:700, color:HUB.accent, letterSpacing:'0.3em', textTransform:'uppercase', marginTop:'4px', marginBottom:0, fontFamily:HUB.fontRegular}}>
