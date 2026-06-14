@@ -91,7 +91,7 @@ export function renderMarket(root) {
                       <h3 style={{fontSize:'16px', fontFamily:HUB.fontBold, margin:0, color:'#fff'}}>{d.name.toUpperCase()}</h3>
                     </div>
                   </div>
-                  <span style={pill(false)}>MARKET: {d.market}</span>
+                  {isAcademy ? <span style={pill(true)}>ACADEMY</span> : <span style={pill(false)}>MARKET: {d.market}</span>}
                 </div>
                 <p style={{fontSize:'12px', color:HUB.textMuted, margin:0}}>Age {d.age} · Salary ${d.salary}M · Est. Potential {potential} OVR</p>
               </div>

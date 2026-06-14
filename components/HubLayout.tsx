@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import {
   LayoutDashboard, Flag, Wrench, Users, Activity,
   Bell, FastForward, LogOut, ShoppingCart, Star,
-  Trophy, CalendarDays, DollarSign
+  Trophy, CalendarDays, DollarSign, GraduationCap
 } from 'lucide-react';
 import { state } from '../state.js';
 import { canSimulateNextDay, simulateNextDay } from '../utils/seasonTimeline.js';
@@ -147,6 +147,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     null, // divider
     { id: 'engineering',  icon: <Wrench size={18}/>,          label: 'Engineering R&D', group: 'Team Ops' },
     { id: 'drivers',      icon: <Users size={18}/>,           label: 'Driver Dossiers',  group: 'Team Ops' },
+    { id: 'academy',      icon: <GraduationCap size={18}/>,   label: 'Driver Academy',   group: 'Team Ops' },
     { id: 'market',       icon: <ShoppingCart size={18}/>,    label: 'Driver Market',   group: 'Team Ops' },
     { id: 'sponsors',     icon: <Star size={18}/>,            label: 'Commercial (Sponsors)', group: 'Team Ops' },
     { id: 'finance',      icon: <DollarSign size={18}/>,      label: 'Finance Control', group: 'Team Ops' },
@@ -163,6 +164,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     const { renderWeekend }    = await import('../screens/weekend.tsx');
     const { renderOffice }     = await import('../screens/office.tsx');
     const { renderMyDrivers }  = await import('../screens/myDrivers.tsx');
+    const { renderAcademy }    = await import('../screens/academy.tsx');
     const { renderMarket }     = await import('../screens/market.tsx');
     const { renderSponsors }   = await import('../screens/sponsors.tsx');
     const { renderTeams }      = await import('../screens/teams.tsx');
@@ -179,6 +181,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
       weekend:     () => navigate(isSeasonOver ? renderOffseason : renderWeekend),
       engineering: () => navigate(renderOffice),
       drivers:     () => navigate(renderMyDrivers),
+      academy:     () => navigate(renderAcademy),
       market:      () => navigate(renderMarket),
       sponsors:    () => navigate(renderSponsors),
       finance:     () => navigate(renderFinance),

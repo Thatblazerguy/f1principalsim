@@ -13,7 +13,17 @@ export const state = {
   /** Current season's sponsor offers (max 3) */
   sponsorOffers: [],
   /** Per-round weekend flow: qualifying must run before race. */
-  weekendProgress: null
+  weekendProgress: null,
+  /** Driver Academy System */
+  academy: {
+    level: 1,
+    reputation: 1,
+    budget: 0,
+    facilities: { simulator: 1, fitness: 1, coaching: 1, sportsPsychology: 1 },
+    prospects: [],
+    scouts: [],
+    loanedOut: []
+  }
 };
 
 export function resetAiTeams() {
@@ -68,6 +78,25 @@ export function hydrateState(payload) {
     state.notifications = rawData.notifications || [];
     state.sponsorOffers = rawData.sponsorOffers || [];
     state.weekendProgress = rawData.weekendProgress || null;
+
+    // Hydrate Academy State
+    state.academy = rawData.academy || {
+      level: 1,
+      reputation: 1,
+      budget: 0,
+      facilities: { simulator: 1, fitness: 1, coaching: 1, sportsPsychology: 1 },
+      prospects: [],
+      scouts: [],
+      loanedOut: []
+    };
+    
+    if (state.academy.prospects) state.academy.prospects.forEach(d => hydrateClass(d, Driver));
+    if (state.academy.loanedOut) state.academy.loanedOut.forEach(d => hydrateClass(d, Driver));
+    if (state.academy.scouts) {
+      state.academy.scouts.forEach(s => {
+        if (s.prospect) hydrateClass(s.prospect, Driver);
+      });
+    }
 
     return true;
   } catch (e) {

@@ -32,6 +32,26 @@ function normalizeActiveDrivers(team) {
   team.activeDrivers = team.activeDrivers.slice(0, Math.min(2, rosterNames.length));
 }
 
+// Ensure the academy object on the state has all required nested objects and arrays
+export function ensureAcademyState(state) {
+  if (!state.academy) {
+    state.academy = {
+      level: 1,
+      reputation: 1,
+      budget: 0,
+      facilities: { simulator: 1, fitness: 1, coaching: 1, sportsPsychology: 1 },
+      prospects: [],
+      scouts: [],
+      loanedOut: []
+    };
+  }
+  if (!state.academy.facilities) state.academy.facilities = { simulator: 1, fitness: 1, coaching: 1, sportsPsychology: 1 };
+  if (!Array.isArray(state.academy.prospects)) state.academy.prospects = [];
+  if (!Array.isArray(state.academy.scouts)) state.academy.scouts = [];
+  if (!Array.isArray(state.academy.loanedOut)) state.academy.loanedOut = [];
+  return state.academy;
+}
+
 export function ensureTeamState(team) {
   if (!team) return team;
 
@@ -65,6 +85,9 @@ export function ensureTeamState(team) {
 
   normalizeActiveDrivers(team);
   ensureSponsorSlots(team);
+  
+  // We don't have the global state here, but we'll export ensureAcademyState 
+  // so callers who have the global state can ensure it when needed.
 
   return team;
 }

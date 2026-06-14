@@ -214,6 +214,10 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlas
     });
   }
   
+  import('../game/development.js').then(({ processSeasonDevelopment }) => {
+     processSeasonDevelopment(state);
+  }).catch(err => console.error("Failed to process academy development", err));
+
   await syncGame();
   renderDashboard(root);
 }

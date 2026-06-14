@@ -70,4 +70,67 @@ export class Team {
       this.carPerformance = parseFloat((this.carPerformance + 1.5).toFixed(1));
     }
   }
+  
+  // ── Academy specific promotion methods ──
+  
+  promoteAcademyToReserve(academyDriver, globalState) {
+    if (this.reserveDriver) return false;
+    
+    // Remove from academy
+    const idx = globalState.academy.prospects.findIndex(d => d.name === academyDriver.name);
+    if (idx !== -1) globalState.academy.prospects.splice(idx, 1);
+    
+    academyDriver.contractType = 'reserve';
+    academyDriver.driverRole = 'reserve';
+    academyDriver.roleLabel = 'Reserve Driver';
+    academyDriver.salary = Math.max(3, academyDriver.salary * 1.5); // Bump salary
+    academyDriver.careerTimeline.unshift({ seasonYear: globalState.season.year || 1, event: 'Promoted', detail: 'Promoted from Academy to Reserve Driver' });
+    
+    this.reserveDriver = academyDriver;
+    return true;
+  }
+  
+  promoteReserveToSeat(driverNameToReplace, globalState) {
+    if (!this.reserveDriver) return false;
+    
+    const driverToReplace = this.drivers.find(d => d.name === driverNameToReplace);
+    if (!driverToReplace) return false;
+    
+    // Move replaced driver to free agency (release)
+    this.drivers = this.drivers.filter(d => d.name !== driverNameToReplace);
+    
+    // Promote reserve
+    const reserve = this.reserveDriver;
+    reserve.contractType = 'race';
+    reserve.driverRole = this.drivers.length === 0 ? 'lead' : 'second';
+    reserve.roleLabel = 'Race Driver';
+    reserve.salary = Math.max(6, reserve.salary * 2);
+    reserve.careerTimeline.unshift({ seasonYear: globalState.season.year || 1, event: 'Race Seat', detail: 'Promoted to active Race Seat' });
+    
+    this.drivers.push(reserve);
+    this.reserveDriver = null;
+    return true;
+  }
+  
+  loanOutAcademyDriver(academyDriver, destination, globalState) {
+    const idx = globalState.academy.prospects.findIndex(d => d.name === academyDriver.name);
+    if (idx !== -1) {
+      globalState.academy.prospects.splice(idx, 1);
+      academyDriver.loanStatus = { destination: destination.id, series: destination.label, seasonYear: globalState.season.year || 1 };
+      academyDriver.roleLabel = `On Loan (${destination.label})`;
+      academyDriver.careerTimeline.unshift({ seasonYear: globalState.season.year || 1, event: 'Loaned Out', detail: `Sent on loan to ${destination.label}` });
+      globalState.academy.loanedOut.push(academyDriver);
+      return true;
+    }
+    return false;
+  }
+  
+  releaseAcademyDriver(academyDriver, globalState) {
+    const idx = globalState.academy.prospects.findIndex(d => d.name === academyDriver.name);
+    if (idx !== -1) {
+      globalState.academy.prospects.splice(idx, 1);
+      return true;
+    }
+    return false;
+  }
 }

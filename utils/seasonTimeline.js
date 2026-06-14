@@ -158,6 +158,13 @@ export function simulateNextDay(state) {
   const completedUpgrades = processCompletedUpgrades(state);
   const daysUntilRace = getDaysUntilRound(state.season.round, state.season.currentDay);
 
+  // Process scouting if academy system is loaded
+  if (state.academy && state.academy.scouts) {
+    import('../game/scouting.js').then(({ processScoutingDay }) => {
+       processScoutingDay(state);
+    }).catch(err => console.error("Failed to process scouting day", err));
+  }
+
   if (daysUntilRace === 0 && state.season.round <= totalRounds) {
     addTimelineNotification(state, `Race weekend is now live: Round ${state.season.round}.`);
   }
