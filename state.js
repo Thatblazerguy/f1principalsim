@@ -10,6 +10,7 @@ export const state = {
   bestFinishes: {},
   driverWins: {},
   driverPodiums: {},
+  raceHistory: [],   // Array<RaceRecord> — grows every completed race
   signedSponsors: {},
   notifications: [],
   /** Current season's sponsor offers (max 3) */
@@ -78,6 +79,7 @@ export function hydrateState(payload) {
     state.bestFinishes = rawData.bestFinishes || {};
     state.driverWins = rawData.driverWins || {};
     state.driverPodiums = rawData.driverPodiums || {};
+    state.raceHistory = rawData.raceHistory || [];
 
     // ── Save migration: old saves have no driverWins/driverPodiums ──
     // If the loaded save has no tracking data, seed from bestFinishes as a

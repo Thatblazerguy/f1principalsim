@@ -5,6 +5,7 @@ import { simulatePractice } from "../game/practice.js";
 import { simulateQualifying } from "../game/qualifying.js";
 import { simulateRaceEvent } from "../game/raceSimulator.js";
 import { updateStandings } from "../game/standings.js";
+import { recordRaceHistory } from "../game/raceHistory.js";
 import { state } from "../state.js";
 import { ensureTeamState, gainTeamXP, gainTeamCarXP, getActiveDrivers } from "../utils/teamState.js";
 import { getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
@@ -202,6 +203,7 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
           gainTeamCarXP(state.team!, 20);
           state.standings = updateStandings(res, state.standings);
           updateBestFinishes(res);
+          recordRaceHistory(round!.round, round!.name, round!.circuit, res, state.standings, state);
 
           let earnings = 0;
           if (sponsorRaceBonus > 0) {

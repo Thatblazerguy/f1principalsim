@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import {
   LayoutDashboard, Flag, Wrench, Users, Activity,
   Bell, FastForward, LogOut, ShoppingCart, Star,
-  Trophy, CalendarDays, DollarSign, GraduationCap
+  Trophy, CalendarDays, DollarSign, GraduationCap, History
 } from 'lucide-react';
 import { state } from '../state.js';
 import { canSimulateNextDay, simulateNextDay } from '../utils/seasonTimeline.js';
@@ -155,6 +155,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     { id: 'teams',        icon: <Trophy size={18}/>,          label: 'F1 Paddock (Teams)', group: 'Championship' },
     { id: 'standings',    icon: <Activity size={18}/>,        label: 'FIA Timing Center', group: 'Championship' },
     { id: 'calendar',     icon: <CalendarDays size={18}/>,    label: 'Season Planner',  group: 'Championship' },
+    { id: 'history',      icon: <History size={18}/>,         label: 'Season History',  group: 'Championship' },
   ];
 
   const handleNav = async (id: string) => {
@@ -172,6 +173,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     const { renderCalendar }   = await import('../screens/calendar.tsx');
     const { renderOffseason }  = await import('../screens/offseason.tsx');
     const { renderFinance }    = await import('../screens/finance.tsx');
+    const { renderHistory }    = await import('../screens/history.tsx');
 
     const isSeasonOver = state.season.round > totalRounds ||
       (state.weekendProgress?.raceComplete && state.season.round === totalRounds);
@@ -188,6 +190,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
       teams:       () => navigate(renderTeams),
       standings:   () => navigate(renderLeaderboard),
       calendar:    () => navigate(renderCalendar),
+      history:     () => navigate(renderHistory),
     };
     map[id]?.();
   };
