@@ -170,6 +170,8 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlas
   state.weekendProgress = null;
   state.standings = { drivers: {}, teams: {} };
   state.bestFinishes = {};
+  state.driverWins = {};
+  state.driverPodiums = {};
 
   const allDriversInPool = [...drivers];
   const getOvr = (d: any) => Math.round((d.pace + d.quali + d.racecraft + d.consistency) / 4);

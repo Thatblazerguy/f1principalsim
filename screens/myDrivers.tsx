@@ -98,10 +98,10 @@ export function renderMyDrivers(root, initialFlashMessage = "") {
       const morale = driver.morale || 94;
       const chemistry = 88;
       const age = driver.age || 25;
-      const wins = Math.floor(points / 25);
-      const podiums = Math.floor(points / 15);
-      const top10s = Math.floor(points / 5);
-      const avgFinish = Math.max(1, 14 - Math.floor(points / 10));
+      const wins    = state.driverWins?.[driver.name] || 0;
+      const podiums  = state.driverPodiums?.[driver.name] || 0;
+      const bestPos  = state.bestFinishes?.[driver.name] || '—';
+      const top10s   = typeof bestPos === 'number' && bestPos <= 10 ? '✓' : '—';
 
       return (
         <motion.div 
@@ -128,11 +128,11 @@ export function renderMyDrivers(root, initialFlashMessage = "") {
 
           <div style={{ display: 'flex', borderBottom: `1px solid ${HUB.border}`, background: 'rgba(0,0,0,0.2)' }}>
             {[
-              { label: 'PTS', val: points },
-              { label: 'WINS', val: wins },
-              { label: 'PODIUMS', val: podiums },
-              { label: 'TOP 10', val: top10s },
-              { label: 'AVG FIN', val: `P${avgFinish}` }
+              { label: 'PTS',      val: points },
+              { label: 'WINS',     val: wins },
+              { label: 'PODIUMS',  val: podiums },
+              { label: 'TOP 10',   val: top10s },
+              { label: 'BEST FIN', val: typeof bestPos === 'number' ? `P${bestPos}` : '—' }
             ].map((stat, i) => (
               <div key={i} style={{ flex: 1, padding: '12px 0', textAlign: 'center', borderRight: i < 4 ? `1px solid ${HUB.border}` : 'none' }}>
                 <span style={{ display: 'block', fontSize: '9px', color: HUB.textMuted, marginBottom: '2px' }}>{stat.label}</span>

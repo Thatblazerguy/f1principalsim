@@ -47,12 +47,27 @@ function ensureWeekendProgress(round: number) {
 }
 
 function updateBestFinishes(results: any[]) {
+  if (!state.driverWins) state.driverWins = {};
+  if (!state.driverPodiums) state.driverPodiums = {};
+
   results.forEach((entry, idx) => {
-    if (entry.team.name !== state.team?.name) return;
     const finishPos = idx + 1;
-    const currentBest = state.bestFinishes[entry.driver.name];
+    const name = entry.driver.name;
+
+    // Best finish tracking (all drivers)
+    const currentBest = state.bestFinishes[name];
     if (!currentBest || finishPos < currentBest) {
-      state.bestFinishes[entry.driver.name] = finishPos;
+      state.bestFinishes[name] = finishPos;
+    }
+
+    // Only count for your own team's drivers
+    if (entry.team.name !== state.team?.name) return;
+
+    if (finishPos === 1) {
+      state.driverWins[name] = (state.driverWins[name] || 0) + 1;
+    }
+    if (finishPos <= 3) {
+      state.driverPodiums[name] = (state.driverPodiums[name] || 0) + 1;
     }
   });
 }

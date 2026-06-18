@@ -8,6 +8,8 @@ export const state = {
   season: { round: 1, year: 1, totalRounds: 24, currentDay: 1 },
   standings: { drivers: {}, teams: {} },
   bestFinishes: {},
+  driverWins: {},
+  driverPodiums: {},
   signedSponsors: {},
   notifications: [],
   /** Current season's sponsor offers (max 3) */
@@ -74,6 +76,8 @@ export function hydrateState(payload) {
     state.season = rawData.season || { round: 1, year: 1, totalRounds: 24, currentDay: 1 };
     state.standings = rawData.standings || { drivers: {}, teams: {} };
     state.bestFinishes = rawData.bestFinishes || {};
+    state.driverWins = rawData.driverWins || {};
+    state.driverPodiums = rawData.driverPodiums || {};
     state.signedSponsors = rawData.signedSponsors || {};
     state.notifications = rawData.notifications || [];
     state.sponsorOffers = rawData.sponsorOffers || [];
