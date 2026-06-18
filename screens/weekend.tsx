@@ -12,6 +12,7 @@ import { getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
 import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getDriverHeadshotUrl } from "../data/drivers.js";
+import { getTrackWetProbability } from "../utils/raceBalance.js";
 import {
   ensureSeasonTimeline,
   getRoundRaceDay,
@@ -119,6 +120,7 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState(flashMessage);
     const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null } | null>(null);
+    const [raceIsWet, setRaceIsWet] = useState<boolean | null>(null);
 
     const advanceDay = async () => {
       const tick = simulateNextDay(state);
@@ -158,11 +160,13 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
       setTimeout(() => {
         try {
           gainTeamCarXP(state.team!, 8);
-          const { grid } = simulateQualifying(teams, round!);
+          const { grid, isWet } = simulateQualifying(teams, round!, state.raceHistory || []);
+          setRaceIsWet(isWet);
           setResultsData({ metric: 'lap', res: grid, grid: null });
           if (weekendProgress) {
             weekendProgress.qualifyingComplete = true;
             weekendProgress.grid = grid.slice();
+            weekendProgress.isWet = isWet;
           }
           setStatusMessage(
             weekendProgress?.raceComplete
@@ -198,7 +202,7 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
       setLoading(true);
       setTimeout(async () => {
         try {
-          const res = simulateRaceEvent(teams, round!, round!.laps, weekendProgress.grid!, weekendProgress.selectedStrategies!);
+          const res = simulateRaceEvent(teams, round!, round!.laps, weekendProgress.grid!, weekendProgress.selectedStrategies!, state.raceHistory || []);
           gainTeamXP(state.team!, 25);
           gainTeamCarXP(state.team!, 20);
           state.standings = updateStandings(res, state.standings);
@@ -415,15 +419,27 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                 <span style={{ color: HUB.textMuted }}>WEATHER FORECAST</span>
-                <span style={{ color: '#fff', fontWeight: 700 }}>⛅ Sunny / Light Drizzle</span>
+                <span style={{ color: raceIsWet === true ? '#60a5fa' : raceIsWet === false ? '#fbbf24' : '#fff', fontWeight: 700 }}>
+                  {raceIsWet === true ? '🌧️ WET RACE' : raceIsWet === false ? '☀️ Dry Race' : '⛅ TBC after Qualifying'}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                 <span style={{ color: HUB.textMuted }}>TRACK GRIP LEVEL</span>
-                <span style={{ color: '#fff', fontWeight: 700 }}>78% (Green Track)</span>
+                <span style={{ color: '#fff', fontWeight: 700 }}>
+                  {raceIsWet === true ? '42% (Wet)' : raceIsWet === false ? '91% (Rubbered-In)' : '—'}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{ color: HUB.textMuted }}>RISK OF RAIN</span>
-                <span style={{ color: '#ef4444', fontWeight: 700 }}>15%</span>
+                <span style={{ color: HUB.textMuted }}>RAIN PROBABILITY</span>
+                <span style={{
+                  color: (() => {
+                    const p = round ? getTrackWetProbability(round.name || round.circuit || '') : 0;
+                    return p >= 0.3 ? '#ef4444' : p >= 0.15 ? '#f59e0b' : '#10b981';
+                  })(),
+                  fontWeight: 700
+                }}>
+                  {round ? `${Math.round(getTrackWetProbability(round.name || round.circuit || '') * 100)}%` : '—'}
+                </span>
               </div>
             </div>
           </div>

@@ -124,6 +124,52 @@ export function getMomentumScore(formResults) {
 }
 
 /**
+ * Get a weekend-confidence value (0.92–1.08) for a driver based on their
+ * last `limit` race results. This is consumed by the race simulator and
+ * qualifying module to adjust per-driver performance.
+ *
+ * Value < 1.00 = driver in good form (performs better than base rating)
+ * Value > 1.00 = driver in poor form (performs slightly worse)
+ *
+ * @param {string} driverName
+ * @param {Array}  raceHistory
+ * @param {number} [limit=5]
+ * @returns {number} multiplier in range 0.92 – 1.08
+ */
+export function getDriverWeekendConfidence(driverName, raceHistory, limit = 5) {
+  const form = getDriverForm(driverName, raceHistory, limit);
+  if (!form.length) return 1.00;
+
+  let weightedScore = 0;
+  let totalWeight = 0;
+
+  form.forEach((r, i) => {
+    const weight = (i + 1) / form.length; // newer races weighted higher
+    let score;
+    if (r.retired) {
+      score = -8;
+    } else if (r.finishPos === 1) {
+      score = 8;
+    } else if (r.finishPos <= 3) {
+      score = 5;
+    } else if (r.finishPos <= 6) {
+      score = 2;
+    } else if (r.finishPos <= 10) {
+      score = 1;
+    } else {
+      score = -1;
+    }
+    weightedScore += score * weight;
+    totalWeight += weight;
+  });
+
+  const normalizedScore = totalWeight > 0 ? weightedScore / totalWeight : 0;
+  // Good form (positive score) → lower multiplier (driver performs better)
+  const rawMultiplier = 1.00 - (normalizedScore / 8) * 0.08;
+  return Math.min(1.08, Math.max(0.92, rawMultiplier));
+}
+
+/**
  * Aggregate per-driver season stats from raceHistory.
  */
 export function getDriverSeasonStats(driverName, raceHistory, season) {

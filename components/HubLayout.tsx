@@ -6,7 +6,7 @@ import {
   Trophy, CalendarDays, DollarSign, GraduationCap, History
 } from 'lucide-react';
 import { state } from '../state.js';
-import { canSimulateNextDay, simulateNextDay } from '../utils/seasonTimeline.js';
+import { canSimulateNextDay, simulateNextDay, getRoundRaceDay, formatSeasonDate } from '../utils/seasonTimeline.js';
 import { syncGame, logoutUser } from '../lib/supabaseApi.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageTransition, AnimatedNumber, microTransition } from './ui/motion.tsx';
@@ -134,8 +134,26 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
 
   const handleSimulate = async () => {
     if (!canAdvance) return;
-    const result = simulateNextDay(state);
-    if (!result.advanced) return;
+
+    // Determine the race day for the current round so we know when to stop
+    const targetRaceDay = getRoundRaceDay(state.season.round);
+    const alreadyAtRaceDay = (state.season.currentDay || 1) >= targetRaceDay;
+
+    if (alreadyAtRaceDay) {
+      // Race window already open — just advance 1 day (normal behaviour when at race)
+      const result = simulateNextDay(state);
+      if (!result.advanced) return;
+    } else {
+      // Fast-forward: keep advancing days until we reach the race day
+      let advanced = false;
+      while ((state.season.currentDay || 1) < targetRaceDay) {
+        const result = simulateNextDay(state);
+        if (!result.advanced) break;
+        advanced = true;
+      }
+      if (!advanced) return;
+    }
+
     await syncGame();
     onSimulate?.();
   };
@@ -306,7 +324,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
               border:'none', cursor: canAdvance ? 'pointer' : 'not-allowed', opacity: canAdvance ? 1 : 0.45,
               boxShadow:'0 4px 20px rgba(225,6,0,0.2)', fontFamily:HUB.fontBold,
             }}
-          >SIMULATE 1 DAY</motion.button>
+          >SKIP TO RACE DAY</motion.button>
         </div>
       </aside>
 
@@ -374,7 +392,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
           <div style={{textAlign:'right'}}>
             <p style={{fontSize:'10px', fontWeight:700, color:HUB.textMuted, textTransform:'uppercase', margin:0, fontFamily:HUB.fontRegular}}>Season Status</p>
             <p style={{fontSize:'12px', fontWeight:700, color:'#fff', margin:0, fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>
-              Day <AnimatedNumber value={state.season.currentDay || 1} /> · Round {state.season.round} / {totalRounds}
+              {formatSeasonDate(state.season.year || 1, state.season.currentDay || 1)} · Round {state.season.round} / {totalRounds}
             </p>
           </div>
           <button onClick={handleSimulate} disabled={!canAdvance}
@@ -385,7 +403,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
               boxShadow:'0 4px 20px rgba(225,6,0,0.3)', display:'flex', alignItems:'center', gap:'10px',
               transition:'all 0.15s', fontFamily:HUB.fontBold,
             }}
-          >FAST FORWARD <FastForward size={13}/></button>
+          >SKIP TO RACE <FastForward size={13}/></button>
         </div>
       </div>
 
