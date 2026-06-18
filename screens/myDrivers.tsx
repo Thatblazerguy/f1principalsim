@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { state } from "../state.js";
 import { ensureTeamState, getTeamRoster, getActiveDrivers, setTeamActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";

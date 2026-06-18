@@ -72,6 +72,7 @@ export function renderMarket(root) {
         {drivers.filter(d => !isDriverEmployed(d.name)).map((d, i) => {
           // potential metrics
           const potential = Math.min(99, Math.round(d.pace * 1.04 + 3));
+          const isAcademy = d.driverRole === 'academy';
           
           return (
             <SlideUp key={d.name} delay={i * 0.05}>
