@@ -78,6 +78,21 @@ export function hydrateState(payload) {
     state.bestFinishes = rawData.bestFinishes || {};
     state.driverWins = rawData.driverWins || {};
     state.driverPodiums = rawData.driverPodiums || {};
+
+    // ── Save migration: old saves have no driverWins/driverPodiums ──
+    // If the loaded save has no tracking data, seed from bestFinishes as a
+    // one-time best-effort estimate (P1 best = at least 1 win, P1-P3 = at least 1 podium).
+    const isLegacySave = !rawData.driverWins && !rawData.driverPodiums;
+    if (isLegacySave && state.bestFinishes) {
+      for (const [driverName, bestPos] of Object.entries(state.bestFinishes)) {
+        if (bestPos === 1) {
+          state.driverWins[driverName] = state.driverWins[driverName] || 1;
+          state.driverPodiums[driverName] = state.driverPodiums[driverName] || 1;
+        } else if (bestPos <= 3) {
+          state.driverPodiums[driverName] = state.driverPodiums[driverName] || 1;
+        }
+      }
+    }
     state.signedSponsors = rawData.signedSponsors || {};
     state.notifications = rawData.notifications || [];
     state.sponsorOffers = rawData.sponsorOffers || [];
