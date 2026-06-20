@@ -60,27 +60,31 @@ export function TimingTower({ cars }) {
 
           const teamColor = car.team.color || HUB.accent;
 
+          const posChange = car.gridPos !== undefined ? (car.gridPos - pos) : 0;
+
           return (
-            <div key={car.id} style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              padding: '4px 12px', 
-              borderBottom: '1px solid rgba(255,255,255,0.02)',
-              backgroundColor: isPlayer ? 'rgba(255,255,255,0.05)' : 'transparent',
-              position: 'relative'
-            }}>
+            <div 
+              key={car.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '6px 12px',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                backgroundColor: isPlayer ? 'rgba(225,6,0,0.1)' : 'transparent',
+                transition: 'background-color 0.2s',
+                opacity: car.retired ? 0.5 : 1
+              }}
+            >
               {/* Team Color Strip */}
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', backgroundColor: teamColor }}></div>
               
-              {/* POS / CHG */}
-              <div style={{ width: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>
+              {/* Position / Change */}
+              <div style={{ width: '32px', textAlign: 'center', fontFamily: HUB.fontMono, fontSize: '12px', fontWeight: 'bold', color: isPlayer ? '#fff' : HUB.textMuted }}>
                 {showPosChange ? (
-                   (() => {
-                     const change = car.gridPos - pos;
-                     if (change > 0) return <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', fontSize: '11px' }}><ChevronUp size={12} strokeWidth={3}/>{change}</span>;
-                     if (change < 0) return <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', fontSize: '11px' }}><ChevronDown size={12} strokeWidth={3}/>{Math.abs(change)}</span>;
-                     return <span style={{ color: 'rgba(255,255,255,0.2)' }}>-</span>;
-                   })()
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', color: posChange > 0 ? '#10b981' : posChange < 0 ? '#ef4444' : HUB.textMuted }}>
+                    {posChange > 0 ? <ChevronUp size={12} strokeWidth={3} /> : posChange < 0 ? <ChevronDown size={12} strokeWidth={3} /> : <span style={{fontSize:'10px', color: 'rgba(255,255,255,0.2)'}}>-</span>}
+                    {Math.abs(posChange) > 0 ? Math.abs(posChange) : ''}
+                  </div>
                 ) : (
                   pos
                 )}

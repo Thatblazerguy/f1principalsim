@@ -106,14 +106,22 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
         <div style={{ position: 'absolute', left: '16px', top: '16px', bottom: '16px', width: '320px', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
           {/* Race Header Status */}
-          <div style={{ backgroundColor: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px' }}>
-            <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {track.name}
-            </h2>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={pill()}>{engine.weatherStr} Track</span>
-              <span style={{ ...pill(), color: '#fff', borderColor: 'rgba(255,255,255,0.4)' }}>LAP {Math.max(1, engine.cars[0]?.lap || 1)} / {engine.totalLaps}</span>
-              {isFinished && <span style={{...pill(true), backgroundColor: HUB.accent, borderColor: HUB.accent, color: '#fff'}}>FINISHED</span>}
+          <div style={{ backgroundColor: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '16px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: '1.1' }}>
+                {track.name}
+              </h2>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{...pill(), fontSize: '9px', padding: '2px 6px'}}>{engine.weatherStr}</span>
+                {isFinished && <span style={{...pill(true), backgroundColor: HUB.accent, borderColor: HUB.accent, color: '#fff', fontSize: '9px', padding: '2px 6px'}}>FINISHED</span>}
+              </div>
+            </div>
+            
+            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <div style={{ fontSize: '10px', color: HUB.textMuted, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>Current Lap</div>
+              <div style={{ fontSize: '24px', fontFamily: HUB.fontMono, fontWeight: 'bold', color: '#fff', lineHeight: '1' }}>
+                {Math.max(1, engine.cars[0]?.lap || 1)} <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.4)' }}>/ {engine.totalLaps}</span>
+              </div>
             </div>
           </div>
 

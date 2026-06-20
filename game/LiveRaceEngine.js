@@ -61,49 +61,42 @@ export class LiveRaceEngine {
   calculateFailures() {
     const isChaotic = Math.random() < 0.05;
     const isExtreme = Math.random() < 0.01;
-    const failureTypes = [
-      { type: "Engine", weight: 35 },
-      { type: "Gearbox", weight: 25 },
-      { type: "Hydraulics", weight: 20 },
-      { type: "Suspension", weight: 10 },
-      { type: "Electrical", weight: 10 }
+    
+    const CATEGORIES = [
+      { type: "Engine", weight: 0.35 },
+      { type: "Gearbox", weight: 0.25 },
+      { type: "Hydraulics", weight: 0.20 },
+      { type: "Suspension", weight: 0.10 },
+      { type: "Electrical", weight: 0.10 }
     ];
 
+    const GLOBAL_MULTIPLIER = 8.5380; // Auto-tuned for 2.5 avg DNFs per race
+
     this.cars.forEach(car => {
-      let baseProb = 0.0;
-      if (car.reliability > 85) baseProb = 0.005 + (0.015 * Math.random());
-      else if (car.reliability >= 70) baseProb = 0.01 + (0.02 * Math.random());
-      else baseProb = 0.02 + (0.03 * Math.random());
+      let relFactor = 0.0;
+      if (car.reliability > 85) relFactor = 0.005;
+      else if (car.reliability >= 70) relFactor = 0.012;
+      else relFactor = 0.025;
       
-      // Multiplier tuned to achieve ~2.5 average DNFs
-      baseProb *= 4.9; 
+      let chaosMult = 1.0;
+      if (isExtreme) chaosMult = 3.5;
+      else if (isChaotic) chaosMult = 2.0;
 
-      if (isExtreme) baseProb *= 5.0;
-      else if (isChaotic) baseProb *= 3.0;
+      for (const cat of CATEGORIES) {
+        let prob = relFactor * cat.weight * GLOBAL_MULTIPLIER * chaosMult;
+        prob = Math.min(0.9, prob);
 
-      baseProb = Math.min(0.9, baseProb);
-
-      if (Math.random() < baseProb) {
-        const failLap = Math.max(1, Math.floor(Math.random() * this.totalLaps));
-        const failFraction = Math.random();
-        const failDistance = failLap - 1 + failFraction;
-        
-        const rand = Math.random() * 100;
-        let cumulative = 0;
-        let selectedType = "Mechanical";
-        for (const ft of failureTypes) {
-           cumulative += ft.weight;
-           if (rand < cumulative) {
-             selectedType = ft.type;
-             break;
-           }
+        if (Math.random() < prob) {
+          const failLap = Math.max(1, Math.floor(Math.random() * this.totalLaps));
+          const failFraction = Math.random();
+          
+          car.failureData = {
+             lap: failLap,
+             distance: failLap - 1 + failFraction,
+             type: cat.type
+          };
+          break; // One critical failure per car max
         }
-        
-        car.failureData = {
-           lap: failLap,
-           distance: failDistance,
-           type: selectedType
-        };
       }
     });
   }
@@ -360,6 +353,10 @@ export class LiveRaceEngine {
         lapsPerSecond *= 0.8; 
       }
 
+      // Thermal Pace Penalties (Instead of RNG Death)
+      if (car.engineTemp > 120) lapsPerSecond *= 0.80; // 20% pace loss
+      else if (car.engineTemp > 115) lapsPerSecond *= 0.95; // 5% pace loss
+
       car.currentSpeed = lapsPerSecond;
 
       let oldDistance = car.distance;
@@ -412,11 +409,7 @@ export class LiveRaceEngine {
       car.engineTemp = Math.max(70, Math.min(130, car.engineTemp));
 
       // DNF Checks
-      if (car.engineTemp > 120 && Math.random() < 0.001 * dt) {
-        car.retired = true;
-        this.addEvent(`${car.driver.name} has suffered a thermal engine failure!`);
-        if (car.isPlayer) this.addComm(car.driver.name, "No power, the engine is gone!", true);
-      } else if (car.failureData && car.distance >= car.failureData.distance) {
+      if (car.failureData && car.distance >= car.failureData.distance) {
         car.retired = true;
         this.addEvent(`${car.driver.name} is OUT of the race with a ${car.failureData.type.toLowerCase()} failure.`);
         if (car.isPlayer) {
