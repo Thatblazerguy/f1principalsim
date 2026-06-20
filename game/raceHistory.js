@@ -24,7 +24,7 @@ const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
  * Record a completed race into state.raceHistory.
  * Called from weekend.tsx after simulateRaceEvent + updateStandings.
  */
-export function recordRaceHistory(round, raceName, circuit, results, standings, state) {
+export function recordRaceHistory(round, raceName, circuit, results, standings, state, replayData = null) {
   if (!Array.isArray(state.raceHistory)) state.raceHistory = [];
 
   // Build driver results (position is implicit from array index)
@@ -67,6 +67,7 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
       teams:   { ...(standings.teams   || {}) },
     },
     fastestLap,
+    replayData,
   };
 
   state.raceHistory.push(record);

@@ -7,6 +7,7 @@ import { FormChips, getPositionColor, getPositionTextColor } from '../components
 import { getDriverSeasonStats, getTeamSeasonStats } from '../game/raceHistory.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SlideUp, AnimatedNumber } from '../components/ui/motion.tsx';
+import { RaceReplay } from './RaceReplay.tsx';
 
 export function renderHistory(root) {
   ensureTeamState(state.team);
@@ -14,6 +15,7 @@ export function renderHistory(root) {
   const HistoryPage = () => {
     const [activeTab, setActiveTab] = useState<'timeline'|'race'|'driver'|'team'>('timeline');
     const [selectedRace, setSelectedRace] = useState<any>(null);
+    const [selectedReplay, setSelectedReplay] = useState<any>(null);
     const [selectedDriverName, setSelectedDriverName] = useState<string>(
       state.team?.drivers?.[0]?.name || ''
     );
@@ -161,7 +163,14 @@ export function renderHistory(root) {
                 <h2 style={{ fontSize: '24px', fontFamily: HUB.fontWide, color: '#fff', margin: '4px 0 4px', textTransform: 'uppercase' }}>{race.name}</h2>
                 <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>{race.circuit}</p>
               </div>
-              <button onClick={() => setActiveTab('timeline')} style={{ ...actionBtn({ backgroundColor: 'transparent', border: `1px solid ${HUB.borderMid}`, color: '#fff', boxShadow: 'none' }) }}>← Back</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {race.replayData && (
+                  <button onClick={() => setSelectedReplay(race)} style={{ ...actionBtn({ backgroundColor: HUB.accent, color: '#fff', border: 'none' }) }}>
+                    Watch Replay
+                  </button>
+                )}
+                <button onClick={() => setActiveTab('timeline')} style={{ ...actionBtn({ backgroundColor: 'transparent', border: `1px solid ${HUB.borderMid}`, color: '#fff', boxShadow: 'none' }) }}>← Back</button>
+              </div>
             </div>
 
             {/* Podium */}
@@ -366,6 +375,10 @@ export function renderHistory(root) {
         </SlideUp>
       );
     };
+
+    if (selectedReplay) {
+      return <RaceReplay race={selectedReplay} onClose={() => setSelectedReplay(null)} />;
+    }
 
     return (
       <div>

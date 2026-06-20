@@ -435,6 +435,10 @@ export function mountLayout(
   if (appEl) appEl.style.display = 'none';
 
   if (!layoutNode) {
+    const existingNode = document.getElementById('hub-layout-root');
+    if (existingNode) {
+      existingNode.remove();
+    }
     layoutNode = document.createElement('div');
     layoutNode.id = 'hub-layout-root';
     document.body.appendChild(layoutNode);

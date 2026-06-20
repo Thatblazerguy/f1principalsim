@@ -17,10 +17,19 @@ export function renderLeaderboard(root) {
   const allTeams = [state.team, ...state.aiTeams].filter(Boolean);
   const knownDriverTeams = new Map();
   allTeams.forEach(team => {
-    const roster = team === state.team ? getTeamRoster(team) : team.drivers;
-    roster.forEach(d => { if (!knownDriverTeams.has(d.name)) knownDriverTeams.set(d.name, team.name); });
+    // Only include active race drivers (not reserves) so reserves never appear in standings
+    const racers = team === state.team
+      ? (getActiveDrivers(team).length > 0 ? getActiveDrivers(team) : team.drivers)
+      : team.drivers;
+    racers.forEach(d => { if (!knownDriverTeams.has(d.name)) knownDriverTeams.set(d.name, team.name); });
   });
   Object.keys(state.standings.drivers).forEach(n => { if (!knownDriverTeams.has(n)) knownDriverTeams.set(n, 'Guest'); });
+
+  // Build a set of driver names who have actually started at least one race
+  const raceStarters = new Set<string>();
+  (state.raceHistory || []).forEach(race => {
+    race.driverResults?.forEach(r => raceStarters.add(r.name));
+  });
 
   const raceHistory = state.raceHistory || [];
   const currentSeason = state.season?.year || 1;
@@ -28,6 +37,8 @@ export function renderLeaderboard(root) {
 
   const driverRows = [...knownDriverTeams.entries()]
     .map(([name, teamName]) => ({ name, teamName, points: state.standings.drivers[name] ?? 0, isYours: teamName === playerTeamName }))
+    // Only show drivers who have started at least one race; always show the player's own active drivers
+    .filter(row => raceStarters.has(row.name) || (row.isYours && raceStarters.size === 0))
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
 
   const teamRows = allTeams

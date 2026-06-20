@@ -8,12 +8,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SlideUp, AnimatedNumber, AnimatedBar } from '../components/ui/motion.tsx';
 import { RadarChart } from '../components/driverComparison.tsx';
 
-export function renderMyDrivers(root, initialFlashMessage = "") {
+export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
   ensureTeamState(state.team);
   const activeNames = new Set(getActiveDrivers(state.team).map(d => d.name));
 
-  const MyDriversPage = () => {
-    const [flashMessage, setFlashMessage] = useState(initialFlashMessage);
+  const [flashMessage, setFlashMessage] = useState(initialFlashMessage);
     const [promotionModalOpen, setPromotionModalOpen] = useState(false);
     const [driverToReplace, setDriverToReplace] = useState(null);
 
@@ -188,92 +187,94 @@ export function renderMyDrivers(root, initialFlashMessage = "") {
       );
     };
 
-    return (
-      <div>
-        <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            {sectionLabel('Personnel Management')}
-            {pageTitle('Driver Dossiers')}
-            {pageSubtitle('Manage contracts, review telemetry, and analyze driver morale.')}
+
+  return (
+    <div>
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          {sectionLabel('Personnel Management')}
+          {pageTitle('Driver Dossiers')}
+          {pageSubtitle('Manage contracts, review telemetry, and analyze driver morale.')}
+        </div>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={statCell()}>
+             {statLabel('Active Roster')}
+             {statValue(`${state.team.drivers.length} / 2`)}
           </div>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <div style={statCell()}>
-               {statLabel('Active Roster')}
-               {statValue(`${state.team.drivers.length} / 2`)}
-            </div>
-            <div style={statCell()}>
-               {statLabel('Reserve Seat')}
-               {statValue(state.team.reserveDriver ? "Filled" : "Empty")}
-            </div>
+          <div style={statCell()}>
+             {statLabel('Reserve Seat')}
+             {statValue(state.team.reserveDriver ? "Filled" : "Empty")}
           </div>
         </div>
+      </div>
 
-        {flashMessage && (
-          <div style={{ padding: '16px', background: 'rgba(225,6,0,0.1)', border: `1px solid ${HUB.accent}`, borderRadius: '4px', color: '#fff', fontSize: '13px', marginBottom: '24px' }}>
-            {flashMessage}
+      {flashMessage && (
+        <div style={{ padding: '16px', background: 'rgba(225,6,0,0.1)', border: `1px solid ${HUB.accent}`, borderRadius: '4px', color: '#fff', fontSize: '13px', marginBottom: '24px' }}>
+          {flashMessage}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
+        {state.team.drivers.length > 0 && (
+          <div>
+            <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, color: '#fff', margin: '0 0 16px', textTransform: 'uppercase' }}>Active Lineup</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '24px' }}>
+              <AnimatePresence>
+                {state.team.drivers.map((driver: any, idx: number) => buildDriverCard(driver, "Main", true, idx))}
+              </AnimatePresence>
+            </div>
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
-          {state.team.drivers.length > 0 && (
-            <div>
-              <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, color: '#fff', margin: '0 0 16px', textTransform: 'uppercase' }}>Active Lineup</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '24px' }}>
-                <AnimatePresence>
-                  {state.team.drivers.map((driver: any, idx: number) => buildDriverCard(driver, "Main", true, idx))}
-                </AnimatePresence>
-              </div>
+        {/* Reserve Driver Section */}
+        <div>
+          <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, color: '#fff', margin: '0 0 16px', textTransform: 'uppercase' }}>Reserve Driver</h3>
+          {state.team.reserveDriver ? (
+            <div style={{ maxWidth: '600px' }}>
+              <AnimatePresence>
+                {buildDriverCard(state.team.reserveDriver, "Reserve", false, 0)}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div style={{ ...glassCard({ padding: '48px' }), textAlign: 'center', border: `1px dashed ${HUB.borderMid}` }}>
+              <span style={{ color: HUB.textMuted, fontSize: '14px' }}>Reserve seat is currently empty. Scout the market or promote from your academy.</span>
             </div>
           )}
-
-          {/* Reserve Driver Section */}
-          <div>
-            <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, color: '#fff', margin: '0 0 16px', textTransform: 'uppercase' }}>Reserve Driver</h3>
-            {state.team.reserveDriver ? (
-              <div style={{ maxWidth: '600px' }}>
-                <AnimatePresence>
-                  {buildDriverCard(state.team.reserveDriver, "Reserve", false, 0)}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <div style={{ ...glassCard({ padding: '48px' }), textAlign: 'center', border: `1px dashed ${HUB.borderMid}` }}>
-                <span style={{ color: HUB.textMuted, fontSize: '14px' }}>Reserve seat is currently empty. Scout the market or promote from your academy.</span>
-              </div>
-            )}
-          </div>
         </div>
+      </div>
 
-        {/* Promotion Modal */}
-        {promotionModalOpen && state.team.reserveDriver && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
-            <div style={{ ...glassCard({ padding: '0', maxWidth: '600px', width: '100%' }), overflow: 'hidden' }}>
-              <div style={{ padding: '24px', borderBottom: `1px solid ${HUB.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  {sectionLabel('Seat Allocation')}
-                  <h3 style={{ fontSize: '20px', fontFamily: HUB.fontWide, color: '#fff', margin: 0, textTransform: 'uppercase' }}>Replace a Race Driver</h3>
-                </div>
-                <button onClick={() => setPromotionModalOpen(false)} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontSize: '24px' }}>&times;</button>
+      {/* Promotion Modal */}
+      {promotionModalOpen && state.team.reserveDriver && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
+          <div style={{ ...glassCard({ padding: '0', maxWidth: '600px', width: '100%' }), overflow: 'hidden' }}>
+            <div style={{ padding: '24px', borderBottom: `1px solid ${HUB.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {sectionLabel('Seat Allocation')}
+                <h3 style={{ fontSize: '20px', fontFamily: HUB.fontWide, color: '#fff', margin: 0, textTransform: 'uppercase' }}>Replace a Race Driver</h3>
               </div>
-              <div style={{ padding: '24px' }}>
-                <p style={{ color: HUB.textMuted, marginBottom: '16px', fontSize: '13px' }}>Your active lineup is full. Select which race driver to replace with <strong style={{ color: '#fff' }}>{state.team.reserveDriver.name}</strong>. The replaced driver will be released.</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {state.team.drivers.map((d: any) => (
-                    <div key={d.name} style={{ ...glassCard({ padding: '16px' }), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold }}>{d.name}</span>
-                        <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>OVR {d.currentRating ? d.currentRating() : '—'} · ${(d.salary / 24).toFixed(2)}M/race</span>
-                      </div>
-                      <button onClick={() => { setDriverToReplace(d.name); confirmPromotion(d.name); }} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '11px' }) }}>Replace</button>
+              <button onClick={() => setPromotionModalOpen(false)} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontSize: '24px' }}>&times;</button>
+            </div>
+            <div style={{ padding: '24px' }}>
+              <p style={{ color: HUB.textMuted, marginBottom: '16px', fontSize: '13px' }}>Your active lineup is full. Select which race driver to replace with <strong style={{ color: '#fff' }}>{state.team.reserveDriver.name}</strong>. The replaced driver will be released.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {state.team.drivers.map((d: any) => (
+                  <div key={d.name} style={{ ...glassCard({ padding: '16px' }), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold }}>{d.name}</span>
+                      <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>OVR {d.currentRating ? d.currentRating() : '—'} · ${(d.salary / 24).toFixed(2)}M/race</span>
                     </div>
-                  ))}
-                </div>
+                    <button onClick={() => { setDriverToReplace(d.name); confirmPromotion(d.name); }} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '11px' }) }}>Replace</button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        )}
-      </div>
-    );
-  };
+        </div>
+      )}
+    </div>
+  );
+};
 
-  mountLayout(root, 'drivers', <MyDriversPage />, () => renderMyDrivers(root, initialFlashMessage));
+export function renderMyDrivers(root: HTMLElement, initialFlashMessage = "") {
+  mountLayout(root, 'drivers', <MyDriversPage root={root} initialFlashMessage={initialFlashMessage} />, () => renderMyDrivers(root, initialFlashMessage));
 }

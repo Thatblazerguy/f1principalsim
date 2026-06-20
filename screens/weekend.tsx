@@ -4,6 +4,7 @@ import { strategies } from "../data/strategies.js";
 import { simulatePractice } from "../game/practice.js";
 import { simulateQualifying } from "../game/qualifying.js";
 import { simulateRaceEvent } from "../game/raceSimulator.js";
+import { RaceControl } from "./RaceControl.tsx";
 import { updateStandings } from "../game/standings.js";
 import { recordRaceHistory } from "../game/raceHistory.js";
 import { state } from "../state.js";
@@ -74,7 +75,7 @@ function updateBestFinishes(results: any[]) {
   });
 }
 
-export function renderWeekend(root: HTMLElement, flashMessage = "") {
+export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
   ensureTeamState(state.team!);
   ensureSeasonTimeline(state);
   
@@ -116,11 +117,11 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
      strategiesValid = true;
   }
 
-  const WeekendPage = () => {
-    const [loading, setLoading] = useState(false);
-    const [statusMessage, setStatusMessage] = useState(flashMessage);
-    const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null } | null>(null);
-    const [raceIsWet, setRaceIsWet] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(initialFlashMessage);
+  const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null } | null>(null);
+  const [raceIsWet, setRaceIsWet] = useState<boolean | null>(null);
+  const [liveRaceMode, setLiveRaceMode] = useState(false);
 
     const advanceDay = async () => {
       const tick = simulateNextDay(state);
@@ -199,34 +200,38 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
         return;
       }
 
+      setLiveRaceMode(true);
+    };
+
+    const handleRaceComplete = async (res, replayData) => {
+      setLiveRaceMode(false);
       setLoading(true);
-      setTimeout(async () => {
-        try {
-          const res = simulateRaceEvent(teams, round!, round!.laps, weekendProgress.grid!, weekendProgress.selectedStrategies!, state.raceHistory || []);
-          gainTeamXP(state.team!, 25);
-          gainTeamCarXP(state.team!, 20);
-          state.standings = updateStandings(res, state.standings);
-          updateBestFinishes(res);
-          recordRaceHistory(round!.round, round!.name, round!.circuit, res, state.standings, state);
+      try {
+        gainTeamXP(state.team!, 25);
+        gainTeamCarXP(state.team!, 20);
+        state.standings = updateStandings(res, state.standings);
+        updateBestFinishes(res);
+        recordRaceHistory(round!.round, round!.name, round!.circuit, res, state.standings, state, replayData);
 
-          let earnings = 0;
-          if (sponsorRaceBonus > 0) {
-            earnings += sponsorRaceBonus;
-            state.team!.budget += earnings;
-          }
-
-          weekendProgress.raceComplete = true;
-          applyRoundCarDevelopmentAll(state);
-          state.season.round += 1;
-          
-          setResultsData({ metric: 'time', res, grid: weekendProgress.grid });
-          setStatusMessage(`${round!.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${state.team!.carXP}/100. Day simulation is now unlocked.`);
-          await syncGame();
-        } catch (error: any) {
-          setStatusMessage(`Race failed to simulate. ${error.message}`);
+        let earnings = 0;
+        if (sponsorRaceBonus > 0) {
+          earnings += sponsorRaceBonus;
+          state.team!.budget += earnings;
         }
-        setLoading(false);
-      }, 1500);
+
+        if (weekendProgress) {
+          weekendProgress.raceComplete = true;
+        }
+        applyRoundCarDevelopmentAll(state);
+        state.season.round += 1;
+        
+        setResultsData({ metric: 'time', res, grid: weekendProgress?.grid || null });
+        setStatusMessage(`${round!.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${state.team!.carXP}/100. Day simulation is now unlocked.`);
+        await syncGame();
+      } catch (error: any) {
+        setStatusMessage(`Race processing failed. ${error.message}`);
+      }
+      setLoading(false);
     };
 
     const renderResults = () => {
@@ -291,6 +296,19 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
       );
     };
 
+    if (liveRaceMode && round && weekendProgress?.grid) {
+      return (
+        <RaceControl
+          teams={teams}
+          track={round}
+          laps={round.laps}
+          qualifyingGrid={weekendProgress.grid}
+          selectedStrategies={weekendProgress.selectedStrategies}
+          onRaceComplete={handleRaceComplete}
+        />
+      );
+    }
+
     if (!round) {
       return (
         <div>
@@ -349,138 +367,138 @@ export function renderWeekend(root: HTMLElement, flashMessage = "") {
       };
     });
 
-    return (
-      <div style={{ paddingBottom: '64px' }}>
+
+  return (
+    <div style={{ paddingBottom: '64px' }}>
+      
+      {/* Pit Wall Title Header */}
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          {sectionLabel('Live Pit Wall Ops')}
+          {pageTitle(round!.name)}
+          {pageSubtitle('Direct your strategy options and monitor track metrics from the secure operations console.')}
+        </div>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={statCell()}>{statLabel('Current Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(round!.round)}</span></div>
+          <div style={statCell()}>{statLabel('Sponsor Bonus')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(`$${sponsorRaceBonus}M`)}</span></div>
+          <div style={statCell()}>{statLabel('Car Level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(`Lv ${state.team!.carLevel}`)}</span></div>
+        </div>
+      </div>
+
+      {/* progression timeline: Practice -> Qualifying -> Race */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '16px',
+        marginBottom: '32px'
+      }}>
+        {[
+          { phase: "Practice", desc: "Gain +5 Car XP", action: handlePractice, active: true, done: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete },
+          { phase: "Qualifying", desc: "Set Grid Position & Gain +8 Car XP", action: handleQuali, active: raceWindowOpen, done: weekendProgress?.qualifyingComplete },
+          { phase: "Race", desc: "Execute strategy & win points", action: handleRace, active: !raceLocked, done: weekendProgress?.raceComplete }
+        ].map((item, idx) => (
+          <div key={idx} style={{
+            ...glassCard({ padding: '20px' }),
+            borderLeft: item.done ? '3px solid #10b981' : item.active ? `3px solid ${HUB.accent}` : '3px solid rgba(255,255,255,0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: '120px'
+          }}>
+            <div>
+              <span style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Phase 0{idx+1}</span>
+              <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: '4px 0' }}>{item.phase}</h4>
+              <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0 }}>{item.desc}</p>
+            </div>
+            <button 
+              onClick={item.action} 
+              disabled={loading || !item.active || item.done}
+              style={{
+                ...actionBtn({ padding: '8px 16px', fontSize: '10px', marginTop: '16px', width: '100%' }),
+                backgroundColor: item.done ? 'rgba(16,185,129,0.1)' : item.active ? HUB.accent : 'rgba(255,255,255,0.02)',
+                color: item.done ? '#10b981' : '#fff',
+                border: item.done ? '1px solid #10b981' : 'none',
+                cursor: (item.done || !item.active) ? 'default' : 'pointer',
+                opacity: item.active ? 1 : 0.5
+              }}
+            >
+              {item.done ? "COMPLETED" : `RUN ${item.phase.toUpperCase()}`}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Live track environment metrics split panels */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '32px' }}>
         
-        {/* Pit Wall Title Header */}
-        <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            {sectionLabel('Live Pit Wall Ops')}
-            {pageTitle(round.name)}
-            {pageSubtitle('Direct your strategy options and monitor track metrics from the secure operations console.')}
-          </div>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <div style={statCell()}>{statLabel('Current Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(round.round)}</span></div>
-            <div style={statCell()}>{statLabel('Sponsor Bonus')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(`$${sponsorRaceBonus}M`)}</span></div>
-            <div style={statCell()}>{statLabel('Car Level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(`Lv ${state.team!.carLevel}`)}</span></div>
-          </div>
-        </div>
-
-        {/* progression timeline: Practice -> Qualifying -> Race */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '16px',
-          marginBottom: '32px'
-        }}>
-          {[
-            { phase: "Practice", desc: "Gain +5 Car XP", action: handlePractice, active: true, done: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete },
-            { phase: "Qualifying", desc: "Set Grid Position & Gain +8 Car XP", action: handleQuali, active: raceWindowOpen, done: weekendProgress?.qualifyingComplete },
-            { phase: "Race", desc: "Execute strategy & win points", action: handleRace, active: !raceLocked, done: weekendProgress?.raceComplete }
-          ].map((item, idx) => (
-            <div key={idx} style={{
-              ...glassCard({ padding: '20px' }),
-              borderLeft: item.done ? '3px solid #10b981' : item.active ? `3px solid ${HUB.accent}` : '3px solid rgba(255,255,255,0.05)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              minHeight: '120px'
-            }}>
-              <div>
-                <span style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Phase 0{idx+1}</span>
-                <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: '4px 0' }}>{item.phase}</h4>
-                <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0 }}>{item.desc}</p>
-              </div>
-              <button 
-                onClick={item.action} 
-                disabled={loading || !item.active || item.done}
-                style={{
-                  ...actionBtn({ padding: '8px 16px', fontSize: '10px', marginTop: '16px', width: '100%' }),
-                  backgroundColor: item.done ? 'rgba(16,185,129,0.1)' : item.active ? HUB.accent : 'rgba(255,255,255,0.02)',
-                  color: item.done ? '#10b981' : '#fff',
-                  border: item.done ? '1px solid #10b981' : 'none',
-                  cursor: (item.done || !item.active) ? 'default' : 'pointer',
-                  opacity: item.active ? 1 : 0.5
-                }}
-              >
-                {item.done ? "COMPLETED" : `RUN ${item.phase.toUpperCase()}`}
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {/* Live track environment metrics split panels */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '32px' }}>
+        {/* Track Conditions & Evolution (Span 4) */}
+        <div style={{ ...glassCard(), gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <h3 style={{ fontSize: '11px', fontFamily: HUB.fontBold, color: HUB.accent, letterSpacing: '0.15em', textTransform: 'uppercase', margin: 0 }}>Track Evolution</h3>
           
-          {/* Track Conditions & Evolution (Span 4) */}
-          <div style={{ ...glassCard(), gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ fontSize: '11px', fontFamily: HUB.fontBold, color: HUB.accent, letterSpacing: '0.15em', textTransform: 'uppercase', margin: 0 }}>Track Evolution</h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{ color: HUB.textMuted }}>WEATHER FORECAST</span>
-                <span style={{ color: raceIsWet === true ? '#60a5fa' : raceIsWet === false ? '#fbbf24' : '#fff', fontWeight: 700 }}>
-                  {raceIsWet === true ? '🌧️ WET RACE' : raceIsWet === false ? '☀️ Dry Race' : '⛅ TBC after Qualifying'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{ color: HUB.textMuted }}>TRACK GRIP LEVEL</span>
-                <span style={{ color: '#fff', fontWeight: 700 }}>
-                  {raceIsWet === true ? '42% (Wet)' : raceIsWet === false ? '91% (Rubbered-In)' : '—'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{ color: HUB.textMuted }}>RAIN PROBABILITY</span>
-                <span style={{
-                  color: (() => {
-                    const p = round ? getTrackWetProbability(round.name || round.circuit || '') : 0;
-                    return p >= 0.3 ? '#ef4444' : p >= 0.15 ? '#f59e0b' : '#10b981';
-                  })(),
-                  fontWeight: 700
-                }}>
-                  {round ? `${Math.round(getTrackWetProbability(round.name || round.circuit || '') * 100)}%` : '—'}
-                </span>
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <span style={{ color: HUB.textMuted }}>WEATHER FORECAST</span>
+              <span style={{ color: raceIsWet === true ? '#60a5fa' : raceIsWet === false ? '#fbbf24' : '#fff', fontWeight: 700 }}>
+                {raceIsWet === true ? '🌧️ WET RACE' : raceIsWet === false ? '☀️ Dry Race' : '⛅ TBC after Qualifying'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <span style={{ color: HUB.textMuted }}>TRACK GRIP LEVEL</span>
+              <span style={{ color: '#fff', fontWeight: 700 }}>
+                {raceIsWet === true ? '42% (Wet)' : raceIsWet === false ? '91% (Rubbered-In)' : '—'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <span style={{ color: HUB.textMuted }}>RAIN PROBABILITY</span>
+              <span style={{
+                color: (() => {
+                  const p = round ? getTrackWetProbability(round.name || round.circuit || '') : 0;
+                  return p >= 0.3 ? '#ef4444' : p >= 0.15 ? '#f59e0b' : '#10b981';
+                })(),
+                fontWeight: 700
+              }}>
+                {round ? `${Math.round(getTrackWetProbability(round.name || round.circuit || '') * 100)}%` : '—'}
+              </span>
             </div>
           </div>
-
-          {/* Pit Strategy Simulations (Span 8) */}
-          <div style={{ ...glassCard(), gridColumn: 'span 8' }}>
-            <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Pit Wall Strategy</p>
-            {roundStrats.length > 0 && activeDrivers.length > 0 ? (
-              <AnimatedTabs tabs={driverTabs} className="max-w-full" />
-            ) : (
-              <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>No custom strategies for this GP.</p>
-            )}
-          </div>
-
         </div>
 
-        {/* Advance Day bar */}
-        <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            {!raceWindowOpen && <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>Race weekend is not open yet. Simulate days until {raceDateLabel}.</p>}
-            {raceWindowOpen && raceNeedsQuali && <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>Complete qualifying to unlock the race simulation.</p>}
-            {raceWindowOpen && raceAlreadyRun && <p style={{ fontSize: '13px', color: '#10b981', margin: 0 }}>This Grand Prix has been run. Advance to the next round.</p>}
-          </div>
-          <button onClick={advanceDay} disabled={!canAdvanceDay || loading} style={{ ...actionBtn({ padding: '12px 32px' }), opacity: (!canAdvanceDay || loading) ? 0.5 : 1 }}>
-            Simulate 1 Day
-          </button>
+        {/* Pit Strategy Simulations (Span 8) */}
+        <div style={{ ...glassCard(), gridColumn: 'span 8' }}>
+          <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Pit Wall Strategy</p>
+          {roundStrats.length > 0 && activeDrivers.length > 0 ? (
+            <AnimatedTabs tabs={driverTabs} className="max-w-full" />
+          ) : (
+            <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>No custom strategies for this GP.</p>
+          )}
         </div>
-
-        {statusMessage && (
-          <div style={{ ...glassCard({ padding: '16px' }), borderLeft: `4px solid ${HUB.accent}`, marginTop: '24px' }}>
-            <p style={{ fontSize: '14px', color: '#fff', margin: 0 }}>{statusMessage}</p>
-          </div>
-        )}
-
-        <AnimatePresence mode="wait">
-          {resultsData && <div key={resultsData.metric}>{renderResults()}</div>}
-        </AnimatePresence>
 
       </div>
-    );
-  };
 
-  mountLayout(root, 'weekend', <WeekendPage />, () => renderWeekend(root, flashMessage));
+      {/* Advance Day bar */}
+      <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          {!raceWindowOpen && <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>Race weekend is not open yet. Simulate days until {raceDateLabel}.</p>}
+          {raceWindowOpen && raceNeedsQuali && <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>Complete qualifying to unlock the race simulation.</p>}
+          {raceWindowOpen && raceAlreadyRun && <p style={{ fontSize: '13px', color: '#10b981', margin: 0 }}>This Grand Prix has been run. Advance to the next round.</p>}
+        </div>
+        <button onClick={advanceDay} disabled={!canAdvanceDay || loading} style={{ ...actionBtn({ padding: '12px 32px' }), opacity: (!canAdvanceDay || loading) ? 0.5 : 1 }}>
+          Simulate 1 Day
+        </button>
+      </div>
+
+      {statusMessage && (
+        <div style={{ ...glassCard({ padding: '16px' }), borderLeft: `4px solid ${HUB.accent}`, marginTop: '24px' }}>
+          <p style={{ fontSize: '14px', color: '#fff', margin: 0 }}>{statusMessage}</p>
+        </div>
+      )}
+
+      {resultsData && <div key={resultsData.metric}>{renderResults()}</div>}
+
+    </div>
+  );
+};
+
+export function renderWeekend(root: HTMLElement, flashMessage = "") {
+  mountLayout(root, 'weekend', <WeekendPage root={root} initialFlashMessage={flashMessage} />, () => renderWeekend(root, flashMessage));
 }

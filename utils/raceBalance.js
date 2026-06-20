@@ -15,8 +15,8 @@
 // ─── Performance Spread Constants ─────────────────────────────────────────────
 
 /** How much each ovr point is worth as a lap-time credit in race sessions */
-export const RACE_OVR_COEFF = 0.018;       // was 0.028 — compressed by ~35%
-export const QUALI_OVR_COEFF = 0.022;      // was 0.031 — compressed by ~29%
+export const RACE_OVR_COEFF = 0.035;       // was 0.018
+export const QUALI_OVR_COEFF = 0.040;      // was 0.022
 
 /** Spec delta multipliers (applied on top of ovr deviation from SPEC_BASE) */
 export const RACE_AERO_COEFF    = 0.006;   // was 0.010
@@ -26,8 +26,8 @@ export const QUALI_AERO_COEFF   = 0.014;   // was 0.024
 export const QUALI_CHASSIS_COEFF = 0.007;  // was 0.011
 
 /** Driver attribute multipliers in race laps */
-export const DRIVER_PACE_COEFF      = 0.018; // was 0.024
-export const DRIVER_RACECRAFT_COEFF = 0.010; // was 0.015
+export const DRIVER_PACE_COEFF      = 0.035; // was 0.018
+export const DRIVER_RACECRAFT_COEFF = 0.015; // was 0.010
 export const DRIVER_QUALI_COEFF     = 0.038; // was 0.045 — qualifying
 
 /** Engine/performance bonus dampening */
@@ -48,7 +48,7 @@ export const QUALI_NOISE_RANGE = 0.30; // was 0.07 — max extra noise for low-c
 
 // ─── Lap Variance Constants ────────────────────────────────────────────────────
 
-export const LAP_VARIANCE_BASE        = 0.55;  // was 0.38 — base random noise per lap
+export const LAP_VARIANCE_BASE        = 0.15;  // was 0.55 — base random noise per lap
 export const LAP_CONSISTENCY_NOISE    = 0.004; // was 0.0022 — per consistency-point below 100
 export const SAFETY_CAR_COMPRESSION   = 4.5;   // seconds bunched under SC
 
@@ -103,8 +103,8 @@ export const FORM_LOOKBACK_RACES  = 5;
  * Represents how well the car is dialled in — good setup = fast,
  * bad setup = slower despite same car.
  */
-export const SETUP_MIN  = 0.982; // worst weekend setup = +1.8% time
-export const SETUP_MAX  = 1.015; // best weekend setup  = -1.5% time
+export const SETUP_MIN  = 0.996; // was 0.982
+export const SETUP_MAX  = 1.004; // was 1.015
 // Applied as: effectiveLap = baseLap * setupQuality
 // Intentionally asymmetric: bad setups hurt more than good setups help
 
