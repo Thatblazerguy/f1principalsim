@@ -9,12 +9,12 @@ import { CommsPanel } from '../components/ui/CommsPanel.tsx';
 import { WeatherPanel } from '../components/ui/WeatherPanel.tsx';
 import { AnimatedTabs } from '../components/ui/animated-tabs.tsx';
 import { BattleTracker } from '../components/ui/BattleTracker.tsx';
-import { StrategyIntelligenceCard } from '../components/ui/StrategyIntelligenceCard.tsx';
+import { RaceEngineerPanel } from '../components/ui/RaceEngineerPanel.tsx';
 import { LiveEventFeed } from '../components/ui/LiveEventFeed.tsx';
 import { MLStrategyEngine } from '../game/MLStrategyEngine.js';
 import { Play, Pause, FastForward, SkipForward } from 'lucide-react';
 
-export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrategies, onRaceComplete }) {
+export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrategies, selectedObjective, weekendContext, onRaceComplete }) {
   // Engine instance Ref
   const engineRef = useRef(null);
   const strategyEngineRef = useRef(null);
@@ -26,10 +26,10 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
   const [rightTab, setRightTab] = useState('strategy');
   
   useEffect(() => {
-    engineRef.current = new LiveRaceEngine(teams, track, laps, qualifyingGrid, selectedStrategies);
-    strategyEngineRef.current = new MLStrategyEngine(engineRef.current);
+    engineRef.current = new LiveRaceEngine(teams, track, laps, qualifyingGrid, selectedStrategies, weekendContext);
+    strategyEngineRef.current = new MLStrategyEngine(engineRef.current, selectedObjective);
     setFrame(f => f + 1);
-  }, [teams, track, laps, qualifyingGrid, selectedStrategies]);
+  }, [teams, track, laps, qualifyingGrid, selectedStrategies, selectedObjective, weekendContext]);
 
   useEffect(() => {
     let animationFrameId;
@@ -82,7 +82,7 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
 
   const finishRace = () => {
     if (engineRef.current && engineRef.current.raceCompleted) {
-      onRaceComplete(engineRef.current.getResults(), engineRef.current.getReplayData());
+      onRaceComplete(engineRef.current.finalClassification, engineRef.current.getReplayData());
     }
   };
 
@@ -147,9 +147,9 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
           {/* Scrolling Sections */}
           <div style={{ flex: 1, backgroundColor: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
              
-             <section>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '10px', color: HUB.accent, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>Intelligence</h4>
-               <StrategyIntelligenceCard strategyEngine={strategyEngineRef.current} />
+             <section style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+               <h4 style={{ margin: '0 0 12px 0', fontSize: '10px', color: HUB.accent, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>AI Race Engineer</h4>
+               <RaceEngineerPanel strategyEngine={strategyEngineRef.current} engine={engine} />
              </section>
 
              <section>

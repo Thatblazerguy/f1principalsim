@@ -9,6 +9,33 @@ const TIRE_DEGRADATION = {
   "Wet": 0.030
 };
 
+export function compareCars(a, b, totalLaps) {
+  // 1. Retired cars always go to the back
+  if (a.retired !== b.retired) {
+    return a.retired ? 1 : -1;
+  }
+  
+  // 2. If both are retired, sort by distance completed (descending)
+  if (a.retired) {
+    return b.distance - a.distance;
+  }
+  
+  // 3. If both completed the race, sort by totalTime (ascending)
+  const aFinished = a.distance >= totalLaps;
+  const bFinished = b.distance >= totalLaps;
+  if (aFinished && bFinished) {
+    return a.totalTime - b.totalTime;
+  }
+  
+  // 4. If one finished and the other didn't, the finished one is ahead
+  if (aFinished !== bFinished) {
+    return aFinished ? -1 : 1;
+  }
+  
+  // 5. If neither finished (still racing), sort by distance (descending)
+  return b.distance - a.distance;
+}
+
 const PACE_MODIFIERS = {
   "Push": 0.020,
   "Attack": 0.040,
@@ -39,7 +66,7 @@ const ERS_USAGE = {
 };
 
 export class LiveRaceEngine {
-  constructor(teams, track, laps, qualifyingGrid, playerSelectedStrategies, raceHistory) {
+  constructor(teams, track, laps, qualifyingGrid, playerSelectedStrategies, weekendContext) {
     this.track = track;
     this.totalLaps = laps;
     this.isWet = Math.random() < getTrackWetProbability(track.name || track.circuit || "");
@@ -51,7 +78,7 @@ export class LiveRaceEngine {
     this.elapsedTime = 0;
     this.snapshots = []; // Store lap-by-lap state for replay
 
-    this.cars = this.initCars(teams, qualifyingGrid, playerSelectedStrategies);
+    this.cars = this.initCars(teams, qualifyingGrid, playerSelectedStrategies, weekendContext);
     this.calculateFailures();
     
     this.addEvent("Race started!");
@@ -101,14 +128,16 @@ export class LiveRaceEngine {
     });
   }
 
-  initCars(teams, qualifyingGrid, playerSelectedStrategies) {
+  initCars(teams, qualifyingGrid, playerSelectedStrategies, weekendContext) {
     let cars = [];
     
     teams.forEach(team => {
       team.drivers.forEach(driver => {
         const gridPos = this.getGridPosition(qualifyingGrid, driver);
         const baseLap = this.track.baseTime - (driver.pace * 0.03) - (team.carPerformance * 0.03);
-        const speedKms = (this.track.baseTime / baseLap) * 220;
+        const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
+        const effectiveBaseLap = baseLap * finalModifier;
+        const speedKms = (this.track.baseTime / effectiveBaseLap) * 220;
         
         cars.push({
           id: driver.name,
@@ -157,7 +186,7 @@ export class LiveRaceEngine {
     // If playerSelectedStrategies is empty, fall back to checking team name against state or assume no player.
     // In weekend.tsx we passed it. We'll trust the caller.
 
-    cars.sort((a, b) => b.distance - a.distance);
+    cars.sort((a, b) => compareCars(a, b, this.totalLaps));
     return cars;
   }
 
@@ -301,10 +330,7 @@ export class LiveRaceEngine {
     // Track old lap for snapshot triggers
     const leaderOldLap = this.cars.length > 0 ? this.cars[0].lap : 0;
 
-    this.cars.sort((a, b) => {
-       if (a.retired !== b.retired) return a.retired ? 1 : -1;
-       return b.distance - a.distance;
-    });
+    this.cars.sort((a, b) => compareCars(a, b, this.totalLaps));
 
     for (let i = 0; i < this.cars.length; i++) {
       let car = this.cars[i];
@@ -423,10 +449,7 @@ export class LiveRaceEngine {
     this.generateComms(dt);
 
     let oldOrder = this.cars.map(c => c.id);
-    this.cars.sort((a, b) => {
-       if (a.retired !== b.retired) return a.retired ? 1 : -1;
-       return b.distance - a.distance;
-    });
+    this.cars.sort((a, b) => compareCars(a, b, this.totalLaps));
     let newOrder = this.cars.map(c => c.id);
 
     // Leader lap check for snapshots
@@ -456,18 +479,52 @@ export class LiveRaceEngine {
       this.raceCompleted = true;
       this.saveSnapshot(); // Final snapshot
       this.addEvent("Race Finished!");
+      this.finalClassification = this.generateFinalClassification();
     }
   }
 
+  generateFinalClassification() {
+    // 1. Sort cars using compareCars to ensure they are in perfect final order
+    const sortedCars = [...this.cars].sort((a, b) => compareCars(a, b, this.totalLaps));
+
+    const classification = {
+      raceId: `${this.track.round || 0}_${this.track.name || this.track.circuit || ""}`,
+      circuit: this.track.circuit || this.track.name || "",
+      round: this.track.round || 0,
+      completedAt: Date.now(),
+      results: sortedCars.map((c, idx) => ({
+        position: idx + 1,
+        driver: c.driver,
+        team: c.team,
+        time: c.retired ? 99999 : c.totalTime,
+        retired: c.retired,
+        stops: c.stops,
+        tireCompound: c.tireCompound
+      }))
+    };
+
+    // Safely freeze classification container, results array, and each result entry
+    // without freezing driver or team instances (which must remain mutable in the global state).
+    Object.freeze(classification);
+    Object.freeze(classification.results);
+    classification.results.forEach(entry => Object.freeze(entry));
+
+    return classification;
+  }
+
   getResults() {
-    return this.cars.map(c => ({
+    if (this.finalClassification) {
+      return this.finalClassification.results;
+    }
+    const sortedCars = [...this.cars].sort((a, b) => compareCars(a, b, this.totalLaps));
+    return sortedCars.map((c, idx) => ({
       driver: c.driver,
       team: c.team,
       time: c.retired ? 99999 : c.totalTime,
       retired: c.retired,
       stops: c.stops,
       tireCompound: c.tireCompound
-    })).sort((a, b) => a.time - b.time);
+    }));
   }
 
   getReplayData() {

@@ -15,6 +15,7 @@ import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getDriverHeadshotUrl } from "../data/drivers.js";
 import { getTrackWetProbability } from "../utils/raceBalance.js";
+import { validateFinalClassification } from "../utils/classificationValidator.js";
 import {
   ensureSeasonTimeline,
   getRoundRaceDay,
@@ -23,6 +24,7 @@ import {
   simulateNextDay,
   canSimulateNextDay,
 } from "../utils/seasonTimeline.js";
+import { generateWeekendContext } from "../utils/weekendForm.js";
 
 import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
 import { AnimatedTabs } from "../components/ui/animated-tabs.tsx";
@@ -37,7 +39,8 @@ function ensureWeekendProgress(round: number) {
       qualifyingComplete: false,
       grid: null,
       raceComplete: false,
-      selectedStrategies: {}
+      selectedStrategies: {},
+      weekendContext: null
     };
   } else {
     if (state.weekendProgress.raceComplete === undefined) {
@@ -76,6 +79,14 @@ function updateBestFinishes(results: any[]) {
   });
 }
 
+export const RACE_OBJECTIVES = [
+  { id: 'win', label: '🏆 Push For Win', risk: 'High' },
+  { id: 'podium', label: '🥈 Fight For Podium', risk: 'Medium' },
+  { id: 'points', label: '🎯 Finish In Points', risk: 'Low' },
+  { id: 'conservative', label: '💰 Conservative Points', risk: 'Minimal' },
+  { id: 'gamble', label: '🌧 Strategy Gamble', risk: 'Extreme' }
+];
+
 export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
   ensureTeamState(state.team!);
   ensureSeasonTimeline(state);
@@ -95,6 +106,11 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   ];
   const sponsorRaceBonus = getTotalSponsorRaceBonus(state.team!);
   const weekendProgress = round ? ensureWeekendProgress(round.round) : null;
+  
+  if (round && weekendProgress && !weekendProgress.weekendContext && raceWindowOpen) {
+    weekendProgress.weekendContext = generateWeekendContext(teams, round, state.raceHistory || []);
+  }
+
   const raceNeedsQuali = Boolean(round && weekendProgress && !weekendProgress.qualifyingComplete);
   const raceAlreadyRun = Boolean(round && weekendProgress?.raceComplete);
   const raceLocked = !raceWindowOpen || raceAlreadyRun || !weekendProgress?.qualifyingComplete;
@@ -113,6 +129,8 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     const d1 = activeDrivers[0];
     const d2 = activeDrivers[1];
     if (!weekendProgress.selectedStrategies) weekendProgress.selectedStrategies = {};
+    if (!weekendProgress.selectedObjective) weekendProgress.selectedObjective = RACE_OBJECTIVES[2].id; // Default to Finish In Points
+    
     const d1Strat = weekendProgress.selectedStrategies[d1?.name] || "";
     const d2Strat = d2 ? (weekendProgress.selectedStrategies[d2.name] || "") : "N/A";
     
@@ -131,6 +149,26 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const [raceIsWet, setRaceIsWet] = useState<boolean | null>(null);
   const [liveRaceMode, setLiveRaceMode] = useState(false);
   const [activeDriverTabId, setActiveDriverTabId] = useState(`driver-${activeDrivers[0]?.name || ""}`);
+
+  useEffect(() => {
+    if (weekendProgress && weekendProgress.round === state.season.round && weekendProgress.raceComplete) {
+      console.log("REPAIRING CORRUPTED STATE: Race is complete but round was not incremented.");
+      state.season.round += 1;
+      syncGame().then(() => {
+        renderWeekend(root, "Successfully progressed to the next round.");
+      });
+    }
+  }, [state.season.round, weekendProgress, root]);
+
+  useEffect(() => {
+    if (weekendProgress?.raceComplete && weekendProgress?.finalClassification) {
+      setResultsData({
+        metric: 'time',
+        res: weekendProgress.finalClassification.results,
+        grid: weekendProgress.grid
+      });
+    }
+  }, [weekendProgress?.raceComplete, weekendProgress?.finalClassification]);
 
     const advanceDay = async () => {
       const tick = simulateNextDay(state);
@@ -151,7 +189,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       setTimeout(() => {
         try {
           gainTeamCarXP(state.team!, 5);
-          setResultsData({ metric: 'bestLap', res: simulatePractice(teams, round!), grid: null });
+          setResultsData({ metric: 'bestLap', res: simulatePractice(teams, round!, weekendProgress?.weekendContext), grid: null });
           setStatusMessage(`Practice complete. Car XP increased to ${state.team!.carXP}/100.`);
           syncGame();
         } catch (error: any) {
@@ -170,7 +208,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       setTimeout(() => {
         try {
           gainTeamCarXP(state.team!, 8);
-          const { grid, isWet } = simulateQualifying(teams, round!, state.raceHistory || []);
+          const { grid, isWet } = simulateQualifying(teams, round!, weekendProgress?.weekendContext);
           setRaceIsWet(isWet);
           setResultsData({ metric: 'lap', res: grid, grid: null });
           if (weekendProgress) {
@@ -212,15 +250,22 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       setLiveRaceMode(true);
     };
 
-    const handleRaceComplete = async (res, replayData) => {
+    const handleRaceComplete = async (finalClassification, replayData) => {
       setLiveRaceMode(false);
       setLoading(true);
       try {
+        const res = finalClassification.results;
         gainTeamXP(state.team!, 25);
         gainTeamCarXP(state.team!, 20);
+
+        // Keep a deep copy of standings before update for validation
+        const standingsBefore = JSON.parse(JSON.stringify(state.standings));
+
         state.standings = updateStandings(res, state.standings);
         updateBestFinishes(res);
         recordRaceHistory(round!.round, round!.name, round!.circuit, res, state.standings, state, replayData);
+
+        const historyRecord = state.raceHistory[state.raceHistory.length - 1];
 
         let earnings = 0;
         if (sponsorRaceBonus > 0) {
@@ -230,11 +275,16 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
 
         if (weekendProgress) {
           weekendProgress.raceComplete = true;
+          weekendProgress.finalClassification = finalClassification;
         }
         applyRoundCarDevelopmentAll(state);
         state.season.round += 1;
         
         setResultsData({ metric: 'time', res, grid: weekendProgress?.grid || null });
+
+        // Diagnostic validation suite
+        validateFinalClassification(finalClassification, standingsBefore, state.standings, historyRecord);
+
         setStatusMessage(`${round!.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${state.team!.carXP}/100. Day simulation is now unlocked.`);
         await syncGame();
       } catch (error: any) {
@@ -249,6 +299,46 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       const title = metric === "bestLap" ? "Practice Results" : metric === "lap" ? "Qualifying Results" : "Race Results";
       const isRace = metric === "time";
 
+      let objectiveReviewHtml = null;
+      if (isRace) {
+        const selectedObjId = weekendProgress?.selectedObjective || 'points';
+        const objDef = RACE_OBJECTIVES.find(o => o.id === selectedObjId) || RACE_OBJECTIVES[2];
+        
+        let targetPos = 10;
+        if (selectedObjId === 'win') targetPos = 1;
+        else if (selectedObjId === 'podium') targetPos = 3;
+        else if (selectedObjId === 'conservative') targetPos = 12;
+        else if (selectedObjId === 'gamble') targetPos = 5;
+
+        // Best finish from player team
+        const playerResults = res.map((r, i) => ({ r, pos: i+1 })).filter(x => x.r.team?.name === state.team?.name);
+        const bestPos = playerResults.length > 0 ? playerResults[0].pos : 20;
+
+        const achieved = bestPos <= targetPos;
+        const score = achieved ? Math.min(100, 80 + (targetPos - bestPos) * 10) : Math.max(10, 80 - (bestPos - targetPos) * 15);
+
+        objectiveReviewHtml = (
+          <div style={{ backgroundColor: 'rgba(10,10,10,0.85)', border: `1px solid ${achieved ? '#10b981' : '#ef4444'}`, borderRadius: '8px', padding: '16px', marginBottom: '24px', display: 'flex', gap: '24px', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Objective Review</div>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{objDef.label}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Result</div>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: achieved ? '#10b981' : '#ef4444' }}>{achieved ? 'ACHIEVED' : 'FAILED'}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Actual</div>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>P{bestPos}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Strategy Score</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>{score}%</div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <SlideUp>
           <motion.div 
@@ -257,6 +347,9 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
              transition={{ type: "spring", bounce: 0, duration: 0.3 }}
              style={{ ...glassCard({ padding: '24px' }), marginTop: '24px' }}>
              <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, margin: '0 0 16px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{title}</h3>
+             
+             {objectiveReviewHtml}
+
              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {res.map((r, i) => {
                   const metricValue = metric && Number.isFinite(r[metric]) ? `${r[metric].toFixed(3)}s` : "";
@@ -313,6 +406,8 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           laps={round.laps}
           qualifyingGrid={weekendProgress.grid}
           selectedStrategies={weekendProgress.selectedStrategies}
+          selectedObjective={weekendProgress.selectedObjective}
+          weekendContext={weekendProgress.weekendContext}
           onRaceComplete={handleRaceComplete}
         />
       );
@@ -472,21 +567,87 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           </div>
         </div>
 
-        {/* Pit Strategy Simulations (Span 8) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 8' }}>
-          <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Pit Wall Strategy</p>
-          {activeDrivers.length > 0 ? (
-            <>
-              <AnimatedTabs tabs={driverTabs} activeTab={activeDriverTabId} setActiveTab={setActiveDriverTabId} />
-              
-              {/* Render active tab content */}
-              <div style={{ marginTop: '16px' }}>
-                {driverTabs.find(t => t.id === activeDriverTabId)?.content || driverTabs[0]?.content}
+        {/* Strategy & Objectives (Span 8) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', gridColumn: 'span 8' }}>
+          
+          {/* Race Objectives */}
+          <div style={{ ...glassCard() }}>
+            <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Race Objective</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              {RACE_OBJECTIVES.map(obj => {
+                const isSelected = weekendProgress?.selectedObjective === obj.id;
+                const isDisabled = weekendProgress?.raceComplete;
+                return (
+                  <button 
+                    key={obj.id} 
+                    disabled={isDisabled}
+                    onClick={() => {
+                      if (isDisabled) return;
+                      if (weekendProgress) {
+                        weekendProgress.selectedObjective = obj.id;
+                        syncGame();
+                        renderWeekend(root);
+                      }
+                    }}
+                    style={{
+                      ...glassCard({ padding: '12px' }),
+                      textAlign: 'center',
+                      background: isSelected ? 'rgba(225,6,0,0.15)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${isSelected ? HUB.accent : HUB.border}`,
+                      opacity: isDisabled ? 0.6 : 1,
+                      cursor: isDisabled ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>{obj.label}</div>
+                    <div style={{ fontSize: '10px', color: HUB.textMuted }}>Risk: {obj.risk}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pit Strategy Simulations */}
+          <div style={{ ...glassCard() }}>
+            <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Pit Wall Strategy</p>
+            {activeDrivers.length > 0 ? (
+              <>
+                <AnimatedTabs tabs={driverTabs} activeTab={activeDriverTabId} setActiveTab={setActiveDriverTabId} />
+                
+                {/* Render active tab content */}
+                <div style={{ marginTop: '16px' }}>
+                  {driverTabs.find(t => t.id === activeDriverTabId)?.content || driverTabs[0]?.content}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>No custom strategies for this GP.</p>
+            )}
+          </div>
+          
+          {/* Weekend Narrative Briefing */}
+          {weekendProgress?.weekendContext?.trackEvents?.length > 0 && (
+            <div style={{ ...glassCard() }}>
+              <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Weekend Briefing & Reports</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {weekendProgress.weekendContext.trackEvents.map((ev: any, idx: number) => {
+                  const isPlayerTeam = ev.team === state.team?.name;
+                  return (
+                    <div key={idx} style={{ 
+                      padding: '12px', 
+                      background: isPlayerTeam ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)', 
+                      borderLeft: `3px solid ${isPlayerTeam ? HUB.accent : '#f59e0b'}`,
+                      borderRadius: '4px'
+                    }}>
+                      <div style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>{ev.driver} ({ev.team})</div>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>{ev.event.label}</div>
+                      <div style={{ fontSize: '12px', color: '#e5e7eb' }}>{ev.event.desc}</div>
+                    </div>
+                  );
+                })}
               </div>
-            </>
-          ) : (
-            <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>No custom strategies for this GP.</p>
+            </div>
           )}
+
         </div>
 
       </div>

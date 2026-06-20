@@ -28,15 +28,12 @@ import {
   LAP_CONSISTENCY_NOISE,
   WET_SPECIALIST_BONUS,
   WET_SPECIALIST_PENALTY,
-  SETUP_MIN,
-  SETUP_MAX,
   START_POSITION_PENALTY,
   START_INCIDENT_PROB,
   START_INCIDENT_MIN,
   START_INCIDENT_MAX,
   SAFETY_CAR_COMPRESSION,
   getDNFPerLap,
-  getDriverFormMultiplier,
   getTrackWetProbability,
   getTeamArchetype,
   getArchetypeWeights,
@@ -185,7 +182,7 @@ function generateStartIncidents(finishers) {
  * @param {number} laps                    Race distance in laps
  * @param {Array}  [qualifyingGrid=null]   Pre-sorted qualifying grid
  * @param {object} [playerSelectedStrategies={}]  Player driver name → strategy id
- * @param {Array}  [raceHistory=[]]        state.raceHistory for form calculation
+ * @param {object} [weekendContext=null]   Pre-calculated performance context
  * @returns {Array} Sorted finisher list (P1 first, DNFs last)
  */
 export function simulateRaceEvent(
@@ -194,7 +191,7 @@ export function simulateRaceEvent(
   laps,
   qualifyingGrid = null,
   playerSelectedStrategies = {},
-  raceHistory = []
+  weekendContext = null
 ) {
   const roundStrategies = track.round ? (strategies[track.round] || []) : [];
 
@@ -242,20 +239,13 @@ export function simulateRaceEvent(
         getTeamLapCredit(team, "race") -
         getTeamPerformanceBonus(team) * RACE_PERF_BONUS_COEFF;
 
-      // ── Per-driver form modifier (last 5 races) ─────────────────────────
-      // Good form: < 1.0 (faster). Poor form: > 1.0 (slower).
-      const formMult = getDriverFormMultiplier(driver.name, raceHistory);
-
-      // ── Weekend setup quality (random per driver per race) ──────────────
-      // Captures: car setup, practice programme quality, engineer calls
-      // Good setup: near SETUP_MIN (faster). Bad setup: near SETUP_MAX.
-      const setupQuality = SETUP_MIN + Math.random() * (SETUP_MAX - SETUP_MIN);
-
       // ── Strategy win modifier ───────────────────────────────────────────
       const adjustedBaseLap = baseLap * (1 - winMod * 0.035);
 
-      // ── Effective base lap with form and setup ──────────────────────────
-      const effectiveBaseLap = adjustedBaseLap * formMult * setupQuality;
+      // ── Effective base lap with weekend context ─────────────────────────
+      // The context has form, outliers, and track suitability baked in
+      const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
+      const effectiveBaseLap = adjustedBaseLap * finalModifier;
 
       // ── Risk strategy: more variance and potential for incidents ─────────
       const riskVarianceMultiplier = 1 + (riskMod * 2.0);
@@ -287,8 +277,6 @@ export function simulateRaceEvent(
         secondPitLap,
         isHighRisk,
         riskMod,
-        formMult,
-        setupQuality,
         time: startPenalty,
         retired: riskPenaltyApplied === "DNF",
       };

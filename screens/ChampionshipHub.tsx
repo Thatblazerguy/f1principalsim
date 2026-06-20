@@ -162,13 +162,40 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             {!isSeasonOver ? (
-                                <div>
-                                    <span style={{ fontSize: '10px', color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>TELEMETRY TIME REMAINING</span>
-                                    <div style={{ display: 'flex', gap: '16px', fontFamily: "'Formula1-Bold', sans-serif", fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', fontSize: '24px', color: 'white' }}>
-                                        <span>{String(daysUntilRace).padStart(2,'0')}<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>D</span></span>
-                                        <span>00<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>H</span></span>
-                                        <span>00<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>M</span></span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                                    <div>
+                                        <span style={{ fontSize: '10px', color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>TELEMETRY TIME REMAINING</span>
+                                        <div style={{ display: 'flex', gap: '16px', fontFamily: "'Formula1-Bold', sans-serif", fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', fontSize: '24px', color: 'white' }}>
+                                            <span>{String(daysUntilRace).padStart(2,'0')}<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>D</span></span>
+                                            <span>00<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>H</span></span>
+                                            <span>00<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>M</span></span>
+                                        </div>
                                     </div>
+                                    {daysUntilRace > 0 && (
+                                        <button 
+                                            onClick={handleSimulateDay} 
+                                            disabled={!canAdvanceDay}
+                                            style={{
+                                                backgroundColor: 'rgba(255,255,255,0.05)',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                color: '#fff',
+                                                padding: '10px 20px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                letterSpacing: '0.05em',
+                                                textTransform: 'uppercase',
+                                                cursor: canAdvanceDay ? 'pointer' : 'not-allowed',
+                                                opacity: canAdvanceDay ? 1 : 0.5,
+                                                transition: 'all 0.15s',
+                                                fontFamily: "'Formula1-Bold', sans-serif"
+                                            }}
+                                            onMouseEnter={e => { if (canAdvanceDay) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)'; }}
+                                            onMouseLeave={e => { if (canAdvanceDay) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
+                                        >
+                                            Simulate 1 Day
+                                        </button>
+                                    )}
                                 </div>
                             ) : <div />}
                             <button onClick={handleEnterPitWall}

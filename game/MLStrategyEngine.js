@@ -2,11 +2,14 @@ import { getTrackStrategyProfile } from '../data/strategyProfiles.js';
 import modelData from '../strategy_ml/model.json'; // Vite supports importing JSON
 
 export class MLStrategyEngine {
-  constructor(liveRaceEngine) {
+  constructor(liveRaceEngine, selectedObjective = 'points') {
     this.engine = liveRaceEngine;
+    this.selectedObjective = selectedObjective;
     this.trackProfile = getTrackStrategyProfile(this.engine.track.name || "");
     this.analysis = {};
     this.model = modelData;
+    this.chatFeed = [];
+    this._lastMsgTime = 0;
   }
 
   update() {
@@ -24,6 +27,39 @@ export class MLStrategyEngine {
         this.analysis.drivers[car.id] = this._analyzePlayerDriver(car);
       }
     });
+
+    this._generateChatFeed();
+  }
+
+  _generateChatFeed() {
+    if (!this.engine.cars || this.engine.cars.length === 0) return;
+    
+    // Add messages slowly over time
+    if (this.engine.elapsedTime - this._lastMsgTime > 15) {
+      this._lastMsgTime = this.engine.elapsedTime;
+      
+      const pCars = this.engine.cars.filter(c => c.isPlayer && !c.retired);
+      if (pCars.length > 0) {
+        const car = pCars[Math.floor(Math.random() * pCars.length)];
+        const analysis = this.analysis.drivers[car.id];
+        if (analysis && analysis.engineerMsgs.length > 0) {
+          const msg = analysis.engineerMsgs[Math.floor(Math.random() * analysis.engineerMsgs.length)];
+          this.pushChat("Engineer", msg, car.id);
+        }
+
+        // Driver feedback
+        if (car.tireWear > 60 && Math.random() < 0.3) {
+          this.pushChat("Driver", "Grip is starting to go.", car.id);
+        } else if (car.engineTemp > 115 && Math.random() < 0.3) {
+          this.pushChat("Driver", "Engine feels a bit hot.", car.id);
+        }
+      }
+    }
+  }
+
+  pushChat(sender, message, carId) {
+    this.chatFeed.push({ time: this.engine.elapsedTime, sender, message, carId });
+    if (this.chatFeed.length > 20) this.chatFeed.shift();
   }
 
   _analyzeWeather() {
@@ -149,72 +185,72 @@ export class MLStrategyEngine {
     const mlResult = this._evaluateMLModel(features);
 
     let projectedPos = this.engine.cars.indexOf(car) + 1;
-    let alternativePos = projectedPos;
+    
+    // Objective processing
+    let targetPos = 10;
+    if (this.selectedObjective === 'win') targetPos = 1;
+    else if (this.selectedObjective === 'podium') targetPos = 3;
+    else if (this.selectedObjective === 'points') targetPos = 10;
+    else if (this.selectedObjective === 'conservative') targetPos = 12;
+    else if (this.selectedObjective === 'gamble') targetPos = 5;
 
-    if (mlResult.bestStrategy !== "STAY_OUT" && mlResult.confidence > 70) {
-      alternativePos = Math.max(1, projectedPos - 1);
+    let objectiveStatus = "ON TARGET";
+    if (projectedPos > targetPos + 2) objectiveStatus = "FAILED";
+    else if (projectedPos > targetPos) objectiveStatus = "AT RISK";
+
+    let confidenceOffset = (targetPos - projectedPos) * 5;
+    let baseConfidence = 80 + confidenceOffset;
+    if (this.selectedObjective === 'gamble') baseConfidence -= 20;
+    baseConfidence = Math.max(10, Math.min(99, baseConfidence));
+
+    const plans = {
+      planA: { action: "One Stop", proj: projectedPos, conf: baseConfidence },
+      planB: { action: "Undercut", proj: Math.max(1, projectedPos - 1), conf: baseConfidence - 15 },
+      planC: { action: "Safety Car Gamble", proj: Math.max(1, projectedPos - 3), conf: 25 }
+    };
+
+    let activePlan = plans.planA;
+    let recommendedAction = "STAY OUT";
+    let actionGain = "N/A";
+    
+    if (mlResult.bestStrategy !== "STAY_OUT" && mlResult.confidence > 60) {
+      recommendedAction = mlResult.bestStrategy.replace(/_/g, ' ');
+      actionGain = "+1 Position";
+      activePlan = plans.planB;
     }
 
     return {
-      recommendedStrategy: {
-        type: mlResult.bestStrategy.replace(/_/g, ' '),
-        window: mlResult.bestStrategy === "STAY_OUT" ? "N/A" : "Immediate",
+      objective: {
+        id: this.selectedObjective,
+        status: objectiveStatus,
+        projectedFinish: `P${activePlan.proj}`,
+        confidence: activePlan.conf
+      },
+      recommendedAction: {
+        type: recommendedAction,
+        gain: actionGain,
         confidence: mlResult.confidence
       },
-      currentRank: `P${projectedPos} Projected`,
-      alternativeRank: `P${alternativePos} Projected`,
+      plans: plans,
       pitWindow: {
         status: mlResult.bestStrategy.includes("PIT") ? "OPEN" : "CLOSED",
-        loss: `${this.trackProfile.pitLoss || 22}s`,
-        undercutAvailable: gapAhead < 2.0,
-        gain: gapAhead < 2.0 ? "+1.5s" : "N/A",
-        overcutAvailable: false
-      },
-      tyres: {
-        compound: car.tireCompound,
-        wear: Math.floor(car.tireWear),
-        remaining: 30 - car.lap, // simple mock
-        paceDrop: car.tireWear > 70 ? "+0.6s/lap" : "+0.1s/lap"
+        undercutAvailable: gapAhead < 2.0
       },
       engineerMsgs: mlResult.activeInsights
     };
   }
 
   simulateStrategy(carId, option) {
-    const car = this.engine.cars.find(c => c.id === carId);
-    if (!car) return null;
-
-    let currentPos = this.engine.cars.indexOf(car) + 1;
-    let timeLoss = this.trackProfile.pitLoss || 22;
-    let timeGain = 0;
-    let projectedFinish = currentPos;
-
-    if (option === "PIT_THIS_LAP") {
-      timeGain = 2.5;
-      projectedFinish = Math.max(1, currentPos - 1);
-    } else if (option === "PIT_IN_2") {
-      timeLoss += 1.0;
-      timeGain = 1.8;
-      projectedFinish = currentPos;
-    } else if (option === "PIT_IN_5") {
-      timeLoss += 3.0;
-      timeGain = 0.5;
-      projectedFinish = Math.min(this.engine.cars.length, currentPos + 1);
-    } else if (option === "STAY_OUT") {
-      timeLoss = 0;
-      timeGain = 0;
-      projectedFinish = currentPos;
-    }
-
-    // Apply ML accuracy variance to projection
-    const errorMargin = this.model.metrics.mae || 1.42;
-
-    return {
-      option,
-      projectedFinish: `P${projectedFinish}`,
-      errorMargin: `±${errorMargin.toFixed(1)} Pos`,
-      timeLoss: `-${timeLoss.toFixed(1)}s`,
-      timeGain: `+${timeGain.toFixed(1)}s`
-    };
+     if (!this.analysis.drivers || !this.analysis.drivers[carId]) return null;
+     const currentProjStr = this.analysis.drivers[carId].objective.projectedFinish || 'P10';
+     const currentProj = parseInt(currentProjStr.replace('P', ''));
+     
+     if (option === "PIT_THIS_LAP") {
+        return { proj: `P${Math.max(1, currentProj - 1)}`, conf: 78 };
+     } else if (option === "PIT_IN_3_LAPS") {
+        return { proj: `P${currentProj}`, conf: 65 };
+     } else {
+        return { proj: `P${currentProj + 1}`, conf: 45 };
+     }
   }
 }

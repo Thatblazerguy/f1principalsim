@@ -43,13 +43,13 @@ export const RACE_ENGINE_BOOST_COEFF = 0.45; // was 0.5 (inside getRaceBoost)
  * Base spread ensures even perfect drivers can vary ±0.15s.
  * Consistency reduces this noise.
  */
-export const QUALI_NOISE_BASE  = 0.15; // was 0.06
-export const QUALI_NOISE_RANGE = 0.30; // was 0.07 — max extra noise for low-consistency drivers
+export const QUALI_NOISE_BASE  = 0.05; // was 0.15
+export const QUALI_NOISE_RANGE = 0.15; // was 0.30
 
 // ─── Lap Variance Constants ────────────────────────────────────────────────────
 
-export const LAP_VARIANCE_BASE        = 0.15;  // was 0.55 — base random noise per lap
-export const LAP_CONSISTENCY_NOISE    = 0.004; // was 0.0022 — per consistency-point below 100
+export const LAP_VARIANCE_BASE        = 0.08;  // was 0.15 — base random noise per lap
+export const LAP_CONSISTENCY_NOISE    = 0.002; // was 0.004 — per consistency-point below 100
 export const SAFETY_CAR_COMPRESSION   = 4.5;   // seconds bunched under SC
 
 // ─── Weather System ────────────────────────────────────────────────────────────
@@ -96,17 +96,7 @@ export const FORM_NEUTRAL         = 1.00;
 /** How many past races are used to compute current form */
 export const FORM_LOOKBACK_RACES  = 5;
 
-// ─── Setup Quality (Per-Weekend Variance) ─────────────────────────────────────
 
-/**
- * Each driver gets a random "setup quality" each weekend.
- * Represents how well the car is dialled in — good setup = fast,
- * bad setup = slower despite same car.
- */
-export const SETUP_MIN  = 0.996; // was 0.982
-export const SETUP_MAX  = 1.004; // was 1.015
-// Applied as: effectiveLap = baseLap * setupQuality
-// Intentionally asymmetric: bad setups hurt more than good setups help
 
 // ─── Grid Start System ─────────────────────────────────────────────────────────
 

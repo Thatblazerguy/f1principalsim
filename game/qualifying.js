@@ -6,7 +6,6 @@ import {
   QUALI_PERF_BONUS_COEFF,
   WET_SPECIALIST_BONUS,
   WET_SPECIALIST_PENALTY,
-  getDriverFormMultiplier,
   getTrackWetProbability,
 } from "../utils/raceBalance.js";
 
@@ -30,18 +29,7 @@ function qualiNoise(driver) {
   return (u1 + u2) * spread; // range ≈ ±spread
 }
 
-/**
- * Weekend confidence modifier — some drivers nail their lap, some don't.
- * Separate from seasonal form: this is the single-session hot-lap factor.
- * Range: 0.988 – 1.012 (±1.2% of lap time)
- */
-function qualiConfidence(driver) {
-  // High racecraft = better at delivering the lap under pressure
-  const pressureStat = driver.racecraft ?? 80;
-  const baseConfidence = 0.990 + (pressureStat / 100) * 0.015;
-  const noise = (Math.random() - 0.5) * 0.020;
-  return Math.min(1.015, Math.max(0.985, baseConfidence + noise));
-}
+
 
 /**
  * simulateQualifying
@@ -55,10 +43,10 @@ function qualiConfidence(driver) {
  *
  * @param {Array}  teams        All teams with their drivers
  * @param {object} track        Calendar track entry
- * @param {Array}  [raceHistory] Optional state.raceHistory for form calculation
+ * @param {object} weekendContext Pre-calculated performance context
  * @returns {{ grid: Array, isWet: boolean }}
  */
-export function simulateQualifying(teams, track, raceHistory = []) {
+export function simulateQualifying(teams, track, weekendContext) {
   // Determine conditions
   const wetChance = getTrackWetProbability(track.name || track.circuit || "");
   const isWet = Math.random() < wetChance;
@@ -73,13 +61,10 @@ export function simulateQualifying(teams, track, raceHistory = []) {
           getTeamLapCredit(t, "quali") -
           getTeamPerformanceBonus(t) * QUALI_PERF_BONUS_COEFF;
 
-        // Form modifier from recent race history (0.92–1.08 range)
-        const formMult = getDriverFormMultiplier(d.name, raceHistory);
+        // Form modifier from weekend context
+        const finalModifier = weekendContext?.drivers?.[d.name]?.finalModifier ?? 1.0;
 
-        // Weekend confidence (hot-lap factor)
-        const confidence = qualiConfidence(d);
-
-        // Random lap noise (wider — allows grid shuffles)
+        // Random lap noise (reduced in v3)
         const noise = qualiNoise(d);
 
         // Weather effects
@@ -93,7 +78,7 @@ export function simulateQualifying(teams, track, raceHistory = []) {
         }
 
         // Effective lap time
-        const lap = baseLap * formMult * confidence + noise + weatherDelta;
+        const lap = baseLap * finalModifier + noise + weatherDelta;
 
         return { driver: d, team: t, lap, isWet };
       })

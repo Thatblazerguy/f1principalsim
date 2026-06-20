@@ -11,18 +11,18 @@ function practiceNoise(driver) {
   return (Math.random() - 0.5) * 2 * spread;
 }
 
-export function simulatePractice(teams, track) {
+export function simulatePractice(teams, track, weekendContext) {
   return teams
     .flatMap((t) =>
       t.drivers.map((d) => ({
         driver: d,
         team: t,
         bestLap:
-          track.baseTime -
+          (track.baseTime -
           (d.pace + getEnginePaceBoost(t)) * 0.032 -
           getTeamLapCredit(t, "practice") -
-          getTeamPerformanceBonus(t) * 0.02 +
-          practiceNoise(d),
+          getTeamPerformanceBonus(t) * 0.02) * (weekendContext?.drivers?.[d.name]?.finalModifier ?? 1.0) +
+          practiceNoise(d) * 0.5,
       }))
     )
     .sort((a, b) => a.bestLap - b.bestLap);
