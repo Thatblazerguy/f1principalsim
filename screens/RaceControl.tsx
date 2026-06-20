@@ -11,7 +11,7 @@ import { AnimatedTabs } from '../components/ui/animated-tabs.tsx';
 import { BattleTracker } from '../components/ui/BattleTracker.tsx';
 import { StrategyIntelligenceCard } from '../components/ui/StrategyIntelligenceCard.tsx';
 import { LiveEventFeed } from '../components/ui/LiveEventFeed.tsx';
-import { StrategyEngine } from '../game/StrategyEngine.js';
+import { MLStrategyEngine } from '../game/MLStrategyEngine.js';
 import { Play, Pause, FastForward, SkipForward } from 'lucide-react';
 
 export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrategies, onRaceComplete }) {
@@ -27,7 +27,7 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
   
   useEffect(() => {
     engineRef.current = new LiveRaceEngine(teams, track, laps, qualifyingGrid, selectedStrategies);
-    strategyEngineRef.current = new StrategyEngine(engineRef.current);
+    strategyEngineRef.current = new MLStrategyEngine(engineRef.current);
     setFrame(f => f + 1);
   }, [teams, track, laps, qualifyingGrid, selectedStrategies]);
 

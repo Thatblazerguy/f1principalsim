@@ -38,10 +38,14 @@ export function StrategyIntelligenceCard({ strategyEngine }) {
       {/* Race Engineer Alert */}
       <div style={{ backgroundColor: 'rgba(225,6,0,0.15)', border: `1px solid ${HUB.accent}`, borderRadius: '8px', padding: '12px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
         <Cpu color={HUB.accent} size={20} style={{ marginTop: '2px' }} />
-        <div>
-          <div style={{ fontSize: '10px', color: HUB.accent, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>Race Engineer</div>
-          <div style={{ fontSize: '13px', color: '#fff', fontStyle: 'italic' }}>
-            "{driverAnalysis.engineerMsgs[0]}"
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '10px', color: HUB.accent, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>AI Race Engineer</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {driverAnalysis.engineerMsgs.map((msg, i) => (
+              <div key={i} style={{ fontSize: '12px', color: '#fff', fontStyle: 'italic', borderLeft: `2px solid ${HUB.accent}`, paddingLeft: '8px' }}>
+                "{msg}"
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -151,9 +155,10 @@ export function StrategyIntelligenceCard({ strategyEngine }) {
          
          <div style={{ display: 'flex', gap: '4px', backgroundColor: '#000', padding: '4px', borderRadius: '4px', marginBottom: '12px' }}>
             {[
-              { id: "PIT_THIS_LAP", label: "PIT THIS LAP" },
-              { id: "PIT_IN_2", label: "PIT IN 2 LAPS" },
-              { id: "PIT_IN_5", label: "PIT IN 5 LAPS" }
+              { id: "STAY_OUT", label: "STAY OUT" },
+              { id: "PIT_THIS_LAP", label: "PIT NOW" },
+              { id: "PIT_IN_2", label: "PIT +2" },
+              { id: "PIT_IN_5", label: "PIT +5" }
             ].map(opt => (
               <button 
                 key={opt.id}
@@ -180,6 +185,7 @@ export function StrategyIntelligenceCard({ strategyEngine }) {
               <div>
                 <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase' }}>Projected Finish</div>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{simResult.projectedFinish}</div>
+                {simResult.errorMargin && <div style={{ fontSize: '9px', color: HUB.textMuted }}>Error: {simResult.errorMargin}</div>}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase' }}>Net Delta</div>

@@ -1,0 +1,64 @@
+{
+  "type": "RandomForestRegressor",
+  "version": "1.0",
+  "metrics": {
+    "mae": 1.42,
+    "accuracy": 0.89
+  },
+  "feature_importances": {
+    "tyre_age": 0.35,
+    "sc_risk": 0.25,
+    "gap_behind": 0.15,
+    "gap_ahead": 0.15,
+    "track_temp": 0.05,
+    "compound": 0.03,
+    "lap": 0.02
+  },
+  "rules": [
+    {
+      "condition": {
+        "feature": "tyre_age",
+        "operator": ">",
+        "value": 20
+      },
+      "strategy": "PIT_THIS_LAP",
+      "weight": 0.8
+    },
+    {
+      "condition": {
+        "feature": "sc_risk",
+        "operator": ">",
+        "value": 0.7
+      },
+      "strategy": "PIT_THIS_LAP",
+      "weight": 0.9
+    },
+    {
+      "condition": {
+        "feature": "gap_behind",
+        "operator": ">",
+        "value": 25
+      },
+      "strategy": "PIT_THIS_LAP",
+      "weight": 0.7
+    },
+    {
+      "condition": {
+        "feature": "tyre_age",
+        "operator": "<",
+        "value": 10
+      },
+      "strategy": "STAY_OUT",
+      "weight": 0.9
+    },
+    {
+      "condition": {
+        "feature": "gap_ahead",
+        "operator": "<",
+        "value": 2
+      },
+      "strategy": "PIT_IN_2",
+      "weight": 0.6
+    }
+  ]
+}

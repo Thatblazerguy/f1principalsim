@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { calendar } from "../data/calendar.js";
 import { strategies } from "../data/strategies.js";
+import { getTrackStrategyProfile } from "../data/strategyProfiles.js";
 import { simulatePractice } from "../game/practice.js";
 import { simulateQualifying } from "../game/qualifying.js";
 import { simulateRaceEvent } from "../game/raceSimulator.js";
@@ -98,8 +99,15 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const raceAlreadyRun = Boolean(round && weekendProgress?.raceComplete);
   const raceLocked = !raceWindowOpen || raceAlreadyRun || !weekendProgress?.qualifyingComplete;
 
-  const roundStrats = round && strategies[round.round] ? strategies[round.round] : [];
-
+  const trackProfile = round ? getTrackStrategyProfile(round.circuit) : null;
+  const roundStrats = trackProfile ? trackProfile.recommendedStrategies.map((strat: any, idx: number) => ({
+    id: `ml_strat_${idx}`,
+    label: strat.type,
+    rank: idx + 1,
+    confidence: strat.confidence,
+    winModifier: (strat.confidence / 100) * 0.15,
+    riskModifier: (1 - (strat.confidence / 100)) * 0.05
+  })) : [];
   let strategiesValid = false;
   if (round && weekendProgress) {
     const d1 = activeDrivers[0];
@@ -122,6 +130,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null } | null>(null);
   const [raceIsWet, setRaceIsWet] = useState<boolean | null>(null);
   const [liveRaceMode, setLiveRaceMode] = useState(false);
+  const [activeDriverTabId, setActiveDriverTabId] = useState(`driver-${activeDrivers[0]?.name || ""}`);
 
     const advanceDay = async () => {
       const tick = simulateNextDay(state);
@@ -351,8 +360,8 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
                       <p style={{ fontSize: '12px', color: '#fff', margin: 0, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}>{strat.rank}</p>
                     </div>
                     <div>
-                      <p style={{ fontSize: '10px', color: HUB.textMuted, margin: '0 0 4px', textTransform: 'uppercase' }}>Win Bonus</p>
-                      <p style={{ fontSize: '12px', color: '#10b981', margin: 0, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}>+{(strat.winModifier * 100).toFixed(0)}%</p>
+                      <p style={{ fontSize: '10px', color: HUB.textMuted, margin: '0 0 4px', textTransform: 'uppercase' }}>ML Confidence</p>
+                      <p style={{ fontSize: '12px', color: '#10b981', margin: 0, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}>{strat.confidence}%</p>
                     </div>
                     <div>
                       <p style={{ fontSize: '10px', color: HUB.textMuted, margin: '0 0 4px', textTransform: 'uppercase' }}>Risk Level</p>
@@ -466,8 +475,15 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
         {/* Pit Strategy Simulations (Span 8) */}
         <div style={{ ...glassCard(), gridColumn: 'span 8' }}>
           <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Pit Wall Strategy</p>
-          {roundStrats.length > 0 && activeDrivers.length > 0 ? (
-            <AnimatedTabs tabs={driverTabs} className="max-w-full" />
+          {activeDrivers.length > 0 ? (
+            <>
+              <AnimatedTabs tabs={driverTabs} activeTab={activeDriverTabId} setActiveTab={setActiveDriverTabId} />
+              
+              {/* Render active tab content */}
+              <div style={{ marginTop: '16px' }}>
+                {driverTabs.find(t => t.id === activeDriverTabId)?.content || driverTabs[0]?.content}
+              </div>
+            </>
           ) : (
             <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>No custom strategies for this GP.</p>
           )}
