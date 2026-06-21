@@ -2,7 +2,7 @@
 
 **F1 Manager** is an immersive Formula 1 team management simulator where you take control of an F1 team, manage drivers, develop your car, and compete throughout an entire championship season. Build your legacy by making strategic decisions on driver recruitment, car development, sponsorships, and race strategy.
 
-> *Available at: `npm run dev` → Open browser at localhost*
+> *Run locally with `npm run dev` and open the Vite URL, usually `http://localhost:5173`.*
 
 ---
 
@@ -31,19 +31,23 @@
 - **Dynamic Driver Market** – Scout, sign, and manage drivers with real-time integration to the OpenF1 API for authentic driver data
 - **Car Development System** – Invest budget points into four core car systems: aerodynamics, engine, chassis, and reliability
 - **Complete Season Progression** – Race through a full 24-race championship calendar, earning points and competing for the championship
-- **Strategic Race Planning** – Select race strategies, manage tire strategies, practice sessions, and qualifying runs
+- **Strategic Race Planning** – Select race objectives, recommended strategies, tire plans, practice sessions, and qualifying runs
 
 ### Advanced Systems
 - **Driver Academy** – Train young drivers with customizable development programs focusing on specific skill areas
 - **Scouting Network** – Scout promising drivers across multiple regions with detailed attribute analysis
 - **Sponsorship Deals** – Negotiate sponsorship contracts for revenue and stat bonuses
-- **Pit Wall Decisions** – Make real-time strategic calls during races (pit timing, tire strategy, driver instructions)
+- **Live Race Control** – Run races through a full-screen pit wall with track map, timing tower, telemetry, weather, comms, and event feed
+- **Pit Wall Decisions** – Make real-time strategic calls during races, including driver mode, fuel mode, ERS mode, and pit commands
+- **ML Strategy Assistant** – Use track profiles and exported strategy rules to surface AI race engineer recommendations
+- **Race Replay & Season History** – Review completed races through timeline, race detail, driver/team deep dives, and replay snapshots
 - **Driver Morale & Contracts** – Manage driver satisfaction, contract negotiations, and career progression
 - **Detailed Statistics** – Track driver performance, car upgrades, financial records, and championship standings
 
 ### Technical Features
 - **Cloud-Based Save System** – All progress securely saved to Supabase with Row Level Security (RLS) for privacy
-- **Real-Time Sync** – Driver stats and team data synchronized from the OpenF1 API
+- **Real-Time Sync** – Driver stats and team data synchronized from the OpenF1 API on app boot
+- **Race Validation Utilities** – Classification, history, and performance validation helpers keep results consistent across screens
 - **Responsive Design** – Fully responsive UI optimized for desktop, tablet, and mobile devices
 - **Modern Animations** – Smooth transitions and micro-interactions powered by Framer Motion
 - **Dark Mode UI** – Eye-friendly glassmorphism design system with Formula 1 branding
@@ -57,7 +61,8 @@
 2. **Weekly Cycles** – Each race week includes practice sessions, qualifying rounds, and the main race event
 3. **Strategic Management** – Between races, manage your budget, develop your car, scout new drivers, and negotiate sponsorships
 4. **Race Simulation** – Competitive racing with dynamic simulation based on driver skill, car performance, weather, and strategy
-5. **Season Progression** – Build points and climbing the championship standings across 24 races
+5. **Race Review** – Inspect race history, replays, driver form, and constructor performance after completed rounds
+6. **Season Progression** – Build points and climb the championship standings across 24 races
 
 ### Budget & Economics
 - **Initial Budget** – Each team starts with a budget pool based on team tier
@@ -125,34 +130,47 @@ f1manager/
 │   └── fonts/                   # Formula 1 typeface files
 ├── components/                  # Reusable React components
 │   ├── HubLayout.tsx            # Main championship hub scaffold
-│   ├── ChampionshipHub.tsx       # Hub container with sidebar navigation
 │   ├── NavDropdown.tsx          # Navigation dropdown menus
 │   ├── driverComparison.tsx     # Driver stats comparison UI
 │   ├── demo.tsx                 # Demo/showcase components
 │   └── ui/                      # Radix UI component library
 │       ├── animated-tabs.tsx    # Custom tabbed interface
 │       ├── avatar.tsx           # Driver/team avatars
+│       ├── BattleTracker.tsx    # Live battle overlay
 │       ├── button.tsx           # Reusable button component
+│       ├── CommsPanel.tsx       # Team radio and engineer comms
 │       ├── dropdown-menu.tsx    # Dropdown interactions
 │       ├── header-2.tsx         # Header variants
+│       ├── RaceEngineerPanel.tsx # AI race engineer recommendations
 │       ├── popover.tsx          # Popover dialogs
 │       ├── scroll-area.tsx      # Scrollable containers
 │       ├── sign-in.tsx          # Authentication forms
 │       ├── slide-tabs.tsx       # Animated tab switching
+│       ├── TelemetryCenter.tsx  # Live telemetry widgets
+│       ├── TimingTower.tsx      # F1-style live timing tower
+│       ├── TrackMap.tsx         # Track map and car positioning
+│       ├── WeatherPanel.tsx     # Race weather and forecast panel
 │       └── workspaces.tsx       # Workspace/team switcher
 ├── data/                        # Game data & API integration
 │   ├── calendar.js              # Race calendar and schedule
 │   ├── drivers.js               # OpenF1 driver sync & database
+│   ├── realTrackLayouts.js      # Real circuit coordinate data
 │   ├── sponsors.js              # Sponsorship contracts data
+│   ├── strategyProfiles.js      # Track strategy recommendations
 │   ├── strategies.js            # Pit strategy definitions
-│   └── teams.js                 # F1 teams reference data
+│   ├── teams.js                 # F1 teams reference data
+│   └── trackLayouts.js          # Local track layout definitions
 ├── game/                        # Core game logic & simulation
+│   ├── LiveRaceEngine.js        # Interactive live race simulation
+│   ├── MLStrategyEngine.js      # Rule/model-backed race engineer
+│   ├── StrategyEngine.js        # Strategy evaluation helpers
 │   ├── academy.js               # Driver training & development
 │   ├── development.js           # Car upgrade progression system
 │   ├── driver.js                # Driver class and attributes
 │   ├── practice.js              # Practice session simulation
 │   ├── qualifying.js            # Qualifying round simulation
 │   ├── race.js                  # Single race simulation engine
+│   ├── raceHistory.js           # Completed race records and stats
 │   ├── raceSimulator.js         # Full season race simulation
 │   ├── scouting.js              # Driver scouting mechanics
 │   ├── standings.js             # Championship standings calculation
@@ -167,6 +185,8 @@ f1manager/
 │   ├── setup.tsx                # Initial team/driver setup
 │   ├── dashboard.tsx            # Main dashboard overview
 │   ├── ChampionshipHub.tsx       # Hub navigation scaffold
+│   ├── RaceControl.tsx          # Live race command center
+│   ├── RaceReplay.tsx           # Replay viewer for completed races
 │   ├── weekend.tsx              # Race weekend (practice → qualifying → race)
 │   ├── academy.tsx              # Driver academy & training
 │   ├── myDrivers.tsx            # Driver roster management
@@ -174,6 +194,7 @@ f1manager/
 │   ├── market.tsx               # Driver transfer market
 │   ├── sponsors.tsx             # Sponsorship management
 │   ├── finance.tsx              # Budget & financial overview
+│   ├── history.tsx              # Season history and deep dives
 │   ├── office.tsx               # General team management
 │   ├── calendar.tsx             # Race calendar view
 │   ├── leaderboard.tsx          # Championship standings
@@ -181,12 +202,20 @@ f1manager/
 │   └── hubNav.tsx               # Hub navigation logic
 ├── utils/                       # Helper functions
 │   ├── carDevelopment.js        # Car upgrade calculations
+│   ├── classificationValidator.js # Race result consistency checks
+│   ├── raceBalance.js           # Race balancing and form modifiers
 │   ├── reactRoot.tsx            # React mounting utilities
 │   ├── seasonTimeline.js        # Season scheduling logic
 │   ├── simTeam.js               # Team simulation helpers
+│   ├── simulationValidator.js   # Simulation sanity checks
 │   ├── sponsorDeals.js          # Sponsorship calculations
 │   ├── storage.js               # LocalStorage/SessionStorage helpers
-│   └── teamState.js             # Team state management
+│   ├── teamState.js             # Team state management
+│   └── weekendForm.js           # Weekend context and form generation
+├── strategy_ml/                 # Strategy model data and fetch/train scripts
+│   ├── model.json               # Exported strategy rules consumed by Vite
+│   ├── train_model.py           # Local model training script
+│   └── fetch_*.py               # Optional data fetch helpers
 ├── app.js                       # Application entry point
 ├── index.html                   # HTML template
 ├── style.css                    # Global styles
@@ -215,6 +244,8 @@ f1manager/
 - `reactRoot.tsx` mounts full-page React experiences (Landing, Auth, Setup)
 - `HubLayout.tsx` injects sub-screens into a persistent hub scaffold
 - Game logic remains purely JavaScript (no React dependency)
+- `RaceControl.tsx` bridges React HUD components with `LiveRaceEngine.js`
+- `MLStrategyEngine.js` imports `strategy_ml/model.json` for in-browser strategy hints
 
 ---
 
@@ -233,7 +264,7 @@ f1manager/
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/f1manager.git
+git clone https://github.com/Thatblazerguy/f1principalsim.git f1manager
 cd f1manager
 ```
 
@@ -304,9 +335,6 @@ npm run dev
 
 # Build once
 npm run build
-
-# Run production build (requires built assets)
-npm run build && npm run preview  # (if preview script exists)
 ```
 
 ### Environment Variables Explained
@@ -378,11 +406,10 @@ team.addSponsors(sponsor)         // Sign sponsorship deal
 ### 4. Race Simulation (`game/raceSimulator.js`, `game/race.js`)
 
 **Simulation Engine:**
-- Lap-by-lap race modeling with weather effects
-- Pit stop timing calculations
-- Tire degradation modeling
-- Driver consistency variance
-- Safety car and incident simulation (random)
+- Live race model for interactive race control and replay capture
+- Lap-by-lap race modeling with weather effects and driver form
+- Pit stop timing, tire degradation, fuel, ERS, and engine temperature modeling
+- Driver consistency variance, reliability failures, and race events
 - Points allocation (F1 2024 format: 25-18-15-12-10-8-6-4-2-1)
 
 **Strategy Impact:**
@@ -390,6 +417,7 @@ team.addSponsors(sponsor)         // Sign sponsorship deal
 - Fuel management influences race pace
 - Safety car windows create strategic opportunities
 - Weather changes mid-race
+- ML strategy recommendations analyze tire age, gaps, safety car risk, and race objective
 
 ### 5. Driver Scouting (`game/scouting.js`)
 
@@ -420,7 +448,24 @@ team.addSponsors(sponsor)         // Sign sponsorship deal
 - Performance incentive clauses
 - Driver preference alignment
 
-### 7. Championship Standing (`game/standings.js`)
+### 7. Live Race Control (`screens/RaceControl.tsx`, `game/LiveRaceEngine.js`)
+
+**Pit Wall Experience:**
+- Full-screen track map with live car positioning
+- F1-style timing tower and battle tracker
+- Player strategy panel for fuel, ERS, driver mode, and pit commands
+- Telemetry, weather, comms, event feed, and AI race engineer panels
+- Replay snapshots stored for post-race review
+
+### 8. Season History & Replays (`screens/history.tsx`, `screens/RaceReplay.tsx`)
+
+**Review Tools:**
+- Race timeline with podiums and player-team results
+- Race detail pages with full classifications
+- Driver and constructor deep dives from completed race history
+- Track-map replay viewer for races completed with replay data
+
+### 9. Championship Standing (`game/standings.js`)
 
 **Calculation:**
 - Points tallied across all races
@@ -579,14 +624,13 @@ statValue(text)        // Monospace numeric display
 
 2. Add navigation in `screens/hubNav.tsx`
    ```javascript
-   case 'myNewScreen':
-     mountLayout(renderMyNewScreen, container);
-     break;
+   { key: "myNewScreen", label: "My New Screen" }
    ```
 
-3. Add menu item in `components/NavDropdown.tsx`
+3. Register the screen in `components/HubLayout.tsx`
    ```typescript
-   { label: 'My New Screen', action: 'myNewScreen' }
+   const { renderMyNewScreen } = await import('../screens/myNewScreen.tsx');
+   myNewScreen: () => navigate(renderMyNewScreen)
    ```
 
 ### Adding Game Logic
@@ -620,6 +664,9 @@ When modifying the schema:
 ```bash
 # Run development server with hot reload
 npm run dev
+
+# Verify the production bundle compiles
+npm run build
 
 # Open browser DevTools (F12)
 # → Console for JS errors
@@ -668,6 +715,8 @@ npm run dev
 - Check driver attributes are within valid ranges (0-100)
 - Ensure team car upgrades are initialized
 - Review race simulation logs in browser console
+- Check `utils/classificationValidator.js` output after completed live races
+- If replay playback is empty, confirm the race was completed after replay snapshots were added
 
 #### "UI not rendering properly / Tailwind classes not applied"
 **Solution:**
@@ -743,20 +792,23 @@ if (DEBUG) {
 - [ ] Multiplayer competitive seasons
 - [ ] Driver injuries and medical recovery system
 - [ ] Advanced weather simulation
-- [ ] Team radio communications with AI co-pilot
-- [ ] Historical replay and telemetry viewing
+- [x] Team radio communications with AI race engineer panels
+- [x] Historical replay and telemetry viewing
+- [ ] Expanded strategy model training and calibration
 
 ### Known Limitations
-- Race simulation is deterministic (same state → same result)
+- Live race outcomes include random weather, reliability, and incident factors
 - Limited to 24-race seasons
 - No dynamic track condition changes mid-session (practice/quali)
 - Driver development is linear without major breakpoints
 - No transfer market for AI team drivers
+- Older completed races may not include replay snapshot data
 
 ### Performance Notes
 - Large season data (multiple years) may slow down UI
 - Real-time Supabase subscriptions not yet implemented
-- Race simulation runs synchronously (blocks UI during calculation)
+- Live race control uses animation-frame updates; heavy debug logging can affect smoothness
+- ML strategy rules run in-browser from `strategy_ml/model.json`
 
 ---
 
