@@ -306,22 +306,49 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
           {pageTitle('Driver Intelligence Center')}
           {pageSubtitle('Comprehensive telemetry, seasonal analytics, and contract evaluation.')}
         </div>
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.4)', padding: '6px', borderRadius: '8px', border: `1px solid ${HUB.border}` }}>
-          {allDrivers.map((d, idx) => (
-            <button key={d.name} onClick={() => setSelectedTab(idx)} style={{
-              background: selectedTab === idx ? HUB.accent : 'transparent',
-              color: selectedTab === idx ? '#fff' : HUB.textMuted,
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontFamily: HUB.fontBold,
-              fontSize: '13px',
-              transition: '0.2s all'
-            }}>
-              {d.name.split(' ').pop()} {d.driverRole === 'reserve' ? '(RES)' : ''}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.4)', padding: '6px', borderRadius: '8px', border: `1px solid ${HUB.border}`, position: 'relative' }}>
+          {allDrivers.map((d, idx) => {
+            const isActive = selectedTab === idx;
+            return (
+              <button 
+                key={d.name} 
+                onClick={() => setSelectedTab(idx)} 
+                style={{
+                  position: 'relative',
+                  background: 'transparent',
+                  color: isActive ? '#fff' : HUB.textMuted,
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontFamily: HUB.fontBold,
+                  fontSize: '13px',
+                  outline: 'none',
+                  zIndex: 1,
+                  transition: 'color 0.2s ease'
+                }}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="active-driver-tab"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: HUB.accent,
+                      borderRadius: '4px',
+                      zIndex: -1,
+                    }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 380,
+                      damping: 30
+                    }}
+                  />
+                )}
+                {d.name.split(' ').pop()} {d.driverRole === 'reserve' ? '(RES)' : ''}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -331,8 +358,16 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
         </div>
       )}
 
-      {/* --- SECTION 1: DRIVER OVERVIEW --- */}
-      <div style={{ ...glassCard({ padding: 0 }), marginBottom: '24px', display: 'flex', overflow: 'hidden' }}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentDriver.name}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.22, ease: [0.32, 0.94, 0.6, 1] }}
+        >
+          {/* --- SECTION 1: DRIVER OVERVIEW --- */}
+          <div style={{ ...glassCard({ padding: 0 }), marginBottom: '24px', display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: '0 0 240px', background: 'rgba(0,0,0,0.3)', borderRight: `1px solid ${HUB.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
            <img src={getDriverHeadshotUrl(currentDriver)} alt={currentDriver.name} style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${HUB.accent}`, marginBottom: '16px' }} loading="lazy" />
            <h2 style={{ fontSize: '24px', color: '#fff', fontFamily: HUB.fontBold, margin: '0 0 4px', textAlign: 'center' }}>{currentDriver.name}</h2>
@@ -563,6 +598,8 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
           Complete at least one race to generate Intelligence Center analytics.
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Promotion Modal */}
       {promotionModalOpen && (state as any).team.reserveDriver && (
