@@ -125,6 +125,16 @@ export function processCompletedUpgrades(state) {
   completed.forEach(entry => {
     state.team.car[entry.part] += 1;
     state.team.carPerformance = roundToTenth((state.team.carPerformance || 0) + 1.5);
+    
+    // Track upgrade history for Analytics
+    if (!state.team.upgradeHistory) state.team.upgradeHistory = [];
+    const partNames = { aero: 'Aerodynamics', engine: 'Power Unit', chassis: 'Chassis', reliability: 'Reliability' };
+    state.team.upgradeHistory.push({
+      round: state.season.round,
+      part: partNames[entry.part] || entry.part,
+      expectedGain: 1.5
+    });
+
     addTimelineNotification(
       state,
       `${entry.part.toUpperCase()} upgrade complete (Lv ${state.team.car[entry.part]}).`

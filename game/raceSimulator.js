@@ -191,7 +191,8 @@ export function simulateRaceEvent(
   laps,
   qualifyingGrid = null,
   playerSelectedStrategies = {},
-  weekendContext = null
+  weekendContext = null,
+  selectedObjective = 'points'
 ) {
   const roundStrategies = track.round ? (strategies[track.round] || []) : [];
 
@@ -227,6 +228,22 @@ export function simulateRaceEvent(
       const riskMod = chosenStrat ? chosenStrat.riskModifier : 0;
       const isHighRisk = riskMod >= 0.05;
 
+      const isPlayer = playerSelectedStrategies[driver.name] !== undefined;
+
+      // ── Objective Modifiers (Player Only) ───────────────────────────────
+      let objPaceMod = 0;
+      let objVarMod = 1.0;
+      let objDnfMod = 1.0;
+
+      if (isPlayer) {
+        if (selectedObjective === 'win') { objPaceMod = -0.15; objVarMod = 1.6; objDnfMod = 1.3; }
+        else if (selectedObjective === 'podium') { objPaceMod = -0.08; objVarMod = 1.3; objDnfMod = 1.15; }
+        else if (selectedObjective === 'points') { objPaceMod = 0; objVarMod = 1.0; objDnfMod = 1.0; }
+        else if (selectedObjective === 'conservative') { objPaceMod = 0.15; objVarMod = 0.5; objDnfMod = 0.5; }
+        else if (selectedObjective === 'gamble') { objPaceMod = -0.05; objVarMod = 2.5; objDnfMod = 1.2; }
+        // For beat rivals, we just use a balanced pace
+      }
+
       // ── Grid position ───────────────────────────────────────────────────
       const pos = gridPosition(qualifyingGrid, driver);
       const gridPos = pos; // store for incident targeting
@@ -245,10 +262,10 @@ export function simulateRaceEvent(
       // ── Effective base lap with weekend context ─────────────────────────
       // The context has form, outliers, and track suitability baked in
       const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
-      const effectiveBaseLap = adjustedBaseLap * finalModifier;
+      const effectiveBaseLap = adjustedBaseLap * finalModifier + objPaceMod;
 
       // ── Risk strategy: more variance and potential for incidents ─────────
-      const riskVarianceMultiplier = 1 + (riskMod * 2.0);
+      const riskVarianceMultiplier = (1 + (riskMod * 2.0)) * objVarMod;
       const riskTriggered = Math.random() < riskMod;
       const riskPenaltyApplied = riskTriggered
         ? (Math.random() < 0.30 ? "DNF" : "+35s")
@@ -279,6 +296,8 @@ export function simulateRaceEvent(
         riskMod,
         time: startPenalty,
         retired: riskPenaltyApplied === "DNF",
+        isPlayer,
+        objDnfMod
       };
     })
   );
@@ -292,14 +311,21 @@ export function simulateRaceEvent(
     }
   });
 
+  // ── Snapshots for Replay Data ─────────────────────────────────────────────
+  const snapshots = [];
+
   // ── Run lap-by-lap simulation ─────────────────────────────────────────────
   finishers.forEach((f) => {
+    f.lapTimes = []; // individual lap times
+    f.cumulativeTimes = []; // Store cumulative time for snapshots
     if (f.retired) return;
 
-    const dnfPerLap = getDNFPerLap(f.team, f.driver, f.isHighRisk);
+    const dnfPerLap = getDNFPerLap(f.team, f.driver, f.isHighRisk) * f.objDnfMod;
 
     for (let lap = 1; lap <= laps; lap++) {
       if (f.retired) break;
+
+      let prevTime = f.time;
 
       // Per-lap DNF check (reliability model)
       if (Math.random() < dnfPerLap) {
@@ -334,6 +360,10 @@ export function simulateRaceEvent(
       if (vscLap && lap === vscLap) {
         f.time += 1.5 + Math.random() * 1.0;
       }
+
+      let lapTime = f.time - prevTime;
+      f.lapTimes.push(lapTime);
+      f.cumulativeTimes.push(f.time);
     }
 
     // Post-race: risk strategy time penalty (collision damage, stop-go, etc.)
@@ -342,9 +372,28 @@ export function simulateRaceEvent(
     }
   });
 
+  // Generate Replay Snapshots (approximated for Quick Sim)
+  // We don't have true lap-by-lap simultaneous state, so we construct a synthetic timeline
+  for (let lap = 1; lap <= laps; lap++) {
+    const lapSnapshot = { lap, time: lap * track.baseTime, cars: [] };
+    finishers.forEach(f => {
+      const isRetiredLap = f.retired && (!f.cumulativeTimes || lap > f.cumulativeTimes.length);
+      const cTime = f.cumulativeTimes && f.cumulativeTimes[lap - 1] ? f.cumulativeTimes[lap - 1] : (f.cumulativeTimes && f.cumulativeTimes.length > 0 ? f.cumulativeTimes[f.cumulativeTimes.length - 1] : lap * track.baseTime);
+      
+      if (isRetiredLap) {
+        lapSnapshot.cars.push({ id: f.driver.name, distance: f.cumulativeTimes ? f.cumulativeTimes.length : 0, cumulativeTime: cTime, retired: true });
+      } else {
+        lapSnapshot.cars.push({ id: f.driver.name, distance: lap, cumulativeTime: cTime, retired: false });
+      }
+    });
+    snapshots.push(lapSnapshot);
+  }
+
   // ── Sort: finishers first (by time), DNFs last ────────────────────────────
-  return finishers.sort((a, b) => {
+  const finalFinishers = finishers.sort((a, b) => {
     if (a.retired !== b.retired) return a.retired ? 1 : -1;
     return a.time - b.time;
   });
+
+  return { finishers: finalFinishers, replayData: { totalLaps: laps, snapshots, events: [] } };
 }

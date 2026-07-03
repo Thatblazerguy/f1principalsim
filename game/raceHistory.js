@@ -38,6 +38,12 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
 
   // Aggregate team results
   const teamPointsMap = {};
+  
+  // Create a map of current car performance for all teams
+  const allTeams = [state.team, ...(state.aiTeams || [])].filter(Boolean);
+  const perfMap = {};
+  allTeams.forEach(t => perfMap[t.name] = t.carPerformance || 80);
+
   driverResults.forEach(r => {
     if (!teamPointsMap[r.team]) teamPointsMap[r.team] = { points: 0, bestPos: 99 };
     teamPointsMap[r.team].points += r.points;
@@ -45,10 +51,12 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
       teamPointsMap[r.team].bestPos = r.finishPos;
     }
   });
+  
   const teamResults = Object.entries(teamPointsMap).map(([team, data]) => ({
     team,
     points: data.points,
     bestPos: data.bestPos,
+    carPerformance: perfMap[team] || 80, // Save projected performance at time of race
   }));
 
   // Fastest lap = first non-retired driver (simplification — race sim doesn't track it separately)
@@ -60,6 +68,7 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
     name:     raceName,
     circuit,
     day:      state.season?.currentDay || 0,
+    weather:  replayData?.weather || 'dry', // Capture weather if available
     driverResults,
     teamResults,
     standingsAfter: {

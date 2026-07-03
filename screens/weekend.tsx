@@ -23,18 +23,21 @@ import {
   formatSeasonDate,
   simulateNextDay,
   canSimulateNextDay,
+  getPendingUpgradeForPart,
+  getNextUpgradeAvailability
 } from "../utils/seasonTimeline.js";
 import { generateWeekendContext } from "../utils/weekendForm.js";
 
 import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
-import { AnimatedTabs } from "../components/ui/animated-tabs.tsx";
-import { CloudRain, Sun, Wind, ChevronRight, Activity, Award } from "lucide-react";
+import { CloudRain, Sun, Wind, ChevronRight, Activity, Award, ShieldAlert, Cpu, CheckCircle, AlertTriangle, MessageSquare, Flag, ArrowUpRight, ArrowDownRight, Minus, Timer, Zap } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { SlideUp, PageTransition } from '../components/ui/motion.tsx';
+import { PreRaceBriefingModal } from "../components/ui/PreRaceBriefingModal.tsx";
+import { DetailedRaceReport } from "../components/ui/DetailedRaceReport.tsx";
 
-function ensureWeekendProgress(round: number) {
-  if (!state.weekendProgress || state.weekendProgress.round !== round) {
-    state.weekendProgress = {
+function ensureWeekendProgress(round: number): any {
+  if (!(state as any).weekendProgress || (state as any).weekendProgress.round !== round) {
+    (state as any).weekendProgress = {
       round,
       qualifyingComplete: false,
       grid: null,
@@ -43,41 +46,86 @@ function ensureWeekendProgress(round: number) {
       weekendContext: null
     };
   } else {
-    if (state.weekendProgress.raceComplete === undefined) {
-      state.weekendProgress.raceComplete = false;
-    }
-    if (!state.weekendProgress.selectedStrategies) {
-      state.weekendProgress.selectedStrategies = {};
-    }
+    if ((state as any).weekendProgress.raceComplete === undefined) (state as any).weekendProgress.raceComplete = false;
+    if (!(state as any).weekendProgress.selectedStrategies) (state as any).weekendProgress.selectedStrategies = {};
   }
-  return state.weekendProgress;
+  return (state as any).weekendProgress;
 }
 
 function updateBestFinishes(results: any[]) {
-  if (!state.driverWins) state.driverWins = {};
-  if (!state.driverPodiums) state.driverPodiums = {};
+  const s = state as any;
+  if (!s.driverWins) s.driverWins = {};
+  if (!s.driverPodiums) s.driverPodiums = {};
 
-  results.forEach((entry, idx) => {
+  results.forEach((entry: any, idx: number) => {
     const finishPos = idx + 1;
     const name = entry.driver.name;
 
-    // Best finish tracking (all drivers)
-    const currentBest = state.bestFinishes[name];
-    if (!currentBest || finishPos < currentBest) {
-      state.bestFinishes[name] = finishPos;
-    }
+    const currentBest = s.bestFinishes[name];
+    if (!currentBest || finishPos < currentBest) s.bestFinishes[name] = finishPos;
 
-    // Only count for your own team's drivers
-    if (entry.team.name !== state.team?.name) return;
+    if (entry.team.name !== s.team?.name) return;
 
-    if (finishPos === 1) {
-      state.driverWins[name] = (state.driverWins[name] || 0) + 1;
-    }
-    if (finishPos <= 3) {
-      state.driverPodiums[name] = (state.driverPodiums[name] || 0) + 1;
-    }
+    if (finishPos === 1) s.driverWins[name] = (s.driverWins[name] || 0) + 1;
+    if (finishPos <= 3) s.driverPodiums[name] = (s.driverPodiums[name] || 0) + 1;
   });
 }
+
+// AI insights generator based on circuit and state
+const generateTrackInsights = (circuit: string, isWet: boolean | null, trackProfile: any) => {
+  const insights = [];
+  const c = circuit.toLowerCase();
+  
+  if (c.includes("monaco") || c.includes("singapore") || c.includes("madrid") || c.includes("baku") || c.includes("jeddah") || c.includes("marina bay")) {
+    insights.push("Overtaking is extremely difficult. Qualifying position is critical.");
+    insights.push("High probability of Safety Car deployments. Strategic flexibility is advised.");
+  } else if (c.includes("monza") || c.includes("spa") || c.includes("vegas")) {
+    insights.push("Low downforce circuit. Top speed and drag efficiency will dictate pace.");
+    insights.push("Slipstream and DRS effectiveness are very high.");
+  } else {
+    insights.push("Standard track evolution expected throughout the weekend.");
+    insights.push("Tyre degradation is predicted to be within nominal limits.");
+  }
+
+  if (isWet) {
+    insights.push("Heavy rain forecast. Expect high degradation on intermediate compounds if the track dries.");
+  }
+
+  if (trackProfile && trackProfile.baseDegradation > 1.2) {
+    insights.push("High tyre degradation detected. Multi-stop strategies are highly favorable.");
+  }
+  
+  return insights;
+};
+
+// Returns track type classification
+const getTrackTypeString = (circuit: string) => {
+  const c = circuit.toLowerCase();
+  if (c.includes("monaco") || c.includes("singapore") || c.includes("marina bay") || c.includes("jeddah") || c.includes("vegas") || c.includes("madrid") || c.includes("baku")) return "Street Circuit";
+  if (c.includes("monza") || c.includes("spa")) return "Low Downforce";
+  if (c.includes("suzuka") || c.includes("silverstone")) return "High Downforce";
+  return "Permanent Circuit";
+};
+
+// Generates fake dynamic engineer comms
+const getEngineerNotes = (team: any, weekendProgress: any, isWet: boolean | null) => {
+  const notes = [
+    { time: '08:15', msg: "Garage setup completed successfully." },
+    { time: '09:00', msg: "Telemetry link established with factory." }
+  ];
+  if (weekendProgress?.qualifyingComplete) {
+    notes.push({ time: '14:30', msg: "Parc fermé conditions active. No further setup changes allowed." });
+  }
+  if (isWet === true) {
+    notes.push({ time: '15:00', msg: "Weather radar confirms incoming rain. Preparing wet tyre blankets." });
+  } else if (isWet === false) {
+    notes.push({ time: '15:00', msg: "Track declared dry. Risk of precipitation dropping." });
+  }
+  if (team.carPerformance > 85) {
+    notes.push({ time: '16:00', msg: "Simulations show high correlation with recent aero upgrades." });
+  }
+  return notes.reverse();
+};
 
 export const RACE_OBJECTIVES = [
   { id: 'win', label: '🏆 Push For Win', risk: 'High' },
@@ -88,27 +136,28 @@ export const RACE_OBJECTIVES = [
 ];
 
 export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
-  ensureTeamState(state.team!);
-  ensureSeasonTimeline(state);
+  const s = state as any;
+  ensureTeamState(s.team!);
+  ensureSeasonTimeline(s);
   
-  const totalRounds = Math.min(state.season.totalRounds || calendar.length, calendar.length);
-  const round = state.season.round <= totalRounds ? calendar[state.season.round - 1] : null;
-  const currentDay = state.season.currentDay;
+  const totalRounds = Math.min(s.season.totalRounds || calendar.length, calendar.length);
+  const round = s.season.round <= totalRounds ? calendar[s.season.round - 1] : null;
+  const currentDay = s.season.currentDay;
   const raceDay = round ? getRoundRaceDay(round.round) : null;
-  const raceDateLabel = round ? formatSeasonDate(state.season.year || 1, raceDay!) : "";
+  const raceDateLabel = round ? formatSeasonDate(s.season.year || 1, raceDay!) : "";
   const daysUntilRace = round ? getDaysUntilRound(round.round, currentDay) : 0;
   const raceWindowOpen = Boolean(round) && daysUntilRace === 0;
-  const canAdvanceDay = canSimulateNextDay(state);
-  const activeDrivers = getActiveDrivers(state.team!);
+  const canAdvanceDay = canSimulateNextDay(s);
+  const activeDrivers = getActiveDrivers(s.team!);
   const teams = [
-    { ...state.team!, drivers: activeDrivers },
-    ...state.aiTeams
+    { ...s.team!, drivers: activeDrivers },
+    ...s.aiTeams
   ];
-  const sponsorRaceBonus = getTotalSponsorRaceBonus(state.team!);
-  const weekendProgress = round ? ensureWeekendProgress(round.round) : null;
+  const sponsorRaceBonus = getTotalSponsorRaceBonus(s.team!);
+  const weekendProgress: any = round ? ensureWeekendProgress(round.round) : null;
   
   if (round && weekendProgress && !weekendProgress.weekendContext && raceWindowOpen) {
-    weekendProgress.weekendContext = generateWeekendContext(teams, round, state.raceHistory || []);
+    weekendProgress.weekendContext = generateWeekendContext(teams, round, s.raceHistory || []);
   }
 
   const raceNeedsQuali = Boolean(round && weekendProgress && !weekendProgress.qualifyingComplete);
@@ -124,41 +173,24 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     winModifier: (strat.confidence / 100) * 0.15,
     riskModifier: (1 - (strat.confidence / 100)) * 0.05
   })) : [];
-  let strategiesValid = false;
-  if (round && weekendProgress) {
-    const d1 = activeDrivers[0];
-    const d2 = activeDrivers[1];
-    if (!weekendProgress.selectedStrategies) weekendProgress.selectedStrategies = {};
-    if (!weekendProgress.selectedObjective) weekendProgress.selectedObjective = RACE_OBJECTIVES[2].id; // Default to Finish In Points
-    
-    const d1Strat = weekendProgress.selectedStrategies[d1?.name] || "";
-    const d2Strat = d2 ? (weekendProgress.selectedStrategies[d2.name] || "") : "N/A";
-    
-    if (roundStrats.length === 0) {
-      strategiesValid = true; 
-    } else {
-      strategiesValid = Boolean(d1Strat && (d2 ? d2Strat : true));
-    }
-  } else {
-     strategiesValid = true;
-  }
 
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(initialFlashMessage);
-  const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null } | null>(null);
-  const [raceIsWet, setRaceIsWet] = useState<boolean | null>(null);
+  const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null, replayData?: any, objectiveId?: string } | null>(null);
+  const [raceIsWet, setRaceIsWet] = useState<boolean | null>(weekendProgress?.isWet !== undefined ? weekendProgress.isWet : null);
   const [liveRaceMode, setLiveRaceMode] = useState(false);
-  const [activeDriverTabId, setActiveDriverTabId] = useState(`driver-${activeDrivers[0]?.name || ""}`);
+  const [showBriefingModal, setShowBriefingModal] = useState<'quick_sim' | 'race_control' | null>(null);
+  const [briefingSelectedObjective, setBriefingSelectedObjective] = useState(weekendProgress?.selectedObjective || RACE_OBJECTIVES[2].id);
 
   useEffect(() => {
-    if (weekendProgress && weekendProgress.round === state.season.round && weekendProgress.raceComplete) {
+    if (weekendProgress && weekendProgress.round === s.season.round && weekendProgress.raceComplete) {
       console.log("REPAIRING CORRUPTED STATE: Race is complete but round was not incremented.");
-      state.season.round += 1;
+      s.season.round += 1;
       syncGame().then(() => {
         renderWeekend(root, "Successfully progressed to the next round.");
       });
     }
-  }, [state.season.round, weekendProgress, root]);
+  }, [s.season.round, weekendProgress, root]);
 
   useEffect(() => {
     if (weekendProgress?.raceComplete && weekendProgress?.finalClassification) {
@@ -170,497 +202,491 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     }
   }, [weekendProgress?.raceComplete, weekendProgress?.finalClassification]);
 
-    const advanceDay = async () => {
-      const tick = simulateNextDay(state);
-      if (!tick.advanced) return;
-      await syncGame();
-      const completedText = tick.completedUpgrades.length
-        ? ` Upgrade complete: ${tick.completedUpgrades.map(entry => entry.part.toUpperCase()).join(", ")}.`
-        : "";
-      renderWeekend(root, `Advanced to Day ${state.season.currentDay}.${completedText}`);
-    };
+  const advanceDay = async () => {
+    const tick = simulateNextDay(state);
+    if (!tick.advanced) return;
+    await syncGame();
+    const completedText = tick.completedUpgrades.length
+      ? ` Upgrade complete: ${tick.completedUpgrades.map((entry: any) => entry.part.toUpperCase()).join(", ")}.`
+      : "";
+    renderWeekend(root, `Advanced to Day ${s.season.currentDay}.${completedText}`);
+  };
 
-    const handlePractice = async () => {
-      if (!raceWindowOpen) {
-        setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
-        return;
-      }
-      setLoading(true);
-      setTimeout(() => {
-        try {
-          gainTeamCarXP(state.team!, 5);
-          setResultsData({ metric: 'bestLap', res: simulatePractice(teams, round!, weekendProgress?.weekendContext), grid: null });
-          setStatusMessage(`Practice complete. Car XP increased to ${state.team!.carXP}/100.`);
-          syncGame();
-        } catch (error: any) {
-          setStatusMessage(`Practice failed to simulate. ${error.message}`);
-        }
-        setLoading(false);
-      }, 1000);
-    };
-
-    const handleQuali = async () => {
-      if (!raceWindowOpen) {
-        setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
-        return;
-      }
-      setLoading(true);
-      setTimeout(() => {
-        try {
-          gainTeamCarXP(state.team!, 8);
-          const { grid, isWet } = simulateQualifying(teams, round!, weekendProgress?.weekendContext);
-          setRaceIsWet(isWet);
-          setResultsData({ metric: 'lap', res: grid, grid: null });
-          if (weekendProgress) {
-            weekendProgress.qualifyingComplete = true;
-            weekendProgress.grid = grid.slice();
-            weekendProgress.isWet = isWet;
-          }
-          setStatusMessage(
-            weekendProgress?.raceComplete
-              ? `Qualifying session updated. This Grand Prix race is already complete — advance to the next round for a new race. Car XP is ${state.team!.carXP}/100.`
-              : `Qualifying complete. Car XP increased to ${state.team!.carXP}/100. Race is now unlocked.`
-          );
-          syncGame();
-        } catch (error: any) {
-          setStatusMessage(`Qualifying failed to simulate. ${error.message}`);
-        }
-        setLoading(false);
-      }, 1000);
-    };
-
-    const handleRace = async () => {
-      if (!raceWindowOpen) {
-        setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
-        return;
-      }
-      if (weekendProgress?.raceComplete) {
-        setStatusMessage("This Grand Prix race has already been completed. Simulate days to progress the calendar.");
-        return;
-      }
-      if (!weekendProgress?.qualifyingComplete) {
-        setStatusMessage("Run qualifying first — the race stays locked until the grid is set.");
-        return;
-      }
-      if (roundStrats.length > 0 && !strategiesValid) {
-        setStatusMessage("Assign a race strategy for your active drivers on the pit wall before starting the race.");
-        return;
-      }
-
-      setLiveRaceMode(true);
-    };
-
-    const handleRaceComplete = async (finalClassification, replayData) => {
-      setLiveRaceMode(false);
-      setLoading(true);
+  const handlePractice = async () => {
+    if (!raceWindowOpen) {
+      setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
       try {
-        const res = finalClassification.results;
-        gainTeamXP(state.team!, 25);
-        gainTeamCarXP(state.team!, 20);
-
-        // Keep a deep copy of standings before update for validation
-        const standingsBefore = JSON.parse(JSON.stringify(state.standings));
-
-        state.standings = updateStandings(res, state.standings);
-        updateBestFinishes(res);
-        recordRaceHistory(round!.round, round!.name, round!.circuit, res, state.standings, state, replayData);
-
-        const historyRecord = state.raceHistory[state.raceHistory.length - 1];
-
-        let earnings = 0;
-        if (sponsorRaceBonus > 0) {
-          earnings += sponsorRaceBonus;
-          state.team!.budget += earnings;
-        }
-
-        if (weekendProgress) {
-          weekendProgress.raceComplete = true;
-          weekendProgress.finalClassification = finalClassification;
-        }
-        applyRoundCarDevelopmentAll(state);
-        state.season.round += 1;
-        
-        setResultsData({ metric: 'time', res, grid: weekendProgress?.grid || null });
-
-        // Diagnostic validation suite
-        validateFinalClassification(finalClassification, standingsBefore, state.standings, historyRecord);
-
-        setStatusMessage(`${round!.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${state.team!.carXP}/100. Day simulation is now unlocked.`);
-        await syncGame();
+        gainTeamCarXP(s.team!, 5);
+        setResultsData({ metric: 'bestLap', res: simulatePractice(teams, round!, weekendProgress?.weekendContext), grid: null });
+        setStatusMessage(`Practice complete. Car XP increased to ${s.team!.carXP}/100.`);
+        syncGame();
       } catch (error: any) {
-        setStatusMessage(`Race processing failed. ${error.message}`);
+        setStatusMessage(`Practice failed to simulate. ${error.message}`);
       }
       setLoading(false);
-    };
+    }, 1000);
+  };
 
-    const renderResults = () => {
-      if (!resultsData) return null;
-      const { metric, res, grid } = resultsData;
-      const title = metric === "bestLap" ? "Practice Results" : metric === "lap" ? "Qualifying Results" : "Race Results";
-      const isRace = metric === "time";
-
-      let objectiveReviewHtml = null;
-      if (isRace) {
-        const selectedObjId = weekendProgress?.selectedObjective || 'points';
-        const objDef = RACE_OBJECTIVES.find(o => o.id === selectedObjId) || RACE_OBJECTIVES[2];
-        
-        let targetPos = 10;
-        if (selectedObjId === 'win') targetPos = 1;
-        else if (selectedObjId === 'podium') targetPos = 3;
-        else if (selectedObjId === 'conservative') targetPos = 12;
-        else if (selectedObjId === 'gamble') targetPos = 5;
-
-        // Best finish from player team
-        const playerResults = res.map((r, i) => ({ r, pos: i+1 })).filter(x => x.r.team?.name === state.team?.name);
-        const bestPos = playerResults.length > 0 ? playerResults[0].pos : 20;
-
-        const achieved = bestPos <= targetPos;
-        const score = achieved ? Math.min(100, 80 + (targetPos - bestPos) * 10) : Math.max(10, 80 - (bestPos - targetPos) * 15);
-
-        objectiveReviewHtml = (
-          <div style={{ backgroundColor: 'rgba(10,10,10,0.85)', border: `1px solid ${achieved ? '#10b981' : '#ef4444'}`, borderRadius: '8px', padding: '16px', marginBottom: '24px', display: 'flex', gap: '24px', alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Objective Review</div>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{objDef.label}</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Result</div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: achieved ? '#10b981' : '#ef4444' }}>{achieved ? 'ACHIEVED' : 'FAILED'}</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Actual</div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>P{bestPos}</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Strategy Score</div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>{score}%</div>
-            </div>
-          </div>
+  const handleQuali = async () => {
+    if (!raceWindowOpen) {
+      setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      try {
+        gainTeamCarXP(s.team!, 8);
+        const { grid, isWet } = simulateQualifying(teams, round!, weekendProgress?.weekendContext);
+        setRaceIsWet(isWet);
+        setResultsData({ metric: 'lap', res: grid, grid: null });
+        if (weekendProgress) {
+          weekendProgress.qualifyingComplete = true;
+          weekendProgress.grid = grid.slice();
+          weekendProgress.isWet = isWet;
+        }
+        setStatusMessage(
+          weekendProgress?.raceComplete
+            ? `Qualifying session updated. This Grand Prix race is already complete — advance to the next round for a new race. Car XP is ${s.team!.carXP}/100.`
+            : `Qualifying complete. Car XP increased to ${s.team!.carXP}/100. Race is now unlocked.`
         );
+        syncGame();
+      } catch (error: any) {
+        setStatusMessage(`Qualifying failed to simulate. ${error.message}`);
+      }
+      setLoading(false);
+    }, 1000);
+  };
+
+  const openBriefingModal = (mode: 'quick_sim' | 'race_control') => {
+    if (!raceWindowOpen) {
+      setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
+      return;
+    }
+    if (weekendProgress?.raceComplete) {
+      setStatusMessage("This Grand Prix race has already been completed. Simulate days to progress the calendar.");
+      return;
+    }
+    if (!weekendProgress?.qualifyingComplete) {
+      setStatusMessage("Qualifying must be completed before launching the Pre-Race Briefing.");
+      return;
+    }
+    setShowBriefingModal(mode);
+  };
+
+  const startSimulationMode = async (objectiveId: string) => {
+    const mode = showBriefingModal;
+    setShowBriefingModal(null);
+    if (weekendProgress) weekendProgress.selectedObjective = objectiveId;
+
+    if (mode === 'quick_sim') {
+      setLoading(true);
+      setTimeout(async () => {
+        try {
+          const result: any = simulateRaceEvent(teams, round!, round!.laps, weekendProgress?.grid, weekendProgress?.selectedStrategies, weekendProgress?.weekendContext, objectiveId);
+          const { finishers, replayData } = result;
+          
+          gainTeamXP(s.team!, 25);
+          gainTeamCarXP(s.team!, 20);
+          const standingsBefore = JSON.parse(JSON.stringify(s.standings));
+          s.standings = updateStandings(finishers, s.standings);
+          updateBestFinishes(finishers);
+          recordRaceHistory(round!.round, round!.name, round!.circuit, finishers, s.standings, state, replayData);
+
+          if (weekendProgress) {
+            weekendProgress.raceComplete = true;
+            weekendProgress.finalClassification = { results: finishers };
+          }
+          applyRoundCarDevelopmentAll(state);
+          s.season.round += 1;
+          
+          setResultsData({ metric: 'time', res: finishers, grid: weekendProgress?.grid || null, replayData, objectiveId });
+          
+          let earnings = 0;
+          if (sponsorRaceBonus > 0) {
+            earnings += sponsorRaceBonus;
+            s.team!.budget += earnings;
+          }
+          setStatusMessage(`${round!.name} Quick Sim complete. Car XP is now ${s.team!.carXP}/100.`);
+          await syncGame();
+        } catch(e: any) {
+           setStatusMessage(`Race failed to simulate. ${e.message}`);
+        }
+        setLoading(false);
+      }, 500);
+    } else if (mode === 'race_control') {
+      setLiveRaceMode(true);
+    }
+  };
+
+  const handleRaceComplete = async (finalClassification: any, replayData: any) => {
+    setLiveRaceMode(false);
+    setLoading(true);
+    try {
+      const res = finalClassification.results;
+      gainTeamXP(s.team!, 25);
+      gainTeamCarXP(s.team!, 20);
+
+      const standingsBefore = JSON.parse(JSON.stringify(s.standings));
+
+      s.standings = updateStandings(res, s.standings);
+      updateBestFinishes(res);
+      recordRaceHistory(round!.round, round!.name, round!.circuit, res, s.standings, state, replayData);
+
+      const historyRecord = s.raceHistory[s.raceHistory.length - 1];
+
+      let earnings = 0;
+      if (sponsorRaceBonus > 0) {
+        earnings += sponsorRaceBonus;
+        s.team!.budget += earnings;
       }
 
-      return (
-        <SlideUp>
-          <motion.div 
-             initial={{ opacity: 0, scale: 0.98 }}
-             animate={{ opacity: 1, scale: 1 }}
-             transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-             style={{ ...glassCard({ padding: '24px' }), marginTop: '24px' }}>
-             <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, margin: '0 0 16px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{title}</h3>
-             
-             {objectiveReviewHtml}
+      if (weekendProgress) {
+        weekendProgress.raceComplete = true;
+        weekendProgress.finalClassification = finalClassification;
+      }
+      const objId = weekendProgress?.selectedObjective || 'points';
+      applyRoundCarDevelopmentAll(state);
+      s.season.round += 1;
+      
+      setResultsData({ metric: 'time', res, grid: weekendProgress?.grid || null, replayData, objectiveId: objId });
+      validateFinalClassification(finalClassification, standingsBefore, s.standings, historyRecord);
 
-             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {res.map((r, i) => {
-                  const metricValue = metric && Number.isFinite(r[metric]) ? `${r[metric].toFixed(3)}s` : "";
-                  const status = r.retired ? "DNF" : metricValue;
-                  const isPlayerDriver = state.team && r.team && r.team.name === state.team.name;
-                  
-                  let deltaHtml = null;
-                  if (isRace && grid?.length) {
-                    const qIdx = grid.findIndex((e: any) => e.driver.name === r.driver.name);
-                    if (qIdx >= 0) {
-                      const qualiPos = qIdx + 1;
-                      const finishPos = i + 1;
-                      const delta = qualiPos - finishPos;
-                      deltaHtml = (
-                        <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', color: delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : HUB.textMuted, marginRight: '16px' }}>
-                           Q{qualiPos} {delta > 0 ? `(+${delta})` : delta < 0 ? `(${delta})` : '(±0)'}
-                        </span>
-                      );
-                    }
-                  }
+      setStatusMessage(`${round!.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${s.team!.carXP}/100. Day simulation is now unlocked.`);
+      await syncGame();
+    } catch (error: any) {
+      setStatusMessage(`Race processing failed. ${error.message}`);
+    }
+    setLoading(false);
+  };
 
-                  return (
-                    <motion.div 
-                       initial={{ opacity: 0, y: 5 }}
-                       animate={{ opacity: 1, y: 0 }}
-                       transition={{ duration: 0.2, delay: i * 0.02 }}
-                       key={r.driver.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: isPlayerDriver ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isPlayerDriver ? HUB.accent : 'transparent'}`, borderRadius: '8px' }}>
-                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff', width: '30px' }}>P{i + 1}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                             <img src={getDriverHeadshotUrl(r.driver)} alt={r.driver.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} loading="lazy" />
-                             <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{r.driver.name}</span>
-                          </div>
-                          <span style={{ fontSize: '12px', color: HUB.textMuted }}>{r.team.name}</span>
-                       </div>
-                       <div style={{ display: 'flex', alignItems: 'center' }}>
-                          {deltaHtml}
-                          <span style={{ fontSize: '13px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', color: '#fff' }}>{status}</span>
-                       </div>
-                    </motion.div>
-                  );
-                })}
-             </div>
-          </motion.div>
-        </SlideUp>
-      );
-    };
+  const renderResults = () => {
+    if (!resultsData) return null;
+    const { metric, res, grid, replayData, objectiveId } = resultsData;
+    const title = metric === "bestLap" ? "Practice Results" : metric === "lap" ? "Qualifying Results" : "Race Results";
+    const isRace = metric === "time";
 
-    if (liveRaceMode && round && weekendProgress?.grid) {
-      return (
-        <RaceControl
-          teams={teams}
-          track={round}
-          laps={round.laps}
-          qualifyingGrid={weekendProgress.grid}
-          selectedStrategies={weekendProgress.selectedStrategies}
-          selectedObjective={weekendProgress.selectedObjective}
-          weekendContext={weekendProgress.weekendContext}
-          onRaceComplete={handleRaceComplete}
-        />
-      );
+    if (isRace) {
+      return <DetailedRaceReport results={res} grid={grid} objectiveId={objectiveId || 'points'} state={state} track={round} replayData={replayData} />;
     }
 
-    if (!round) {
-      return (
-        <div>
-          <div style={{ marginBottom: '32px' }}>
-            {sectionLabel('End of Calendar')}
-            {pageTitle('Season Complete')}
-            {pageSubtitle('The championship is over. Head into the offseason to review results and confirm your lineup.')}
-          </div>
-          <button onClick={() => { import('./offseason.tsx').then(m => m.renderOffseason(root)) }} style={actionBtn({ padding: '12px 24px' })}>Open Offseason</button>
+    return (
+      <SlideUp>
+        <motion.div 
+           initial={{ opacity: 0, scale: 0.98 }}
+           animate={{ opacity: 1, scale: 1 }}
+           transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+           style={{ ...glassCard({ padding: '24px' }), marginTop: '24px' }}>
+           <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, margin: '0 0 16px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{title}</h3>
+
+           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {res.map((r, i) => {
+                const metricValue = metric && Number.isFinite(r[metric]) ? `${r[metric].toFixed(3)}s` : "";
+                const status = r.retired ? "DNF" : metricValue;
+                const isPlayerDriver = s.team && r.team && r.team.name === s.team.name;
+                
+                let deltaHtml = null;
+                if (isRace && grid?.length) {
+                  const qIdx = grid.findIndex((e: any) => e.driver.name === r.driver.name);
+                  if (qIdx >= 0) {
+                    const qualiPos = qIdx + 1;
+                    const finishPos = i + 1;
+                    const delta = qualiPos - finishPos;
+                    deltaHtml = (
+                      <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', color: delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : HUB.textMuted, marginRight: '16px' }}>
+                         Q{qualiPos} {delta > 0 ? `(+${delta})` : delta < 0 ? `(${delta})` : '(±0)'}
+                      </span>
+                    );
+                  }
+                }
+
+                return (
+                  <motion.div 
+                     initial={{ opacity: 0, y: 5 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     transition={{ duration: 0.2, delay: i * 0.02 }}
+                     key={r.driver.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: isPlayerDriver ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isPlayerDriver ? HUB.accent : 'transparent'}`, borderRadius: '8px' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff', width: '30px' }}>P{i + 1}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                           <img src={getDriverHeadshotUrl(r.driver)} alt={r.driver.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} loading="lazy" />
+                           <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{r.driver.name}</span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: HUB.textMuted }}>{r.team.name}</span>
+                     </div>
+                     <div style={{ display: 'flex', alignItems: 'center' }}>
+                        {deltaHtml}
+                        <span style={{ fontSize: '13px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', color: '#fff' }}>{status}</span>
+                     </div>
+                  </motion.div>
+                );
+              })}
+           </div>
+        </motion.div>
+      </SlideUp>
+    );
+  };
+
+  if (liveRaceMode && round && weekendProgress?.grid) {
+    return (
+      <RaceControl
+        teams={teams}
+        track={round}
+        laps={round.laps}
+        qualifyingGrid={weekendProgress.grid}
+        selectedStrategies={weekendProgress.selectedStrategies}
+        selectedObjective={weekendProgress.selectedObjective}
+        weekendContext={weekendProgress.weekendContext}
+        onRaceComplete={handleRaceComplete}
+      />
+    );
+  }
+
+  if (!round) {
+    return (
+      <div>
+        <div style={{ marginBottom: '32px' }}>
+          {sectionLabel('End of Calendar')}
+          {pageTitle('Season Complete')}
+          {pageSubtitle('The championship is over. Head into the offseason to review results and confirm your lineup.')}
         </div>
-      );
-    }
+        <button onClick={() => { import('./offseason.tsx').then(m => m.renderOffseason(root)) }} style={actionBtn({ padding: '12px 24px' })}>Open Offseason</button>
+      </div>
+    );
+  }
 
-    const driverTabs = activeDrivers.map(driver => {
-      const currentStratId = weekendProgress?.selectedStrategies?.[driver.name] || "";
-      return {
-        id: `driver-${driver.name}`,
-        label: driver.name,
-        content: (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginTop: '16px' }}>
-            {roundStrats.map((strat: any) => {
-              const isSelected = currentStratId === strat.id;
-              const isDisabled = weekendProgress?.raceComplete;
-              return (
-                <button key={strat.id} onClick={() => {
-                  if (isDisabled) return;
-                  if (weekendProgress && weekendProgress.selectedStrategies) {
-                    weekendProgress.selectedStrategies[driver.name] = strat.id;
-                    syncGame();
-                    renderWeekend(root);
-                  }
-                }} style={{ ...glassCard({ padding: '16px' }), textAlign: 'left', background: isSelected ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isSelected ? HUB.accent : HUB.border}`, opacity: isDisabled ? 0.6 : 1, cursor: isDisabled ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>{strat.label}</span>
-                    {isSelected && <span style={{ ...pill(true), padding: '2px 8px', fontSize: '10px' }}>Selected</span>}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    <div>
-                      <p style={{ fontSize: '10px', color: HUB.textMuted, margin: '0 0 4px', textTransform: 'uppercase' }}>Rank</p>
-                      <p style={{ fontSize: '12px', color: '#fff', margin: 0, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}>{strat.rank}</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: '10px', color: HUB.textMuted, margin: '0 0 4px', textTransform: 'uppercase' }}>ML Confidence</p>
-                      <p style={{ fontSize: '12px', color: '#10b981', margin: 0, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}>{strat.confidence}%</p>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: '10px', color: HUB.textMuted, margin: '0 0 4px', textTransform: 'uppercase' }}>Risk Level</p>
-                      <p style={{ fontSize: '12px', color: '#ef4444', margin: 0, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}>{(strat.riskModifier * 100).toFixed(0)}%</p>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )
-      };
-    });
+  // Calculate Data for the New Dashboard Layout
+  const reliability = s.team!.car?.reliability || 80;
+  const healthScore = Math.min(100, Math.max(0, reliability + (Math.random() * 10 - 5)));
+  
+  // Standings
+  const sortedTeams = Object.entries(s.standings.teams).sort((a: any, b: any) => b[1] - a[1]);
+  const teamPos = sortedTeams.findIndex(t => t[0] === s.team!.name) + 1;
+  const teamPts = s.standings.teams[s.team!.name] || 0;
+  
+  let gapAhead = 0, gapBehind = 0;
+  if (teamPos > 1) gapAhead = (sortedTeams[teamPos - 2][1] as number) - teamPts;
+  if (teamPos < sortedTeams.length) gapBehind = teamPts - (sortedTeams[teamPos][1] as number);
 
+  const sortedDrivers = Object.entries(s.standings.drivers).sort((a: any, b: any) => b[1] - a[1]);
+  const d1Pos = activeDrivers[0] ? sortedDrivers.findIndex(d => d[0] === activeDrivers[0].name) + 1 : '-';
+
+  // Rival Watch
+  const rivals = sortedTeams.filter((t: any) => t[0] !== s.team!.name).map((t: any) => {
+    const aiTeam = s.aiTeams.find((a: any) => a.name === t[0]);
+    return { name: t[0], points: t[1], carLevel: aiTeam?.carLevel || 1, perf: aiTeam?.carPerformance || 80 };
+  }).slice(0, 3); // top 3 rivals
+
+  const lastUpgrade = s.team!.upgradeHistory?.[s.team!.upgradeHistory.length - 1];
+  const pendingUpg = s.team!.pendingUpgrades?.[0];
+
+  const rainProb = Math.round(getTrackWetProbability(round.circuit) * 100);
 
   return (
     <div style={{ paddingBottom: '64px' }}>
       
-      {/* Pit Wall Title Header */}
+      {/* Title Header */}
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          {sectionLabel('Live Pit Wall Ops')}
+          {sectionLabel('Race Operations Hub')}
           {pageTitle(round!.name)}
-          {pageSubtitle('Direct your strategy options and monitor track metrics from the secure operations console.')}
+          {pageSubtitle('Monitor track conditions, factory readiness, and rival developments before the race.')}
         </div>
         <div style={{ display: 'flex', gap: '16px' }}>
-          <div style={statCell()}>{statLabel('Current Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(round!.round)}</span></div>
-          <div style={statCell()}>{statLabel('Sponsor Bonus')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(`$${sponsorRaceBonus}M`)}</span></div>
-          <div style={statCell()}>{statLabel('Car Level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>{statValue(`Lv ${state.team!.carLevel}`)}</span></div>
+          <div style={statCell()}>{statLabel('Current Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color:'#fff', fontWeight:700, fontSize:'16px'}}>{round.round} / {totalRounds}</span></div>
+          <div style={statCell()}>{statLabel('Car Readiness')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color: healthScore > 80 ? '#10b981' : '#f59e0b', fontWeight:700, fontSize:'16px'}}>{healthScore.toFixed(0)}%</span></div>
+          <div style={statCell()}>{statLabel('Car Level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color:'#fff', fontWeight:700, fontSize:'16px'}}>Lv {s.team!.carLevel}</span></div>
         </div>
       </div>
 
-      {/* progression timeline: Practice -> Qualifying -> Race */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '16px',
-        marginBottom: '32px'
-      }}>
-        {[
-          { phase: "Practice", desc: "Gain +5 Car XP", action: handlePractice, active: true, done: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete },
-          { phase: "Qualifying", desc: "Set Grid Position & Gain +8 Car XP", action: handleQuali, active: raceWindowOpen, done: weekendProgress?.qualifyingComplete },
-          { phase: "Race", desc: "Execute strategy & win points", action: handleRace, active: !raceLocked, done: weekendProgress?.raceComplete }
-        ].map((item, idx) => (
-          <div key={idx} style={{
-            ...glassCard({ padding: '20px' }),
-            borderLeft: item.done ? '3px solid #10b981' : item.active ? `3px solid ${HUB.accent}` : '3px solid rgba(255,255,255,0.05)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            minHeight: '120px'
-          }}>
-            <div>
-              <span style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Phase 0{idx+1}</span>
-              <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: '4px 0' }}>{item.phase}</h4>
-              <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0 }}>{item.desc}</p>
-            </div>
-            <button 
-              onClick={item.action} 
-              disabled={loading || !item.active || item.done}
-              style={{
-                ...actionBtn({ padding: '8px 16px', fontSize: '10px', marginTop: '16px', width: '100%' }),
-                backgroundColor: item.done ? 'rgba(16,185,129,0.1)' : item.active ? HUB.accent : 'rgba(255,255,255,0.02)',
-                color: item.done ? '#10b981' : '#fff',
-                border: item.done ? '1px solid #10b981' : 'none',
-                cursor: (item.done || !item.active) ? 'default' : 'pointer',
-                opacity: item.active ? 1 : 0.5
-              }}
-            >
-              {item.done ? "COMPLETED" : `RUN ${item.phase.toUpperCase()}`}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Live track environment metrics split panels */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '24px' }}>
         
-        {/* Track Conditions & Evolution (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <h3 style={{ fontSize: '11px', fontFamily: HUB.fontBold, color: HUB.accent, letterSpacing: '0.15em', textTransform: 'uppercase', margin: 0 }}>Track Evolution</h3>
-          
+        {/* Section 1: Weekend Overview (Span 4) */}
+        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={14} /> Weekend Overview</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: HUB.textMuted }}>WEATHER FORECAST</span>
-              <span style={{ color: raceIsWet === true ? '#60a5fa' : raceIsWet === false ? '#fbbf24' : '#fff', fontWeight: 700 }}>
-                {raceIsWet === true ? '🌧️ WET RACE' : raceIsWet === false ? '☀️ Dry Race' : '⛅ TBC after Qualifying'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: HUB.textMuted }}>TRACK GRIP LEVEL</span>
-              <span style={{ color: '#fff', fontWeight: 700 }}>
-                {raceIsWet === true ? '42% (Wet)' : raceIsWet === false ? '91% (Rubbered-In)' : '—'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: HUB.textMuted }}>RAIN PROBABILITY</span>
-              <span style={{
-                color: (() => {
-                  const p = round ? getTrackWetProbability(round.name || round.circuit || '') : 0;
-                  return p >= 0.3 ? '#ef4444' : p >= 0.15 ? '#f59e0b' : '#10b981';
-                })(),
-                fontWeight: 700
-              }}>
-                {round ? `${Math.round(getTrackWetProbability(round.name || round.circuit || '') * 100)}%` : '—'}
-              </span>
-            </div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit Type</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{getTrackTypeString(round.circuit)}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Weather Forecast</span><span style={{ fontSize: '12px', color: raceIsWet === true ? '#60a5fa' : raceIsWet === false ? '#fbbf24' : '#fff', fontWeight: 700 }}>{raceIsWet === true ? '🌧️ Wet Race' : raceIsWet === false ? '☀️ Dry Race' : '⛅ TBC'}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Rain Probability</span><span style={{ fontSize: '12px', color: rainProb > 30 ? '#ef4444' : rainProb > 10 ? '#f59e0b' : '#10b981', fontWeight: 700 }}>{rainProb}%</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Track Temp</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{Math.floor(25 + Math.random() * 15)}°C</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Tyre Degradation</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{trackProfile?.baseDegradation > 1.1 ? 'High' : 'Normal'}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Pit Lane Time Loss</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>22.4s</span></div>
           </div>
         </div>
 
-        {/* Strategy & Objectives (Span 8) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', gridColumn: 'span 8' }}>
-          
-          {/* Race Objectives */}
-          <div style={{ ...glassCard() }}>
-            <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Race Objective</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-              {RACE_OBJECTIVES.map(obj => {
-                const isSelected = weekendProgress?.selectedObjective === obj.id;
-                const isDisabled = weekendProgress?.raceComplete;
-                return (
-                  <button 
-                    key={obj.id} 
-                    disabled={isDisabled}
-                    onClick={() => {
-                      if (isDisabled) return;
-                      if (weekendProgress) {
-                        weekendProgress.selectedObjective = obj.id;
-                        syncGame();
-                        renderWeekend(root);
-                      }
-                    }}
-                    style={{
-                      ...glassCard({ padding: '12px' }),
-                      textAlign: 'center',
-                      background: isSelected ? 'rgba(225,6,0,0.15)' : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${isSelected ? HUB.accent : HUB.border}`,
-                      opacity: isDisabled ? 0.6 : 1,
-                      cursor: isDisabled ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>{obj.label}</div>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted }}>Risk: {obj.risk}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Pit Strategy Simulations */}
-          <div style={{ ...glassCard() }}>
-            <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Pit Wall Strategy</p>
-            {activeDrivers.length > 0 ? (
-              <>
-                <AnimatedTabs tabs={driverTabs} activeTab={activeDriverTabId} setActiveTab={setActiveDriverTabId} />
-                
-                {/* Render active tab content */}
-                <div style={{ marginTop: '16px' }}>
-                  {driverTabs.find(t => t.id === activeDriverTabId)?.content || driverTabs[0]?.content}
+        {/* Section 2: Team Readiness (Span 4) */}
+        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldAlert size={14} /> Team Readiness</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {['Power Unit Health', 'Gearbox Health', 'ERS Health', 'Aerodynamic Integrity'].map((comp, i) => {
+              const h = Math.min(100, Math.max(0, reliability + ((i - 1.5) * 4)));
+              return (
+                <div key={comp}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: HUB.textMuted, marginBottom: '4px', textTransform: 'uppercase' }}>
+                    <span>{comp}</span>
+                    <span style={{ color: '#fff', fontWeight: 700 }}>{h.toFixed(0)}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}>
+                    <div style={{ width: `${h}%`, height: '100%', background: h > 85 ? '#10b981' : h > 60 ? '#f59e0b' : '#ef4444', borderRadius: '2px' }} />
+                  </div>
                 </div>
-              </>
-            ) : (
-              <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>No custom strategies for this GP.</p>
-            )}
+              );
+            })}
           </div>
+        </div>
+
+        {/* Section 3: Engineering Status (Span 4) */}
+        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Cpu size={14} /> Engineering Status</h4>
           
-          {/* Weekend Narrative Briefing */}
-          {weekendProgress?.weekendContext?.trackEvents?.length > 0 && (
-            <div style={{ ...glassCard() }}>
-              <p style={{ fontSize: '10px', fontWeight: 700, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px' }}>Weekend Briefing & Reports</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {weekendProgress.weekendContext.trackEvents.map((ev: any, idx: number) => {
-                  const isPlayerTeam = ev.team === state.team?.name;
-                  return (
-                    <div key={idx} style={{ 
-                      padding: '12px', 
-                      background: isPlayerTeam ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)', 
-                      borderLeft: `3px solid ${isPlayerTeam ? HUB.accent : '#f59e0b'}`,
-                      borderRadius: '4px'
-                    }}>
-                      <div style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>{ev.driver} ({ev.team})</div>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>{ev.event.label}</div>
-                      <div style={{ fontSize: '12px', color: '#e5e7eb' }}>{ev.event.desc}</div>
-                    </div>
-                  );
-                })}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+              <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Latest Upgrade</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{lastUpgrade?.part || 'None'}</span>
+                {lastUpgrade && <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>+{lastUpgrade.expectedGain} OVR</span>}
               </div>
             </div>
-          )}
 
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+              <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Manufacturing Queue</span>
+              {pendingUpg ? (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{pendingUpg.part}</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted }}>ETA Round {Math.floor((Math.max(1, pendingUpg.readyDay) - 1) / 14) + 1}</span>
+                  </div>
+                  <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}>
+                    <div style={{ width: '60%', height: '100%', background: '#3b82f6', borderRadius: '2px', animation: 'pulse 2s infinite' }} />
+                  </div>
+                </div>
+              ) : (
+                <span style={{ fontSize: '13px', color: HUB.textMuted }}>No active development projects.</span>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* Section 4: Championship Snapshot (Span 4) */}
+        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Award size={14} /> Championship Snapshot</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
+               <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Constructors</span>
+               <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>P{teamPos}</span>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
+               <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Lead Driver</span>
+               <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>P{d1Pos}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to Team Ahead:</span>
+            <span style={{ fontSize: '13px', color: gapAhead > 0 ? '#ef4444' : HUB.textMuted, fontWeight: 700, fontFamily: HUB.fontMono }}>{gapAhead > 0 ? `-${gapAhead} pts` : '—'}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to Team Behind:</span>
+            <span style={{ fontSize: '13px', color: gapBehind > 0 ? '#10b981' : HUB.textMuted, fontWeight: 700, fontFamily: HUB.fontMono }}>{gapBehind > 0 ? `+${gapBehind} pts` : '—'}</span>
+          </div>
+        </div>
+
+        {/* Section 5: Track Insights (Span 4) */}
+        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Flag size={14} /> AI Track Insights</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {generateTrackInsights(round.circuit, raceIsWet, trackProfile).map((msg, i) => (
+               <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <ChevronRight size={14} color={HUB.accent} style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <p style={{ fontSize: '12px', color: '#ccc', margin: 0, lineHeight: '1.4' }}>{msg}</p>
+               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 6: Rival Watch (Span 4) */}
+        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Timer size={14} /> Rival Watch</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {rivals.map((rival, i) => (
+              <div key={rival.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', display: 'block' }}>{rival.name}</span>
+                  <span style={{ fontSize: '10px', color: HUB.textMuted }}>{rival.points} pts</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 700, display: 'block' }}>Car Lv {rival.carLevel}</span>
+                  <span style={{ fontSize: '10px', color: HUB.textMuted, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', marginTop: '2px' }}>
+                    Pace: {rival.perf}
+                    {rival.perf > s.team!.carPerformance ? <ArrowUpRight size={10} color="#ef4444" /> : <ArrowDownRight size={10} color="#10b981" />}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Advance Day bar */}
-      <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          {!raceWindowOpen && <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>Race weekend is not open yet. Simulate days until {raceDateLabel}.</p>}
-          {raceWindowOpen && raceNeedsQuali && <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0 }}>Complete qualifying to unlock the race simulation.</p>}
-          {raceWindowOpen && raceAlreadyRun && <p style={{ fontSize: '13px', color: '#10b981', margin: 0 }}>This Grand Prix has been run. Advance to the next round.</p>}
+      {/* Section 7: Engineer Notes Feed */}
+      <div style={{ ...glassCard({ padding: '20px' }), marginBottom: '32px' }}>
+         <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={14} /> Comms Feed</h4>
+         <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
+           {getEngineerNotes(s.team, weekendProgress, raceIsWet).map((note, i) => (
+             <div key={i} style={{ minWidth: '250px', borderLeft: `2px solid ${i === 0 ? HUB.accent : 'rgba(255,255,255,0.1)'}`, paddingLeft: '12px' }}>
+               <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono, display: 'block', marginBottom: '4px' }}>{note.time}</span>
+               <p style={{ fontSize: '13px', color: i === 0 ? '#fff' : '#ccc', margin: 0 }}>{note.msg}</p>
+             </div>
+           ))}
+         </div>
+      </div>
+
+      {/* Advance Day Bar (if not open) */}
+      {!raceWindowOpen && (
+        <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderLeft: `4px solid ${HUB.accent}` }}>
+          <div>
+            <p style={{ fontSize: '14px', color: '#fff', fontWeight: 700, margin: '0 0 4px' }}>Race Weekend Closed</p>
+            <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>Simulate {daysUntilRace} more day{daysUntilRace === 1 ? "" : "s"} until {raceDateLabel} to unlock track sessions.</p>
+          </div>
+          <button onClick={advanceDay} disabled={!canAdvanceDay || loading} style={{ ...actionBtn({ padding: '12px 32px' }), opacity: (!canAdvanceDay || loading) ? 0.5 : 1 }}>
+            Simulate 1 Day
+          </button>
         </div>
-        <button onClick={advanceDay} disabled={!canAdvanceDay || loading} style={{ ...actionBtn({ padding: '12px 32px' }), opacity: (!canAdvanceDay || loading) ? 0.5 : 1 }}>
-          Simulate 1 Day
+      )}
+
+      {/* Bottom Actions Console */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        <button 
+          onClick={handlePractice} 
+          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', border: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)' }}
+        >
+          {weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? <CheckCircle size={20} color="#10b981" style={{ marginBottom: '8px' }} /> : <Activity size={20} color="#fff" style={{ marginBottom: '8px' }} />}
+          <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em', color: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? '#10b981' : '#fff' }}>RUN PRACTICE</span>
+        </button>
+        
+        <button 
+          onClick={handleQuali} 
+          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: weekendProgress?.qualifyingComplete ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', border: weekendProgress?.qualifyingComplete ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)' }}
+        >
+          {weekendProgress?.qualifyingComplete ? <CheckCircle size={20} color="#10b981" style={{ marginBottom: '8px' }} /> : <Timer size={20} color="#fff" style={{ marginBottom: '8px' }} />}
+          <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em', color: weekendProgress?.qualifyingComplete ? '#10b981' : '#fff' }}>RUN QUALIFYING</span>
+        </button>
+
+        <button 
+          onClick={() => openBriefingModal('quick_sim')} 
+          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          <Zap size={20} color="#fff" style={{ marginBottom: '8px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em' }}>QUICK SIM</span>
+        </button>
+
+        <button 
+          onClick={() => openBriefingModal('race_control')} 
+          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: HUB.accent, border: 'none' }}
+        >
+          <Flag size={20} color="#fff" style={{ marginBottom: '8px' }} />
+          <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.1em', color: '#fff' }}>RACE CONTROL</span>
         </button>
       </div>
 
@@ -671,6 +697,24 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       )}
 
       {resultsData && <div key={resultsData.metric}>{renderResults()}</div>}
+
+      {/* Pre-Race Briefing Modal Overlay */}
+      <PreRaceBriefingModal 
+        isOpen={showBriefingModal !== null}
+        mode={showBriefingModal}
+        onClose={() => setShowBriefingModal(null)}
+        onConfirm={startSimulationMode}
+        selectedObjective={briefingSelectedObjective}
+        setSelectedObjective={setBriefingSelectedObjective}
+        briefingData={{
+          expectedFinish: 'P' + (roundStrats.length > 0 && roundStrats[0].rank ? roundStrats[0].rank + 4 : 8),
+          confidence: roundStrats.length > 0 ? roundStrats[0].confidence : 75,
+          rivalTeam: rivals[0]?.name || 'Rivals',
+          isWet: raceIsWet,
+          strategyType: roundStrats.length > 0 ? roundStrats[0].label : 'Balanced',
+          startTyre: 'Medium'
+        }}
+      />
 
     </div>
   );

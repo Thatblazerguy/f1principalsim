@@ -13,6 +13,7 @@ export class Team {
     this.activeDrivers = [];
     this.sponsor = null;
     this.sponsorSlots = {};
+    this.upgradeHistory = []; // Array<{ round: number, part: string, expectedGain: number }>
   }
 
   signDriver(d, role = "main") {
@@ -62,12 +63,20 @@ export class Team {
     }
   }
 
-  upgrade(p) {
+  upgrade(p, currentRound = 1) {
     const cost = 50 * this.car[p];
     if (this.budget >= cost) {
       this.budget = parseFloat((this.budget - cost).toFixed(1));
       this.car[p]++;
       this.carPerformance = parseFloat((this.carPerformance + 1.5).toFixed(1));
+      
+      const partNames = { aero: 'Aerodynamics', engine: 'Power Unit', chassis: 'Chassis', reliability: 'Reliability' };
+      if (!this.upgradeHistory) this.upgradeHistory = [];
+      this.upgradeHistory.push({
+        round: currentRound,
+        part: partNames[p] || p,
+        expectedGain: 1.5
+      });
     }
   }
   

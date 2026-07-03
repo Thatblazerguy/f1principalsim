@@ -148,7 +148,9 @@ export class LiveRaceEngine {
           lap: 0,
           lapFraction: 0,
           baseSpeed: speedKms, 
-          currentSpeed: 0,
+          currentSpeed: speedKms,
+          lapTimes: [],
+          lastLapTime: 0,
           
           // Strategy & Control
           driverMode: "Balanced",
@@ -391,6 +393,7 @@ export class LiveRaceEngine {
       // Lap Cross
       if (Math.floor(newDistance) > Math.floor(oldDistance) && oldDistance > 0) {
         let lapTime = this.elapsedTime - car.currentLapStartTime;
+        car.lapTimes.push(lapTime);
         car.lastLapTime = lapTime;
         if (lapTime < car.bestLapTime) car.bestLapTime = lapTime;
         car.currentLapStartTime = this.elapsedTime;
@@ -523,7 +526,8 @@ export class LiveRaceEngine {
       time: c.retired ? 99999 : c.totalTime,
       retired: c.retired,
       stops: c.stops,
-      tireCompound: c.tireCompound
+      tireCompound: c.tireCompound,
+      lapTimes: c.lapTimes
     }));
   }
 
