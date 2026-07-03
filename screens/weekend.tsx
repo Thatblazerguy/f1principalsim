@@ -294,7 +294,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           const standingsBefore = JSON.parse(JSON.stringify(s.standings));
           s.standings = updateStandings(finishers, s.standings);
           updateBestFinishes(finishers);
-          recordRaceHistory(round!.round, round!.name, round!.circuit, finishers, s.standings, state, replayData);
+          recordRaceHistory(round!.round, round!.name, round!.circuit, finishers, s.standings, state, replayData, weekendProgress?.grid);
 
           if (weekendProgress) {
             weekendProgress.raceComplete = true;
@@ -334,7 +334,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
 
       s.standings = updateStandings(res, s.standings);
       updateBestFinishes(res);
-      recordRaceHistory(round!.round, round!.name, round!.circuit, res, s.standings, state, replayData);
+      recordRaceHistory(round!.round, round!.name, round!.circuit, res, s.standings, state, replayData, weekendProgress?.grid);
 
       const historyRecord = s.raceHistory[s.raceHistory.length - 1];
 

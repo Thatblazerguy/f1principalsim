@@ -24,17 +24,27 @@ const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
  * Record a completed race into state.raceHistory.
  * Called from weekend.tsx after simulateRaceEvent + updateStandings.
  */
-export function recordRaceHistory(round, raceName, circuit, results, standings, state, replayData = null) {
+export function recordRaceHistory(round, raceName, circuit, results, standings, state, replayData = null, grid = null) {
   if (!Array.isArray(state.raceHistory)) state.raceHistory = [];
 
   // Build driver results (position is implicit from array index)
-  const driverResults = results.map((entry, idx) => ({
-    name:      entry.driver.name,
-    team:      entry.team.name,
-    finishPos: idx + 1,
-    points:    entry.retired ? 0 : (F1_POINTS[idx] || 0),
-    retired:   Boolean(entry.retired),
-  }));
+  const driverResults = results.map((entry, idx) => {
+    let gridPos = null;
+    if (grid && Array.isArray(grid)) {
+      const gIndex = grid.findIndex(g => g.driver?.name === entry.driver.name);
+      if (gIndex !== -1) gridPos = gIndex + 1;
+    }
+    
+    return {
+      name:      entry.driver.name,
+      team:      entry.team.name,
+      finishPos: idx + 1,
+      gridPos:   gridPos,
+      points:    entry.retired ? 0 : (F1_POINTS[idx] || 0),
+      retired:   Boolean(entry.retired),
+      lapTimes:  entry.lapTimes || [],
+    };
+  });
 
   // Aggregate team results
   const teamPointsMap = {};
@@ -59,8 +69,21 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
     carPerformance: perfMap[team] || 80, // Save projected performance at time of race
   }));
 
-  // Fastest lap = first non-retired driver (simplification — race sim doesn't track it separately)
-  const fastestLap = driverResults.find(r => !r.retired)?.name || null;
+  // Find true fastest lap from lapTimes
+  let fastestLapDriver = null;
+  let fastestLapTime = Infinity;
+  
+  driverResults.forEach(r => {
+    if (r.lapTimes && r.lapTimes.length > 0) {
+      const bestDriverLap = Math.min(...r.lapTimes);
+      if (bestDriverLap < fastestLapTime) {
+        fastestLapTime = bestDriverLap;
+        fastestLapDriver = r.name;
+      }
+    }
+  });
+
+  const fastestLap = fastestLapDriver || (driverResults.find(r => !r.retired)?.name || null);
 
   const record = {
     round,
