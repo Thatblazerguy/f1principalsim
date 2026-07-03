@@ -190,48 +190,88 @@ const PerformanceAnalytics = ({ allTeams }: { allTeams: any[] }) => {
     ]
   };
 
-  // 4. Projected vs Actual History
-  const processTeamHistory = (team: any) => {
-    let currentProj = 80;
-    return raceHistory.map(race => {
-      let projected = race.teamResults?.find((t: any) => t.team === team.name)?.carPerformance;
-      if (!projected) projected = currentProj;
-      else currentProj = projected;
-      const actual = calculateActualPerformance(team.name, race);
-      return { round: race.round, name: race.name, projected, actual: actual || projected };
-    });
-  };
+  // 4. Projected vs Actual History — sorted by round, non-linear projection
+  const sortedHistory = [...raceHistory].sort((a: any, b: any) => a.round - b.round);
 
-  const playerHistory = processTeamHistory(playerTeam);
-  const labels = playerHistory.map((h: any) => `R${h.round}`);
-  const actualData = playerHistory.map((h: any) => h.actual);
-  
   const upgrades = playerTeam.upgradeHistory || [];
-  const upgradePoints = playerHistory.map((h: any) => {
-    const upg = upgrades.find((u: any) => u.round === h.round);
-    return upg ? h.projected : null;
+
+  // Build actual data — only for rounds we have completed
+  const actualData: { round: number; label: string; actual: number }[] = [];
+  let runningProj = playerTeam.carPerformance ?? 80;
+
+  sortedHistory.forEach((race: any) => {
+    const actual = calculateActualPerformance(playerTeam.name, race);
+    actualData.push({
+      round: race.round,
+      label: `R${race.round}`,
+      actual: actual ?? runningProj,
+    });
+  });
+
+  // Build projected data — all completed rounds PLUS future rounds up to totalRounds
+  // Non-linear: small incremental baseline drift + upgrade spikes
+  const totalRounds = (state as any).season?.totalRounds || 24;
+  const completedRoundNums = new Set(sortedHistory.map((r: any) => r.round));
+  const allRounds = Array.from({ length: totalRounds }, (_, i) => i + 1);
+
+  let projBase = playerTeam.carPerformance ?? 80;
+  const projectedByRound: number[] = allRounds.map((round) => {
+    const upg = upgrades.find((u: any) => u.round === round);
+    if (upg) {
+      // Upgrade delivers a bump — between 0.8 and 2.5 OVR depending on gain
+      projBase = parseFloat((projBase + (upg.expectedGain ?? 1.5) * 0.8).toFixed(2));
+    } else {
+      // Organic development: faster earlier, tapering off
+      const roundProgress = round / totalRounds;
+      const baseGain = 0.05 + (1 - roundProgress) * 0.15;
+      // Add small random-but-seeded variation using round number as deterministic seed
+      const variation = ((round * 7919) % 100) / 1000 - 0.05; // -0.05 to +0.045
+      projBase = parseFloat((projBase + baseGain + variation).toFixed(2));
+    }
+    return projBase;
+  });
+
+  // Labels: only completed rounds on x-axis
+  const labels = actualData.map(h => h.label);
+  // Projected for completed rounds only (slice to match)
+  const projectedSlice = allRounds
+    .slice(0, completedRoundNums.size)
+    .map(r => projectedByRound[r - 1]);
+
+  // Full projected pace for ALL rounds (shown as future forecast beyond actuals)
+  const fullProjectedLabels = allRounds.map(r => `R${r}`);
+  const upgradePoints = allRounds.map(r => {
+    const upg = upgrades.find((u: any) => u.round === r);
+    return upg ? projectedByRound[r - 1] : null;
   });
 
   const projVsActualData = {
-    labels,
+    labels: fullProjectedLabels,
     datasets: [
       {
-        label: 'Actual Pace',
-        data: actualData,
-        borderColor: HUB.accent,
-        backgroundColor: 'rgba(225, 6, 0, 0.1)',
-        borderWidth: 3,
-        pointRadius: 4,
-        fill: true,
-      },
-      {
         label: 'Projected Pace',
-        data: playerHistory.map((h: any) => h.projected),
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        borderDash: [5, 5],
+        data: projectedByRound,
+        borderColor: 'rgba(255, 255, 255, 0.4)',
+        borderDash: [6, 4],
         borderWidth: 2,
         pointRadius: 0,
         fill: false,
+        tension: 0.3,
+      },
+      {
+        label: 'Actual Pace',
+        data: [
+          ...actualData.map(h => h.actual),
+          // null-pad the rest of the future rounds
+          ...Array(totalRounds - actualData.length).fill(null)
+        ],
+        borderColor: HUB.accent,
+        backgroundColor: 'rgba(225, 6, 0, 0.08)',
+        borderWidth: 3,
+        pointRadius: (ctx: any) => ctx.dataIndex < actualData.length ? 4 : 0,
+        fill: true,
+        tension: 0.3,
+        spanGaps: false,
       },
       {
         label: 'Upgrades',
