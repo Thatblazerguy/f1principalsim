@@ -210,7 +210,7 @@ const PerformanceAnalytics = ({ allTeams }: { allTeams: any[] }) => {
 
   // Build projected data — all completed rounds PLUS future rounds up to totalRounds
   // Non-linear: small incremental baseline drift + upgrade spikes
-  const totalRounds = (state as any).season?.totalRounds || 24;
+  const totalRounds = Math.max(actualData.length, (state as any).season?.totalRounds || 24);
   const completedRoundNums = new Set(sortedHistory.map((r: any) => r.round));
   const allRounds = Array.from({ length: totalRounds }, (_, i) => i + 1);
 
@@ -263,7 +263,7 @@ const PerformanceAnalytics = ({ allTeams }: { allTeams: any[] }) => {
         data: [
           ...actualData.map(h => h.actual),
           // null-pad the rest of the future rounds
-          ...Array(totalRounds - actualData.length).fill(null)
+          ...Array(Math.max(0, totalRounds - actualData.length)).fill(null)
         ],
         borderColor: HUB.accent,
         backgroundColor: 'rgba(225, 6, 0, 0.08)',
