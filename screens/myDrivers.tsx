@@ -23,7 +23,7 @@ import { Line } from 'react-chartjs-2';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTitle, Tooltip, Legend, Filler);
 
 // --- Helpers for Analytics ---
-const computeDriverAnalytics = (driverName: string, teamName: string, raceHistory: any[]) => {
+const computeDriverAnalytics = (driverName: string, teamName: string, raceHistory: any[], currentYear: number) => {
   if (!raceHistory || raceHistory.length === 0) return null;
   
   let starts = 0;
@@ -43,6 +43,7 @@ const computeDriverAnalytics = (driverName: string, teamName: string, raceHistor
   const historyData: any[] = [];
 
   raceHistory.forEach((race: any) => {
+    if (race.season !== currentYear) return;
     const dr = race.driverResults?.find((d: any) => d.name === driverName);
     if (!dr) return;
     
@@ -214,7 +215,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
   
   const stats = useMemo(() => {
     if (!currentDriver) return null;
-    return computeDriverAnalytics(currentDriver.name, (state as any).team.name, (state as any).raceHistory || []);
+    return computeDriverAnalytics(currentDriver.name, (state as any).team.name, (state as any).raceHistory || [], (state as any).season?.year || 1);
   }, [currentDriver, (state as any).raceHistory]);
 
   const teammate = useMemo(() => {
@@ -224,7 +225,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
 
   const teammateStats = useMemo(() => {
     if (!teammate) return null;
-    return computeDriverAnalytics(teammate.name, (state as any).team.name, (state as any).raceHistory || []);
+    return computeDriverAnalytics(teammate.name, (state as any).team.name, (state as any).raceHistory || [], (state as any).season?.year || 1);
   }, [teammate, (state as any).raceHistory]);
 
   if (!currentDriver) {

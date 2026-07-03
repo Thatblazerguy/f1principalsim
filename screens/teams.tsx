@@ -80,7 +80,8 @@ const PerformanceAnalytics = ({ allTeams }: { allTeams: any[] }) => {
   const [activeMetricFilter, setActiveMetricFilter] = useState('Overall');
 
   const playerTeam = s.team || {};
-  const raceHistory: any[] = s.raceHistory || [];
+  const currentYear = (s.season?.year) || 1;
+  const raceHistory: any[] = (s.raceHistory || []).filter((r: any) => r.season === currentYear);
   const completedRaces = raceHistory.length;
 
   const playerEngine = assignEngineManufacturer(playerTeam.name);
