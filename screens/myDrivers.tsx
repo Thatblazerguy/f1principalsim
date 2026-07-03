@@ -406,7 +406,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
 
           <div style={{ display: 'flex', gap: '16px', marginTop: '32px', borderTop: `1px solid ${HUB.border}`, paddingTop: '24px' }}>
             <button onClick={() => handleAction('release', currentDriver.name)} style={{ ...actionBtn({ backgroundColor: 'transparent', border: `1px solid ${HUB.border}`, color: '#f87171', padding: '8px 16px', fontSize: '12px' }) }}>Release Contract</button>
-            {currentDriver.driverRole !== 'reserve' ? (
+            {(state as any).team.reserveDriver?.name !== currentDriver.name ? (
               <button onClick={() => handleAction('demote', currentDriver.name)} disabled={!!(state as any).team.reserveDriver} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px' }), opacity: (state as any).team.reserveDriver ? 0.5 : 1 }}>Demote to Reserve</button>
             ) : (
               <button onClick={() => handleAction('promote', currentDriver.name)} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px' }) }}>Promote to Seat</button>
