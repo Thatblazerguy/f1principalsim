@@ -11,25 +11,28 @@ export function getTeamRoster(team) {
 }
 
 function normalizeActiveDrivers(team) {
-  const roster = getRosterFromNormalizedTeam(team);
-  const rosterNames = roster.map(driver => driver.name);
+  // Only race-seat drivers (team.drivers) can be active racers.
+  // The reserveDriver must NEVER appear in activeDrivers.
+  const raceDriverNames = (Array.isArray(team.drivers) ? team.drivers : []).map(d => d.name);
 
   if (!Array.isArray(team.activeDrivers)) {
     team.activeDrivers = [];
   }
 
+  // Strip any stale names (e.g. old driver, or accidentally the reserve)
   team.activeDrivers = team.activeDrivers.filter(
-    (name, index, array) => rosterNames.includes(name) && array.indexOf(name) === index
+    (name, index, array) => raceDriverNames.includes(name) && array.indexOf(name) === index
   );
 
-  for (const name of rosterNames) {
-    if (team.activeDrivers.length >= Math.min(2, rosterNames.length)) break;
+  // Auto-fill missing slots from race seats only
+  for (const name of raceDriverNames) {
+    if (team.activeDrivers.length >= Math.min(2, raceDriverNames.length)) break;
     if (!team.activeDrivers.includes(name)) {
       team.activeDrivers.push(name);
     }
   }
 
-  team.activeDrivers = team.activeDrivers.slice(0, Math.min(2, rosterNames.length));
+  team.activeDrivers = team.activeDrivers.slice(0, Math.min(2, raceDriverNames.length));
 }
 
 // Ensure the academy object on the state has all required nested objects and arrays
@@ -94,13 +97,17 @@ export function ensureTeamState(team) {
 
 export function getActiveDrivers(team) {
   ensureTeamState(team);
-  return getRosterFromNormalizedTeam(team).filter(driver => team.activeDrivers.includes(driver.name));
+  // Only return drivers from the race-seat array — never the reserve.
+  return (Array.isArray(team.drivers) ? team.drivers : []).filter(
+    driver => team.activeDrivers.includes(driver.name)
+  );
 }
 
 export function setTeamActiveDrivers(team, driverNames) {
   ensureTeamState(team);
-  const rosterNames = getRosterFromNormalizedTeam(team).map(driver => driver.name);
-  team.activeDrivers = [...new Set(driverNames)].filter(name => rosterNames.includes(name)).slice(0, 2);
+  // Only allow race-seat drivers to be set as active.
+  const raceDriverNames = (Array.isArray(team.drivers) ? team.drivers : []).map(d => d.name);
+  team.activeDrivers = [...new Set(driverNames)].filter(name => raceDriverNames.includes(name)).slice(0, 2);
   normalizeActiveDrivers(team);
   return getActiveDrivers(team);
 }

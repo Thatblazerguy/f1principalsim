@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { state } from "../state.js";
 import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
-import { Activity, Target, Zap, TrendingUp, Cpu, Settings, AlertCircle, Crosshair, BarChart3, LineChart, ChevronRight } from 'lucide-react';
+import { Activity, Target, Zap, TrendingUp, Cpu, Settings, AlertCircle, Crosshair, BarChart3, LineChart, ChevronRight, Users } from 'lucide-react';
+import { computeTeamOVR, computeTeamBreakdown } from '../utils/teamRating.js';
 
 import {
   Chart as ChartJS,
@@ -33,14 +34,19 @@ const assignEngineManufacturer = (teamName: string) => {
   return 'Honda RBPT'; // default generic fallback
 };
 
-const deriveCarMetrics = (car: any, ovr: number) => {
-  const aero = car?.aero || 80;
-  const chassis = car?.chassis || 80;
-  const engine = car?.engine || 80;
-  const rel = car?.reliability || 80;
+const deriveCarMetrics = (team: any) => {
+  const specs = team.specs || {};
+  const car = team.car || {};
+  const engineManufacturer = assignEngineManufacturer(team.name);
+  const baseEngine = getEngineStats(engineManufacturer).hp;
+
+  const aero = Math.round((specs.aero || team.carPerformance || 80) + ((car.aero || 1) - 1) * 1.5);
+  const chassis = Math.round((specs.chassis || team.carPerformance || 80) + ((car.chassis || 1) - 1) * 1.5);
+  const engine = Math.round(baseEngine + ((car.engine || 1) - 1) * 1.5);
+  const rel = Math.round((specs.reliability || team.carPerformance || 80) + ((car.reliability || 1) - 1) * 1.5);
   
   return {
-    Overall: ovr,
+    Overall: computeTeamOVR(team),
     Aerodynamics: aero,
     PowerUnit: engine,
     MechanicalGrip: chassis,
@@ -85,11 +91,11 @@ const PerformanceAnalytics = ({ allTeams }: { allTeams: any[] }) => {
   const completedRaces = raceHistory.length;
 
   const playerEngine = assignEngineManufacturer(playerTeam.name);
-  const playerMetrics = deriveCarMetrics(playerTeam.car, playerTeam.carPerformance);
+  const playerMetrics = deriveCarMetrics(playerTeam);
   
   const rivalTeam = allTeams.find(t => t.name === comparisonTeam) || playerTeam;
   const rivalEngine = assignEngineManufacturer(rivalTeam.name);
-  const rivalMetrics = deriveCarMetrics(rivalTeam.car, rivalTeam.carPerformance);
+  const rivalMetrics = deriveCarMetrics(rivalTeam);
 
   // -- Insights Generation --
   const generateEngineeringInsights = () => {
@@ -122,8 +128,8 @@ const PerformanceAnalytics = ({ allTeams }: { allTeams: any[] }) => {
     datasets: [{
       label: activeMetricFilter,
       data: allTeams.map(t => {
-        const metrics: any = deriveCarMetrics(t.car, t.carPerformance);
-        return metrics[activeMetricFilter] || t.carPerformance;
+        const metrics: any = deriveCarMetrics(t);
+        return metrics[activeMetricFilter] || computeTeamOVR(t);
       }),
       backgroundColor: allTeams.map(t => t.name === playerTeam.name ? HUB.accent : 'rgba(255,255,255,0.1)'),
       borderRadius: 4,
@@ -409,6 +415,60 @@ const PerformanceAnalytics = ({ allTeams }: { allTeams: any[] }) => {
              </div>
           )}
 
+        </div>
+
+        {/* --- GRID LINEUPS --- */}
+        <div style={{ gridColumn: 'span 12', ...glassCard({ padding: '24px' }), marginTop: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><Users size={16} color={HUB.accent} /> 2026 Constructor Grid</h3>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Weighted Engineering Model</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+            {allTeams.map(team => {
+              const bd: any = computeTeamBreakdown(team);
+              const attrs = [
+                { label: 'Car Perf', value: bd.carPerf, color: HUB.accent },
+                { label: 'Aero', value: bd.aero, color: '#38bdf8' },
+                { label: 'Mech. Grip', value: bd.mechanicalGrip, color: '#a78bfa' },
+                { label: 'Reliability', value: bd.reliability, color: '#34d399' },
+                { label: 'Driver Pair', value: bd.driverPair, color: '#fb923c' },
+                { label: 'Dev. Rate', value: bd.devRate, color: '#facc15' },
+                { label: 'Team Ops', value: bd.teamOps, color: '#94a3b8' },
+              ];
+              const ovrColor = bd.overall >= 93 ? '#e10600' : bd.overall >= 88 ? '#f97316' : bd.overall >= 84 ? '#facc15' : '#94a3b8';
+              return (
+                <div key={team.name} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '14px', border: `1px solid ${HUB.border}`, overflow: 'hidden' }}>
+                  {/* Header */}
+                  <div style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${HUB.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontFamily: HUB.fontBold, fontSize: '14px', color: '#fff' }}>{team.name}</div>
+                      <div style={{ fontSize: '11px', color: HUB.textMuted, marginTop: '2px' }}>
+                        {team.drivers?.map((d: any) => d.name.split(' ').pop()).join(' / ') || 'No drivers'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: HUB.fontMono, fontSize: '22px', fontWeight: 900, color: ovrColor, lineHeight: 1 }}>{bd.overall}</div>
+                      <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>OVR</div>
+                    </div>
+                  </div>
+
+                  {/* Attribute Bars */}
+                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {attrs.map(attr => (
+                      <div key={attr.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', color: HUB.textMuted, width: '72px', flexShrink: 0, fontFamily: HUB.fontMono, textTransform: 'uppercase' }}>{attr.label}</span>
+                        <div style={{ flex: 1, height: '5px', background: 'rgba(255,255,255,0.07)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: `${((attr.value - 55) / (99 - 55)) * 100}%`, height: '100%', background: attr.color, borderRadius: '3px', transition: 'width 0.4s ease' }} />
+                        </div>
+                        <span style={{ fontSize: '11px', fontFamily: HUB.fontMono, color: '#e5e7eb', width: '24px', textAlign: 'right', flexShrink: 0 }}>{attr.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
       </div>

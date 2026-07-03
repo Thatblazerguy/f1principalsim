@@ -7,6 +7,7 @@ import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTit
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedNumber, AnimatedBar } from '../components/ui/motion.tsx';
 import { RadarChart } from '../components/driverComparison.tsx';
+import { DriverNegotiationModal } from '../components/DriverNegotiationModal.tsx';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -144,6 +145,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
   const [flashMessage, setFlashMessage] = useState(initialFlashMessage);
   const [selectedTab, setSelectedTab] = useState(0); // 0 = Driver 1, 1 = Driver 2, 2 = Reserve
   const [promotionModalOpen, setPromotionModalOpen] = useState(false);
+  const [negotiatingDriver, setNegotiatingDriver] = useState<any>(null);
 
   // --- Handlers ---
   const handleAction = async (action: string, driverName: string) => {
@@ -156,6 +158,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
           (state as any).team.drivers = (state as any).team.drivers.filter((d: any) => d.name !== driverName);
           setSelectedTab(0);
         }
+        setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
         await syncGame();
         setFlashMessage(`Released ${driverName} from their contract.`);
       }
@@ -170,6 +173,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                driver.roleLabel = 'Reserve Driver';
                (state as any).team.reserveDriver = driver;
                setSelectedTab(2);
+               setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
                await syncGame();
                setFlashMessage(`Demoted ${driverName} to Reserve Driver.`);
            }
@@ -185,6 +189,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                reserve.roleLabel = 'Race Driver';
                (state as any).team.drivers.push(reserve);
                setSelectedTab((state as any).team.drivers.length - 1);
+               setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
                await syncGame();
                setFlashMessage(`Promoted ${driverName} to Race Seat.`);
            } else {
@@ -194,15 +199,41 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
     }
   };
 
-  const confirmPromotion = async (replaceDriverName: string) => {
-     if(confirm(`Replace ${replaceDriverName} with ${(state as any).team.reserveDriver.name}? ${replaceDriverName} will be released.`)) {
-         if ((state as any).team.promoteReserveToSeat(replaceDriverName, state)) {
-            await syncGame();
-            setFlashMessage(`Promoted new driver and released ${replaceDriverName}.`);
-            setPromotionModalOpen(false);
-            setSelectedTab(0);
-         }
-     }
+  const startNegotiation = (replaceDriverName: string) => {
+    const d = (state as any).team.drivers.find((dr: any) => dr.name === replaceDriverName);
+    if (d) {
+      setNegotiatingDriver(d);
+      setPromotionModalOpen(false);
+    }
+  };
+
+  const handleNegotiationComplete = async (status: string) => {
+    if (status === 'CANCELLED') {
+      setNegotiatingDriver(null);
+      return;
+    }
+
+    const replaceDriverName = negotiatingDriver.name;
+    const reserve = (state as any).team.reserveDriver;
+
+    if ((state as any).team.promoteReserveToSeat(replaceDriverName, state)) {
+        if (status === 'ACCEPTED_RESERVE' || status === 'ACCEPTED_RESERVE_MONEY') {
+            negotiatingDriver.contractType = 'reserve';
+            negotiatingDriver.driverRole = 'reserve';
+            negotiatingDriver.roleLabel = 'Reserve Driver';
+            if (status === 'ACCEPTED_RESERVE_MONEY') {
+              negotiatingDriver.salary = Math.round(negotiatingDriver.salary * 1.2);
+            }
+            (state as any).team.reserveDriver = negotiatingDriver;
+            setFlashMessage(`Promoted ${reserve.name} and moved ${replaceDriverName} to Reserve.`);
+        } else {
+            setFlashMessage(`Promoted ${reserve.name}. ${replaceDriverName} has left the team.`);
+        }
+        setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
+        await syncGame();
+        setNegotiatingDriver(null);
+        setSelectedTab(0);
+    }
   };
 
   // --- Data aggregation ---
@@ -620,13 +651,22 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                     <div>
                       <span style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold }}>{d.name}</span>
                     </div>
-                    <button onClick={() => confirmPromotion(d.name)} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '11px' }) }}>Replace</button>
+                    <button onClick={() => startNegotiation(d.name)} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '11px' }) }}>Replace</button>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Driver Negotiation Modal */}
+      {negotiatingDriver && (
+        <DriverNegotiationModal 
+          driver={negotiatingDriver} 
+          team={(state as any).team} 
+          onComplete={handleNegotiationComplete} 
+        />
       )}
     </div>
   );
