@@ -16,11 +16,12 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  ScatterController
 } from 'chart.js';
 import { Line, Bar, Radar } from 'react-chartjs-2';
 
-ChartJS.register(CategoryScale, LinearScale, RadialLinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, RadialLinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler, ScatterController);
 
 // ─── Data Generation & Derivation ──────────────────────────────────────────
 
