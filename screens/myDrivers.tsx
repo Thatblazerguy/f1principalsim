@@ -350,7 +350,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
              </div>
              <div>
                <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Salary</span>
-               <span style={{ fontSize: '18px', color: '#fff', fontFamily: HUB.fontMono }}>${((currentDriver.salary || 500000) / 1000000).toFixed(1)}M</span>
+               <span style={{ fontSize: '18px', color: '#fff', fontFamily: HUB.fontMono }}>${currentDriver.salary || 0}M</span>
              </div>
              <div>
                <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Contract</span>
