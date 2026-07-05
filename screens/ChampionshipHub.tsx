@@ -20,7 +20,8 @@ import { renderOffseason } from "./offseason.tsx";
 import { renderMarket } from "./market.tsx";
 import { renderSponsors } from "./sponsors.tsx";
 import { renderFinance } from "./finance.tsx"; // We will create a premium finance screen next!
-import { mountLayout } from "../components/HubLayout.tsx";
+
+
 
 
 
@@ -330,10 +331,4 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
     );
 }
 
-export function renderChampionshipHub(appRoot: HTMLElement) {
-    mountLayout(
-        appRoot,
-        'dashboard',
-        <ChampionshipHub appRoot={appRoot} />
-    );
-}
+

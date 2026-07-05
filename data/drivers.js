@@ -292,7 +292,7 @@ export async function syncDriversFromOpenF1() {
     drivers.splice(0, drivers.length, ...openF1BackedDrivers, ...extras);
     return true;
   } catch (error) {
-    console.warn("OpenF1 driver sync failed, using local data.", error);
+    console.log("OpenF1 driver sync skipped (CORS/network), using local data.");
     return false;
   }
 }

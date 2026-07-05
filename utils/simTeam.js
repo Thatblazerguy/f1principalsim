@@ -12,14 +12,23 @@ const SPEC_BASE = 85;
 
 function defaultSpecs(team) {
   const ovr = team.carPerformance ?? SPEC_BASE;
-  if (!team.specs) {
-    return { aero: ovr, chassis: ovr, reliability: ovr, ovr };
+  
+  let baseAero = team.specs?.aero ?? ovr;
+  let baseChassis = team.specs?.chassis ?? ovr;
+  let baseReliability = team.specs?.reliability ?? ovr;
+  
+  // Apply manual player upgrades on top of base specs
+  if (team.car) {
+    baseAero += (team.car.aero - 1) * 1.5;
+    baseChassis += (team.car.chassis - 1) * 1.5;
+    baseReliability += (team.car.reliability - 1) * 1.5;
   }
+  
   return {
-    aero: team.specs.aero ?? ovr,
-    chassis: team.specs.chassis ?? ovr,
-    reliability: team.specs.reliability ?? ovr,
-    ovr: team.specs.ovr ?? ovr,
+    aero: baseAero,
+    chassis: baseChassis,
+    reliability: baseReliability,
+    ovr: ovr, // Use the real carPerformance which tracks manual upgrades accurately
   };
 }
 

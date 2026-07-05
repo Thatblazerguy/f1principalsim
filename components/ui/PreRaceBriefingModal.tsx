@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HUB, glassCard, actionBtn, pill } from '../HubLayout.tsx';
-import { RACE_OBJECTIVES } from '../../screens/weekend.tsx';
+import { RACE_OBJECTIVES } from '../../utils/raceObjectives.js';
 import { Target, AlertTriangle, Settings, CloudRain, Sun, Activity, Flag } from 'lucide-react';
 
 export const PreRaceBriefingModal = ({

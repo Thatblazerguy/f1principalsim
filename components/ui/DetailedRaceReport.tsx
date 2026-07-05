@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { HUB, glassCard, pill } from '../HubLayout.tsx';
 import { Target, Flag, Clock, Zap, Activity, Users, ChevronRight, BarChart3, AlertCircle } from 'lucide-react';
 import { getDriverHeadshotUrl } from '../../data/drivers.js';
-import { RACE_OBJECTIVES } from '../../screens/weekend.tsx';
+import { RACE_OBJECTIVES } from '../../utils/raceObjectives.js';
 
 import {
   Chart as ChartJS,

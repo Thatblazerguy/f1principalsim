@@ -22,6 +22,7 @@ import { updateStandings } from "../game/standings.js";
 import { applyRoundCarDevelopment } from "./carDevelopment.js";
 import { createAiTeams } from "../data/teams.js";
 import { calendar } from "../data/calendar.js";
+import { generateWeekendContext } from "./weekendForm.js";
 
 // ─── Deep clone helpers ────────────────────────────────────────────────────────
 
@@ -77,12 +78,14 @@ function simulateSeason(teams, racesToRun = 24) {
   for (let roundIdx = 0; roundIdx < trackCount; roundIdx++) {
     const track = calendar[roundIdx];
 
+    const weekendContext = generateWeekendContext(teams, track, raceHistory);
+
     // Qualifying
-    const { grid, isWet } = simulateQualifying(teams, track, raceHistory);
+    const { grid, isWet } = simulateQualifying(teams, track, weekendContext);
     if (isWet) wetRaces++;
 
     // Race
-    const results = simulateRaceEvent(teams, track, track.laps, grid, {}, raceHistory);
+    const { finishers: results } = simulateRaceEvent(teams, track, track.laps, grid, {}, weekendContext, 'points');
 
     // Record standings
     updateStandings(results, standings);

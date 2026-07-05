@@ -27,6 +27,8 @@ import {
   getNextUpgradeAvailability
 } from "../utils/seasonTimeline.js";
 import { generateWeekendContext } from "../utils/weekendForm.js";
+import { RACE_OBJECTIVES } from "../utils/raceObjectives.js";
+export { RACE_OBJECTIVES };
 
 import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
 import { CloudRain, Sun, Wind, ChevronRight, Activity, Award, ShieldAlert, Cpu, CheckCircle, AlertTriangle, MessageSquare, Flag, ArrowUpRight, ArrowDownRight, Minus, Timer, Zap } from "lucide-react";
@@ -127,13 +129,7 @@ const getEngineerNotes = (team: any, weekendProgress: any, isWet: boolean | null
   return notes.reverse();
 };
 
-export const RACE_OBJECTIVES = [
-  { id: 'win', label: '🏆 Push For Win', risk: 'High' },
-  { id: 'podium', label: '🥈 Fight For Podium', risk: 'Medium' },
-  { id: 'points', label: '🎯 Finish In Points', risk: 'Low' },
-  { id: 'conservative', label: '💰 Conservative Points', risk: 'Minimal' },
-  { id: 'gamble', label: '🌧 Strategy Gamble', risk: 'Extreme' }
-];
+// RACE_OBJECTIVES is defined in utils/raceObjectives.js and re-exported above.
 
 export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
   const s = state as any;

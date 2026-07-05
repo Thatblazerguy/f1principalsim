@@ -15,20 +15,20 @@
 // ─── Performance Spread Constants ─────────────────────────────────────────────
 
 /** How much each ovr point is worth as a lap-time credit in race sessions */
-export const RACE_OVR_COEFF = 0.035;       // was 0.018
-export const QUALI_OVR_COEFF = 0.040;      // was 0.022
+export const RACE_OVR_COEFF = 0.060;       // was 0.035
+export const QUALI_OVR_COEFF = 0.065;      // was 0.040
 
 /** Spec delta multipliers (applied on top of ovr deviation from SPEC_BASE) */
-export const RACE_AERO_COEFF    = 0.006;   // was 0.010
-export const RACE_CHASSIS_COEFF = 0.008;   // was 0.015
-export const RACE_REL_COEFF     = 0.005;   // was 0.007
-export const QUALI_AERO_COEFF   = 0.014;   // was 0.024
-export const QUALI_CHASSIS_COEFF = 0.007;  // was 0.011
+export const RACE_AERO_COEFF    = 0.010;   // was 0.006
+export const RACE_CHASSIS_COEFF = 0.012;   // was 0.008
+export const RACE_REL_COEFF     = 0.008;   // was 0.005
+export const QUALI_AERO_COEFF   = 0.024;   // was 0.014
+export const QUALI_CHASSIS_COEFF = 0.011;  // was 0.007
 
 /** Driver attribute multipliers in race laps */
-export const DRIVER_PACE_COEFF      = 0.035; // was 0.018
-export const DRIVER_RACECRAFT_COEFF = 0.015; // was 0.010
-export const DRIVER_QUALI_COEFF     = 0.038; // was 0.045 — qualifying
+export const DRIVER_PACE_COEFF      = 0.015; // was 0.035
+export const DRIVER_RACECRAFT_COEFF = 0.005; // was 0.015
+export const DRIVER_QUALI_COEFF     = 0.018; // was 0.038
 
 /** Engine/performance bonus dampening */
 export const RACE_PERF_BONUS_COEFF  = 0.015; // was 0.025
@@ -43,14 +43,14 @@ export const RACE_ENGINE_BOOST_COEFF = 0.45; // was 0.5 (inside getRaceBoost)
  * Base spread ensures even perfect drivers can vary ±0.15s.
  * Consistency reduces this noise.
  */
-export const QUALI_NOISE_BASE  = 0.05; // was 0.15
-export const QUALI_NOISE_RANGE = 0.15; // was 0.30
+export const QUALI_NOISE_BASE  = 0.20; // was 0.10
+export const QUALI_NOISE_RANGE = 0.40; // was 0.20
 
 // ─── Lap Variance Constants ────────────────────────────────────────────────────
 
-export const LAP_VARIANCE_BASE        = 0.08;  // was 0.15 — base random noise per lap
-export const LAP_CONSISTENCY_NOISE    = 0.002; // was 0.004 — per consistency-point below 100
-export const SAFETY_CAR_COMPRESSION   = 4.5;   // seconds bunched under SC
+export const LAP_VARIANCE_BASE        = 0.15;  // was 0.10
+export const LAP_CONSISTENCY_NOISE    = 0.005; // was 0.003
+export const SAFETY_CAR_COMPRESSION   = 3.5;
 
 // ─── Weather System ────────────────────────────────────────────────────────────
 
