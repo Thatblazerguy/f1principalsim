@@ -1,5 +1,7 @@
 import { getTeamLapCredit, getTeamPerformanceBonus } from "../utils/simTeam.js";
 import { getTrackWetProbability } from "../utils/raceBalance.js";
+import { rollForFailures, applySessionWear, getDriverPuPerformance, ensureEngineeringState } from "../utils/engineeringSystem.js";
+import { state } from "../state.js";
 
 const TIRE_DEGRADATION = {
   "Soft": 0.035,
@@ -100,6 +102,22 @@ export class LiveRaceEngine {
     const GLOBAL_MULTIPLIER = 8.5380; // Auto-tuned for 2.5 avg DNFs per race
 
     this.cars.forEach(car => {
+      // ── Player cars: use engineering component wear for failure probability ──
+      if (car.isPlayer) {
+        ensureEngineeringState(state);
+        const failures = rollForFailures(state, car.driver.name, isChaotic ? 2.0 : isExtreme ? 4.0 : 1.0);
+        if (failures.length > 0) {
+          const failLap = Math.max(1, Math.floor(Math.random() * this.totalLaps));
+          car.failureData = {
+            lap: failLap,
+            distance: failLap - 1 + Math.random(),
+            type: failures[0].type
+          };
+        }
+        return;
+      }
+
+      // ── AI cars: use legacy reliability-based model ──
       let relFactor = 0.0;
       if (car.reliability > 85) relFactor = 0.005;
       else if (car.reliability >= 70) relFactor = 0.012;
@@ -136,7 +154,10 @@ export class LiveRaceEngine {
         const gridPos = this.getGridPosition(qualifyingGrid, driver);
         const baseLap = this.track.baseTime - (driver.pace * 0.03) - (team.carPerformance * 0.03);
         const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
-        const effectiveBaseLap = baseLap * finalModifier;
+        // PU wear penalty: apply up to +3s per lap for worn components (player only)
+        const puPerfMod = getDriverPuPerformance(state, driver.name);
+        const puPenalty = (1.0 - puPerfMod) * 3.0;
+        const effectiveBaseLap = baseLap * finalModifier + puPenalty;
         const speedKms = (this.track.baseTime / effectiveBaseLap) * 220;
         
         cars.push({
@@ -483,6 +504,14 @@ export class LiveRaceEngine {
       this.saveSnapshot(); // Final snapshot
       this.addEvent("Race Finished!");
       this.finalClassification = this.generateFinalClassification();
+
+      // Apply component wear for player cars based on how they drove
+      this.cars.filter(c => c.isPlayer).forEach(c => {
+        const aggression = (c.driverMode === "Attack" || c.driverMode === "Push") ? 1.2 : 
+                           (c.driverMode === "Conserve") ? 0.75 : 0.9;
+        const trackIntensity = this.track.speed || 1.0;
+        applySessionWear(state, c.driver.name, trackIntensity, aggression, true);
+      });
     }
   }
 

@@ -191,6 +191,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     const { renderCalendar }   = await import('../screens/calendar.tsx');
     const { renderOffseason }  = await import('../screens/offseason.tsx');
     const { renderFinance }    = await import('../screens/finance.tsx');
+    const { renderEngineering }= await import('../screens/engineering.tsx');
     const { renderHistory }    = await import('../screens/history.tsx');
 
     const isSeasonOver = state.season.round > totalRounds ||
@@ -199,7 +200,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     const map: Record<string, () => void> = {
       dashboard:   () => navigate(renderDashboard),
       weekend:     () => navigate(isSeasonOver ? renderOffseason : renderWeekend),
-      engineering: () => navigate(renderOffice),
+      engineering: () => navigate(renderEngineering),
       drivers:     () => navigate(renderMyDrivers),
       academy:     () => navigate(renderAcademy),
       market:      () => navigate(renderMarket),
