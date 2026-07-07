@@ -2,6 +2,7 @@ import { createAiTeams } from "./data/teams.js";
 import { Team } from "./game/team.js";
 import { Driver } from "./game/driver.js";
 import { ensureFinanceState } from "./utils/financeSystem.js";
+import { ensureEngineeringState } from "./utils/engineeringSystem.js";
 
 export const state = {
   team: null,
@@ -135,6 +136,7 @@ export function hydrateState(payload) {
       });
     }
     ensureFinanceState(state);
+    ensureEngineeringState(state);
 
     return true;
   } catch (e) {

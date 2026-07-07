@@ -17,6 +17,12 @@
  * 11. Tyre degradation mid-race position swaps based on delta pace
  */
 
+import { state } from "../state.js";
+import { 
+  rollForFailures, 
+  applySessionWear, 
+  getDriverPuPerformance 
+} from "../utils/engineeringSystem.js";
 import { getTeamLapCredit, getTeamPerformanceBonus } from "../utils/simTeam.js";
 import { strategies } from "../data/strategies.js";
 import {
@@ -262,7 +268,12 @@ export function simulateRaceEvent(
       // ── Effective base lap with weekend context ─────────────────────────
       // The context has form, outliers, and track suitability baked in
       const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
-      const effectiveBaseLap = adjustedBaseLap * finalModifier + objPaceMod;
+      
+      // ── Power Unit Wear Penalty ─────────────────────────────────────────
+      const puPerfMod = getDriverPuPerformance(state, driver.name); // 1.0 is healthy, lower is worse
+      const puPenalty = (1.0 - puPerfMod) * 3.5; // Up to 3.5 seconds per lap penalty for ruined engine
+
+      const effectiveBaseLap = adjustedBaseLap * finalModifier + objPaceMod + puPenalty;
 
       // ── Risk strategy: more variance and potential for incidents ─────────
       const riskVarianceMultiplier = (1 + (riskMod * 2.0)) * objVarMod;
@@ -320,17 +331,23 @@ export function simulateRaceEvent(
     f.cumulativeTimes = []; // Store cumulative time for snapshots
     if (f.retired) return;
 
-    const dnfPerLap = getDNFPerLap(f.team, f.driver, f.isHighRisk) * f.objDnfMod;
+    // DNF processing via new Engineering System
+    // We roll for failures once per race based on overall stress, 
+    // and assign a random failure lap if they DNF.
+    const stressMod = f.isHighRisk ? 1.2 : 1.0;
+    const failures = rollForFailures(state, f.driver.name, stressMod * f.objDnfMod);
+    const dnfLap = failures.length > 0 ? Math.floor(Math.random() * laps) + 1 : -1;
 
     for (let lap = 1; lap <= laps; lap++) {
       if (f.retired) break;
 
       let prevTime = f.time;
 
-      // Per-lap DNF check (reliability model)
-      if (Math.random() < dnfPerLap) {
+      // Check Engineering DNF
+      if (lap === dnfLap) {
         f.retired = true;
         f.time = 99999 - (Math.random() * 1000); // slight spread among DNFs
+        f.dnfReason = `PU Failure: ${failures[0].type}`;
         break;
       }
 
@@ -391,8 +408,17 @@ export function simulateRaceEvent(
 
   // ── Sort: finishers first (by time), DNFs last ────────────────────────────
   const finalFinishers = finishers.sort((a, b) => {
-    if (a.retired !== b.retired) return a.retired ? 1 : -1;
+    if (a.retired && !b.retired) return 1;
+    if (!a.retired && b.retired) return -1;
+    if (a.retired && b.retired) return a.time - b.time;
     return a.time - b.time;
+  });
+
+  // ── Apply Component Wear ──────────────────────────────────────────────────
+  finishers.forEach(f => {
+    const aggression = f.isHighRisk ? 1.2 : 0.9;
+    const trackIntensity = track.speed || 1.0;
+    applySessionWear(state, f.driver.name, trackIntensity, aggression, true);
   });
 
   return { finishers: finalFinishers, replayData: { totalLaps: laps, snapshots, events: [] } };

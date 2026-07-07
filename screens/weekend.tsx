@@ -26,7 +26,8 @@ import {
   getPendingUpgradeForPart,
   getNextUpgradeAvailability
 } from "../utils/seasonTimeline.js";
-import { generateWeekendContext } from "../utils/weekendForm.js";
+import { startWeekendProgress, generateWeekendContext } from "../utils/weekendForm.js";
+import { ensureEngineeringState, getActiveComponent, COMPONENT_CATALOG, applyGridPenalties } from "../utils/engineeringSystem.js";
 import { RACE_OBJECTIVES } from "../utils/raceObjectives.js";
 export { RACE_OBJECTIVES };
 
@@ -241,11 +242,15 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       try {
         gainTeamCarXP(s.team!, 8);
         const { grid, isWet } = simulateQualifying(teams, round!, weekendProgress?.weekendContext);
+        
+        // Process penalties
+        const finalGrid = applyGridPenalties(s, grid);
+
         setRaceIsWet(isWet);
-        setResultsData({ metric: 'lap', res: grid, grid: null });
+        setResultsData({ metric: 'lap', res: finalGrid, grid: null });
         if (weekendProgress) {
           weekendProgress.qualifyingComplete = true;
-          weekendProgress.grid = grid.slice();
+          weekendProgress.grid = finalGrid.slice();
           weekendProgress.isWet = isWet;
         }
         setStatusMessage(
@@ -490,7 +495,6 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
         </div>
         <div style={{ display: 'flex', gap: '16px' }}>
           <div style={statCell()}>{statLabel('Current Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color:'#fff', fontWeight:700, fontSize:'16px'}}>{round.round} / {totalRounds}</span></div>
-          <div style={statCell()}>{statLabel('Car Readiness')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color: healthScore > 80 ? '#10b981' : '#f59e0b', fontWeight:700, fontSize:'16px'}}>{healthScore.toFixed(0)}%</span></div>
           <div style={statCell()}>{statLabel('Car Level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color:'#fff', fontWeight:700, fontSize:'16px'}}>Lv {s.team!.carLevel}</span></div>
         </div>
       </div>
@@ -510,24 +514,34 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           </div>
         </div>
 
-        {/* Section 2: Team Readiness (Span 4) */}
+        {/* Section 2: Power Unit Status (Span 4) */}
         <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldAlert size={14} /> Team Readiness</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {['Power Unit Health', 'Gearbox Health', 'ERS Health', 'Aerodynamic Integrity'].map((comp, i) => {
-              const h = Math.min(100, Math.max(0, reliability + ((i - 1.5) * 4)));
-              return (
-                <div key={comp}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: HUB.textMuted, marginBottom: '4px', textTransform: 'uppercase' }}>
-                    <span>{comp}</span>
-                    <span style={{ color: '#fff', fontWeight: 700 }}>{h.toFixed(0)}%</span>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldAlert size={14} /> Power Unit Status</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {(() => {
+              ensureEngineeringState(s);
+              const driver = s.team!.drivers[0];
+              if (!driver) return null;
+              
+              const keyComponents = ['ICE', 'TC', 'GB', 'ES'];
+              return keyComponents.map(comp => {
+                const active = getActiveComponent(s, driver.name, comp);
+                if (!active) return null;
+                const h = 100 - active.wear;
+                return (
+                  <div key={comp}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: HUB.textMuted, marginBottom: '4px', textTransform: 'uppercase' }}>
+                      <span>{COMPONENT_CATALOG[comp].name}</span>
+                      <span style={{ color: '#fff', fontWeight: 700 }}>{h.toFixed(0)}%</span>
+                    </div>
+                    <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}>
+                      <div style={{ width: `${h}%`, height: '100%', background: h > 85 ? '#10b981' : h > 60 ? '#f59e0b' : '#ef4444', borderRadius: '2px' }} />
+                    </div>
                   </div>
-                  <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}>
-                    <div style={{ width: `${h}%`, height: '100%', background: h > 85 ? '#10b981' : h > 60 ? '#f59e0b' : '#ef4444', borderRadius: '2px' }} />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
+            <button onClick={() => import('./engineering.tsx').then(m => m.renderEngineering(root))} style={{...actionBtn({padding:'8px', fontSize:'11px', marginTop:'8px', backgroundColor:'rgba(255,255,255,0.05)'})}}>Manage Engineering Centre</button>
           </div>
         </div>
 

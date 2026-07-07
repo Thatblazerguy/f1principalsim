@@ -163,7 +163,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     { id: 'dashboard',    icon: <LayoutDashboard size={18}/>, label: 'Dashboard',     group: null },
     { id: 'weekend',      icon: <Flag size={18}/>,            label: 'Race Weekend',  group: null },
     null, // divider
-    { id: 'engineering',  icon: <Wrench size={18}/>,          label: 'Engineering R&D', group: 'Team Ops' },
+    { id: 'engineering',  icon: <Wrench size={18}/>,          label: 'Engineering',     group: 'Team Ops' },
     { id: 'drivers',      icon: <Users size={18}/>,           label: 'Driver Dossiers',  group: 'Team Ops' },
     { id: 'academy',      icon: <GraduationCap size={18}/>,   label: 'Driver Academy',   group: 'Team Ops' },
     { id: 'market',       icon: <ShoppingCart size={18}/>,    label: 'Driver Market',   group: 'Team Ops' },
