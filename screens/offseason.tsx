@@ -122,12 +122,16 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlas
   const allTeams = [s.team!, ...(s.aiTeams || [])];
   
   allTeams.forEach(t => {
+    const atrMultiplier = t.atrMultiplier ?? 1.0;
     if (t !== s.team) {
-      const aiGrowth = 3 + Math.random() * 3;
+      const aiGrowth = (3 + Math.random() * 3) * atrMultiplier;
       t.carPerformance = parseFloat((t.carPerformance + aiGrowth).toFixed(1));
       const parts = ["aero", "engine", "chassis", "reliability"];
       parts.forEach(p => {
-        if (t.car && t.car[p]) t.car[p] += Math.floor(Math.random() * 2);
+        if (t.car && t.car[p]) {
+          const partGrowth = Math.floor(Math.random() * 2) + (atrMultiplier > 1.05 ? 1 : 0);
+          t.car[p] += partGrowth;
+        }
       });
     }
 
@@ -226,12 +230,90 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlas
   renderDashboard(root);
 }
 
+const PRIZE_MONEY = [68.0, 58.0, 50.0, 43.0, 37.0, 31.0, 25.0, 20.0, 15.0, 10.0];
+const TV_RIGHTS_SHARE = [33.0, 28.6, 26.4, 24.2, 22.0, 19.8, 17.6, 15.4, 13.2, 11.0];
+const ATR_MULTIPLIERS = [0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15];
+
+export function processEndofSeasonFinancials(s: any) {
+  const teamList = [s.team!, ...(s.aiTeams || [])];
+  const points = (tName: string) => s.standings.teams?.[tName] ?? 0;
+  teamList.sort((a, b) => points(b.name) - points(a.name));
+
+  let playerReport = null;
+  const alreadyProcessed = s.season.reportProcessed === s.season.year;
+
+  teamList.forEach((team, index) => {
+    const pos = index + 1;
+    const prize = PRIZE_MONEY[index] ?? 10.0;
+    const tvRights = TV_RIGHTS_SHARE[index] ?? 11.0;
+    const atrMultiplier = ATR_MULTIPLIERS[index] ?? 1.0;
+
+    team.atrMultiplier = atrMultiplier;
+
+    if (!alreadyProcessed) {
+      team.budget = parseFloat((team.budget + prize + tvRights).toFixed(1));
+    }
+
+    if (team.name === s.team!.name) {
+      let sponsorTotal = 0;
+      const sponsorDetails: any[] = [];
+      const SPONSOR_SLOTS = [
+        { key: "title", label: "Title Sponsor" },
+        { key: "kit", label: "Kit Sponsor" },
+        { key: "sidepod", label: "Sidepod Sponsor" },
+        { key: "rearWing", label: "Rear Wing Sponsor" },
+        { key: "halo", label: "Halo Sponsor" }
+      ];
+      SPONSOR_SLOTS.forEach(slot => {
+        const sponsor = s.team!.sponsorSlots?.[slot.key];
+        if (sponsor) {
+          const payout = parseFloat(((sponsor.monthlyIncome || 0) * 5 + (sponsor.performanceBonus || 0) * ((sponsor.relationshipLevel || 100) / 100) * 2).toFixed(1));
+          sponsorTotal += payout;
+          sponsorDetails.push({ name: sponsor.name, slot: slot.label, payout });
+          if (!alreadyProcessed) {
+            s.team!.budget = parseFloat((s.team!.budget + payout).toFixed(1));
+          }
+        }
+      });
+
+      // Calculate performance evaluation
+      const sortedByCar = [...teamList].sort((a, b) => b.carPerformance - a.carPerformance);
+      const carRank = sortedByCar.findIndex(t => t.name === s.team!.name) + 1;
+      let performanceEvaluation = "Met Expectations";
+      if (pos < carRank) {
+        performanceEvaluation = "Overperformed Projected";
+      } else if (pos > carRank) {
+        performanceEvaluation = "Underperformed Projected";
+      }
+
+      playerReport = {
+        position: pos,
+        carRank,
+        performanceEvaluation,
+        prize,
+        tvRights,
+        atrMultiplier,
+        sponsorTotal,
+        sponsorDetails
+      };
+    }
+  });
+
+  if (!alreadyProcessed) {
+    s.season.reportProcessed = s.season.year;
+    syncGame();
+  }
+
+  return playerReport;
+}
+
 // UI Components
 export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
   ensureTeamState(state.team!);
 
   const OffseasonPage = () => {
     const s = state as any;
+    const [view, setView] = useState<'report' | 'headquarters'>('report');
     const [flashMessage, setFlashMessage] = useState(initialFlashMessage);
     const [keepSponsors, setKeepSponsors] = useState<boolean | null>(null);
     const [rosterTick, setRosterTick] = useState(0);
@@ -337,6 +419,136 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
     };
 
     const isChecklistComplete = roster.length >= 2 && keepSponsors !== null;
+
+    if (view === 'report') {
+      const report = processEndofSeasonFinancials(s);
+      if (!report) return <div style={{ color: '#fff', padding: '40px', fontFamily: HUB.fontSans }}>Generating end-of-season audit...</div>;
+
+      const totalPayout = report.prize + report.tvRights + report.sponsorTotal;
+
+      return (
+        <div style={{ paddingBottom: '80px', maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ marginBottom: '40px' }}>
+            {sectionLabel('Season Overview')}
+            {pageTitle(`Season ${s.season.year || 1} Financial & Performance Report`)}
+            {pageSubtitle('Detailed audit of constructors standings, team performance, F1 TV shares, and sponsor payouts.')}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+            {/* Card 1: Performance Evaluation */}
+            <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Target size={16} color={HUB.accent} /> Car Performance Audit
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Constructor Finish</span>
+                  <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>P{report.position}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Expected Performance Rank</span>
+                  <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>P{report.carRank}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Overall Assessment</span>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: report.performanceEvaluation.includes('Overperformed') ? '#10b981' : 
+                           report.performanceEvaluation.includes('Underperformed') ? '#ef4444' : '#f59e0b'
+                  }}>
+                    {report.performanceEvaluation}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: ATR Handicap */}
+            <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Zap size={16} color="#3b82f6" /> Aerodynamic Testing Handicap (ATR)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Wind Tunnel & CFD Allocation</span>
+                  <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>{Math.round(report.atrMultiplier * 100)}%</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>R&D Development Rate Modifier</span>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: report.atrMultiplier > 1.0 ? '#10b981' : report.atrMultiplier < 1.0 ? '#ef4444' : '#fff'
+                  }}>
+                    {report.atrMultiplier >= 1.0 ? `+${Math.round((report.atrMultiplier - 1.0) * 100)}%` : `-${Math.round((1.0 - report.atrMultiplier) * 100)}%`}
+                  </span>
+                </div>
+                <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0, lineHeight: 1.4 }}>
+                  *Note: Under FIA regulations, lower-placed teams receive higher testing allocations to enable field convergence.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Financial summary */}
+          <div style={{ ...glassCard({ padding: '32px' }), marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <DollarSign size={18} color="#10b981" /> Financial Credits Summary (Season payouts credited to all teams)
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', display: 'block' }}>F1 TV Rights Share</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>Distribution based on team presence and standings (All Teams)</span>
+                </div>
+                <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: HUB.fontMono, color: '#10b981' }}>+${report.tvRights.toFixed(1)}M</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', display: 'block' }}>Constructor Prize Money</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>Based on final Constructor standing (P{report.position}) (All Teams)</span>
+                </div>
+                <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: HUB.fontMono, color: '#10b981' }}>+${report.prize.toFixed(1)}M</span>
+              </div>
+
+              {report.sponsorDetails.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', display: 'block' }}>Sponsor Renewal Payouts</span>
+                      <span style={{ fontSize: '11px', color: HUB.textMuted }}>Loyalty bonuses and target payouts based on contract satisfaction</span>
+                    </div>
+                    <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: HUB.fontMono, color: '#10b981' }}>+${report.sponsorTotal.toFixed(1)}M</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
+                    {report.sponsorDetails.map((sp: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: HUB.textMuted }}>{sp.slot}: {sp.name}</span>
+                        <span style={{ color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>+${sp.payout.toFixed(1)}M</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px' }}>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>Total Seasonal Payout Credits</span>
+                <span style={{ fontSize: '24px', fontWeight: 900, fontFamily: HUB.fontMono, color: '#10b981' }}>+${totalPayout.toFixed(1)}M</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setView('headquarters')}
+            style={{ ...actionBtn({ width: '100%', padding: '20px 32px', fontSize: '16px' }) }}
+          >
+            PROCEED TO OFF-SEASON HEADQUARTERS
+          </button>
+        </div>
+      );
+    }
 
     return (
       <div style={{ paddingBottom: '80px', maxWidth: '1200px', margin: '0 auto' }}>

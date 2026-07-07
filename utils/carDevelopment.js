@@ -47,10 +47,11 @@ export function applyRoundCarDevelopment(team) {
 
   const currentOvr = team.specs.ovr ?? team.carPerformance ?? 85;
   const convergenceMult = getDevelopmentConvergenceMult(currentOvr);
+  const atrMult = team.atrMultiplier ?? 1.0;
 
   // Raw R&D budget this round (slightly wider range for more variety)
   const rawBudget = 0.16 + Math.random() * 0.26;
-  const budget = rawBudget * convergenceMult;
+  const budget = rawBudget * convergenceMult * atrMult;
 
   // Random allocation weights across the four spec areas
   const wA = Math.random();
