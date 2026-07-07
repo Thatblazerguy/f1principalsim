@@ -3,6 +3,7 @@ import { renderSetup } from "./setup.tsx";
 import { renderDashboard } from "./dashboard.tsx";
 import { signUpUser, loginUser, getCurrentUserSession, loadUserGameState } from "../lib/supabaseApi.js";
 import { hydrateState, state } from "../state.js";
+import { loadGame } from "../utils/storage.js";
 import { renderToAppRoot } from "../utils/reactRoot.tsx";
 import { HUB, glassCard, actionBtn } from "../components/HubLayout.tsx";
 import { 
@@ -77,6 +78,19 @@ export function renderAuth(root: HTMLElement) {
         setErrorMsg(err.message || 'Authentication failed.');
         setLoading(false);
       }
+    };
+
+    const handlePlayOffline = () => {
+      localStorage.setItem("f1-play-offline", "true");
+      const localData = loadGame();
+      if (localData) {
+        hydrateState(localData);
+        if (state.team) {
+          renderDashboard(root);
+          return;
+        }
+      }
+      renderSetup(root);
     };
 
     const inputStyle = {
@@ -302,6 +316,28 @@ export function renderAuth(root: HTMLElement) {
                 }}
               >
                 {loading ? 'INITIATING LINK...' : mode === 'login' ? 'ESTABLISH LINK' : 'REGISTER CREATIVE ID'}
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', gap: '10px' }}>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+                <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontBold }}>OR</span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              </div>
+
+              <button 
+                type="button" 
+                onClick={handlePlayOffline}
+                style={{ 
+                  ...actionBtn({ width: '100%', padding: '12px 24px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)' }),
+                  fontFamily: HUB.fontBold,
+                  letterSpacing: '0.15em',
+                  cursor: 'pointer',
+                  color: '#3b82f6',
+                  boxShadow: 'none',
+                  textShadow: 'none'
+                }}
+              >
+                PLAY OFFLINE (LOCAL SAVE)
               </button>
             </form>
           </div>
