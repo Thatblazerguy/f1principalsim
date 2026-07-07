@@ -1,6 +1,7 @@
 import { createAiTeams } from "./data/teams.js";
 import { Team } from "./game/team.js";
 import { Driver } from "./game/driver.js";
+import { ensureFinanceState } from "./utils/financeSystem.js";
 
 export const state = {
   team: null,
@@ -17,6 +18,14 @@ export const state = {
   sponsorOffers: [],
   /** Per-round weekend flow: qualifying must run before race. */
   weekendProgress: null,
+  /** Team Finance & Operations System */
+  finance: {
+    cashFlow: [],
+    raceReports: [],
+    boardReviews: [],
+    emergencyActions: [],
+    facilityProjects: []
+  },
   /** Driver Academy System */
   academy: {
     level: 1,
@@ -99,6 +108,13 @@ export function hydrateState(payload) {
     state.notifications = rawData.notifications || [];
     state.sponsorOffers = rawData.sponsorOffers || [];
     state.weekendProgress = rawData.weekendProgress || null;
+    state.finance = rawData.finance || {
+      cashFlow: [],
+      raceReports: [],
+      boardReviews: [],
+      emergencyActions: [],
+      facilityProjects: []
+    };
 
     // Hydrate Academy State
     state.academy = rawData.academy || {
@@ -118,6 +134,7 @@ export function hydrateState(payload) {
         if (s.prospect) hydrateClass(s.prospect, Driver);
       });
     }
+    ensureFinanceState(state);
 
     return true;
   } catch (e) {

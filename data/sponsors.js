@@ -44,3 +44,29 @@ export const SPONSOR_SLOTS = [
   { key: "rearWing", label: "Rear Wing Sponsor", placement: "Rear Wing" },
   { key: "halo", label: "Halo Sponsor", placement: "Halo" }
 ];
+
+const PARTNER_PROFILES = {
+  "Tech/Cloud": { partnerType: "Technology Partner", contractLength: 14, performanceBonus: 2.4, strategicBenefit: "Improves R&D efficiency" },
+  "Technology": { partnerType: "Technology Partner", contractLength: 12, performanceBonus: 2.1, strategicBenefit: "Improves R&D efficiency" },
+  "Cloud": { partnerType: "Technology Partner", contractLength: 12, performanceBonus: 2.0, strategicBenefit: "Improves R&D efficiency" },
+  "Hardware": { partnerType: "Engineering Supplier", contractLength: 11, performanceBonus: 1.8, strategicBenefit: "Improves upgrade development" },
+  "Energy": { partnerType: "Fuel Partner", contractLength: 16, performanceBonus: 1.9, strategicBenefit: "Improves reliability" },
+  "Fuel": { partnerType: "Fuel Partner", contractLength: 13, performanceBonus: 1.5, strategicBenefit: "Improves reliability" },
+  "Lubricants": { partnerType: "Fuel Partner", contractLength: 12, performanceBonus: 1.4, strategicBenefit: "Improves reliability" },
+  "FinTech": { partnerType: "Financial Partner", contractLength: 10, performanceBonus: 2.2, strategicBenefit: "Highest monthly income" },
+  "Banking": { partnerType: "Financial Partner", contractLength: 10, performanceBonus: 1.8, strategicBenefit: "Highest monthly income" },
+  "Eyewear": { partnerType: "Luxury Brand", contractLength: 9, performanceBonus: 1.2, strategicBenefit: "Improves reputation" },
+  "Aviation": { partnerType: "Luxury Brand", contractLength: 15, performanceBonus: 2.5, strategicBenefit: "Improves reputation" },
+};
+
+sponsors.forEach((sponsor) => {
+  const profile = PARTNER_PROFILES[sponsor.industry] || { partnerType: "Commercial Partner", contractLength: 8, performanceBonus: sponsor.fee * 0.7, strategicBenefit: sponsor.perk };
+  sponsor.signingBonus = sponsor.signingBonus ?? sponsor.bonus;
+  sponsor.monthlyIncome = sponsor.monthlyIncome ?? sponsor.fee;
+  sponsor.performanceBonus = sponsor.performanceBonus ?? Number(profile.performanceBonus.toFixed(1));
+  sponsor.contractLength = sponsor.contractLength ?? profile.contractLength;
+  sponsor.partnerType = sponsor.partnerType ?? profile.partnerType;
+  sponsor.strategicBenefit = sponsor.strategicBenefit ?? profile.strategicBenefit;
+  sponsor.brandPrestige = sponsor.brandPrestige ?? Math.min(99, Math.round(48 + sponsor.bonus * 1.35 + sponsor.fee * 5));
+  sponsor.relationshipLevel = sponsor.relationshipLevel ?? 65;
+});

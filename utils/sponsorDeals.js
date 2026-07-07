@@ -1,4 +1,5 @@
 import { SPONSOR_SLOTS, sponsors } from "../data/sponsors.js";
+import { hydrateSponsorContract } from "./financeSystem.js";
 
 /**
  * Rotates the current season's sponsor offers.
@@ -32,6 +33,11 @@ export function ensureSponsorSlots(team) {
   if (legacy && !team.sponsorSlots.title) {
     team.sponsorSlots.title = legacy;
   }
+  for (const { key } of SPONSOR_SLOTS) {
+    if (team.sponsorSlots[key]) {
+      team.sponsorSlots[key] = hydrateSponsorContract(team.sponsorSlots[key], { team }, key);
+    }
+  }
   team.sponsor = team.sponsorSlots.title ?? null;
 }
 
@@ -40,7 +46,7 @@ export function getTotalSponsorRaceBonus(team) {
   let sum = 0;
   for (const slot of SPONSOR_SLOTS) {
     const s = team.sponsorSlots[slot.key];
-    if (s && typeof s.fee === "number") sum += s.fee;
+    if (s && typeof (s.monthlyIncome ?? s.fee) === "number") sum += (s.monthlyIncome ?? s.fee);
   }
   return sum;
 }
@@ -71,12 +77,12 @@ export function assignSponsorToSlot(team, slotKey, sponsorId, sponsorsList, appS
     return { signingBonusPaid: 0, cleared: true };
   }
 
-  team.sponsorSlots[slotKey] = sponsor;
+  team.sponsorSlots[slotKey] = hydrateSponsorContract(sponsor, appState, slotKey);
   team.sponsor = team.sponsorSlots.title ?? null;
 
   let signingBonusPaid = 0;
   if (!appState.signedSponsors[sponsor.id]) {
-    signingBonusPaid = sponsor.bonus;
+    signingBonusPaid = sponsor.signingBonus ?? sponsor.bonus;
     team.budget += signingBonusPaid;
     appState.signedSponsors[sponsor.id] = true;
   }

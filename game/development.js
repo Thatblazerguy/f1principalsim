@@ -161,4 +161,60 @@ export function processSeasonDevelopment(state) {
       }
     }
   }
+
+  // Process AI Teams Development
+  processAiTeamDevelopment(state);
+}
+
+/**
+ * Process end-of-season logic for AI Teams.
+ * Handles dynamic upgrading of AI facilities and staff based on their season performance.
+ */
+function processAiTeamDevelopment(state) {
+  if (!state.aiTeams || !state.aiTeams.length) return;
+
+  const currentYear = state.season?.year || 1;
+  const standings = state.standings?.teams || {};
+
+  state.aiTeams.forEach((aiTeam) => {
+    // Determine budget/income abstractly based on championship finish
+    const standingPosition = Object.keys(standings).sort((a, b) => standings[b] - standings[a]).indexOf(aiTeam.name) + 1;
+    const isTopTeam = standingPosition > 0 && standingPosition <= 3;
+    const isMidfield = standingPosition > 3 && standingPosition <= 7;
+
+    // Base upgrade chance
+    let upgradeChance = 0.3; // 30% chance to upgrade a random facility
+    if (isTopTeam) upgradeChance = 0.8;
+    else if (isMidfield) upgradeChance = 0.5;
+
+    // Facility upgrades
+    if (Math.random() < upgradeChance) {
+      if (!aiTeam.finance) aiTeam.finance = { facilities: {} };
+      if (!aiTeam.finance.facilities) aiTeam.finance.facilities = {};
+      
+      const facilityIds = ['windTunnel', 'cfdDepartment', 'simulator', 'composites', 'powerUnitLab', 'reliabilityCentre', 'vehicleDynamics', 'pitCrewTraining'];
+      const targetFacility = facilityIds[Math.floor(Math.random() * facilityIds.length)];
+      
+      const currentLevel = aiTeam.finance.facilities[targetFacility]?.level || 1;
+      if (currentLevel < 5) {
+        aiTeam.finance.facilities[targetFacility] = { level: currentLevel + 1 };
+        
+        // Apply abstract performance boost
+        if (aiTeam.specs) {
+          const specMap = { windTunnel: 'aero', cfdDepartment: 'aero', simulator: 'chassis', composites: 'chassis', powerUnitLab: 'engine', reliabilityCentre: 'reliability', vehicleDynamics: 'chassis', pitCrewTraining: 'operations' };
+          const spec = specMap[targetFacility];
+          if (spec && aiTeam.specs[spec]) {
+            aiTeam.specs[spec] = Math.min(99, aiTeam.specs[spec] + 2);
+          }
+        }
+      }
+    }
+
+    // Staff progression abstractly represented by small random boosts to overall specs if they didn't upgrade facilities
+    if (Math.random() > upgradeChance && aiTeam.specs) {
+      const specsList = Object.keys(aiTeam.specs);
+      const randomSpec = specsList[Math.floor(Math.random() * specsList.length)];
+      aiTeam.specs[randomSpec] = Math.min(99, aiTeam.specs[randomSpec] + 1);
+    }
+  });
 }

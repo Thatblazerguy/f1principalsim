@@ -10,6 +10,7 @@ import {
   formatSeasonDate,
   getRoundRaceDay,
 } from "../utils/seasonTimeline.js";
+import { FACILITY_CATALOG, ensureFinanceState, getFacilityUpgradeCost, requestFacilityInvestment } from "../utils/financeSystem.js";
 import { mountLayout, HUB, glassCard, statCell, actionBtn, pill, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue } from '../components/HubLayout.tsx';
 import { Cpu, Shield, Activity, Sliders, Play, Settings } from 'lucide-react';
 
@@ -19,6 +20,7 @@ function getRoundFromDay(day) {
 
 export function renderOffice(root, flashMessage = "") {
   ensureTeamState(state.team);
+  const finance = ensureFinanceState(state);
   ensureSeasonTimeline(state);
   const currentDay = state.season.currentDay;
   const nextUpgrade = getNextUpgradeAvailability(state.team, currentDay);
@@ -43,6 +45,14 @@ export function renderOffice(root, flashMessage = "") {
       const etaRound = getRoundFromDay(request.entry.readyDay);
       renderOffice(root, `${part.toUpperCase()} project started. Completion expected by ${formatSeasonDate(state.season.year || 1, request.entry.readyDay)} (Round ${etaRound}).`);
     }, 900);
+  };
+
+  const handleFacilityInvestment = async (facilityId) => {
+    const request = requestFacilityInvestment(state, facilityId);
+    await syncGame();
+    renderOffice(root, request.ok
+      ? `${request.facility.name} investment approved. Construction completes on ${formatSeasonDate(state.season.year || 1, request.readyDay)}.`
+      : request.reason);
   };
 
   const content = (
@@ -193,6 +203,50 @@ export function renderOffice(root, flashMessage = "") {
           })}
         </div>
 
+      </div>
+
+      <div style={{...glassCard(), marginTop:'24px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', gap:'20px', alignItems:'flex-start', marginBottom:'20px'}}>
+          <div>
+            <h3 style={{fontSize:'16px', fontFamily:HUB.fontBold, color:'#fff', margin:'0 0 8px', textTransform:'uppercase'}}>Permanent Facilities</h3>
+            <p style={{fontSize:'13px', color:HUB.textMuted, margin:0, lineHeight:1.5}}>Infrastructure upgrades improve long-term development, reliability, setup confidence, and operational pace.</p>
+          </div>
+          <span style={pill(true)}>Board Review Linked</span>
+        </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:'14px'}}>
+          {FACILITY_CATALOG.map((facility) => {
+            const current = finance.facilities[facility.id];
+            const cost = getFacilityUpgradeCost(facility.id, finance);
+            const canInvest = state.team.budget >= cost && !current.upgrading && current.level < facility.maxLevel;
+            return (
+              <div key={facility.id} style={{padding:'16px', border:`1px solid ${HUB.border}`, borderRadius:'8px', background:'rgba(255,255,255,0.02)'}}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', marginBottom:'10px'}}>
+                  <div>
+                    <h4 style={{fontSize:'13px', color:'#fff', fontFamily:HUB.fontBold, margin:'0 0 4px'}}>{facility.name}</h4>
+                    <p style={{fontSize:'11px', color:HUB.textMuted, margin:0, lineHeight:1.4}}>{facility.benefit}</p>
+                  </div>
+                  <span style={{...pill(current.upgrading), whiteSpace:'nowrap'}}>{current.upgrading ? 'Building' : `Lv ${current.level}/${facility.maxLevel}`}</span>
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'14px'}}>
+                  <span style={{fontSize:'12px', color:HUB.textMuted}}>
+                    {current.upgrading ? `Ready Day ${current.readyDay}` : `Next $${cost}M`}
+                  </span>
+                  <button
+                    onClick={() => handleFacilityInvestment(facility.id)}
+                    disabled={!canInvest}
+                    style={{
+                      ...actionBtn({padding:'8px 12px', fontSize:'10px'}),
+                      opacity: canInvest ? 1 : 0.45,
+                      cursor: canInvest ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    Invest
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes spin { 100% { transform:rotate(360deg); } }

@@ -10,8 +10,8 @@ import { updateStandings } from "../game/standings.js";
 import { recordRaceHistory } from "../game/raceHistory.js";
 import { state } from "../state.js";
 import { ensureTeamState, gainTeamXP, gainTeamCarXP, getActiveDrivers } from "../utils/teamState.js";
-import { getTotalSponsorRaceBonus } from "../utils/sponsorDeals.js";
 import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
+import { ensureFinanceState, generateRaceBonusChallenges, processFacilityProjects, processRaceFinance } from "../utils/financeSystem.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getDriverHeadshotUrl } from "../data/drivers.js";
 import { getTrackWetProbability } from "../utils/raceBalance.js";
@@ -31,7 +31,7 @@ import { RACE_OBJECTIVES } from "../utils/raceObjectives.js";
 export { RACE_OBJECTIVES };
 
 import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
-import { CloudRain, Sun, Wind, ChevronRight, Activity, Award, ShieldAlert, Cpu, CheckCircle, AlertTriangle, MessageSquare, Flag, ArrowUpRight, ArrowDownRight, Minus, Timer, Zap } from "lucide-react";
+import { CloudRain, Sun, Wind, ChevronRight, Activity, Award, ShieldAlert, Cpu, CheckCircle, AlertTriangle, MessageSquare, Flag, ArrowUpRight, ArrowDownRight, Minus, Timer, Zap, DollarSign } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { SlideUp, PageTransition } from '../components/ui/motion.tsx';
 import { PreRaceBriefingModal } from "../components/ui/PreRaceBriefingModal.tsx";
@@ -149,7 +149,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     { ...s.team!, drivers: activeDrivers },
     ...s.aiTeams
   ];
-  const sponsorRaceBonus = getTotalSponsorRaceBonus(s.team!);
+  ensureFinanceState(s);
   const weekendProgress: any = round ? ensureWeekendProgress(round.round) : null;
   
   if (round && weekendProgress && !weekendProgress.weekendContext && raceWindowOpen) {
@@ -205,7 +205,11 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     const completedText = tick.completedUpgrades.length
       ? ` Upgrade complete: ${tick.completedUpgrades.map((entry: any) => entry.part.toUpperCase()).join(", ")}.`
       : "";
-    renderWeekend(root, `Advanced to Day ${s.season.currentDay}.${completedText}`);
+    const completedFacilities = processFacilityProjects(state);
+    const facilityText = completedFacilities.length
+      ? ` Facility complete: ${completedFacilities.map((entry: any) => entry.name).join(", ")}.`
+      : "";
+    renderWeekend(root, `Advanced to Day ${s.season.currentDay}.${completedText}${facilityText}`);
   };
 
   const handlePractice = async () => {
@@ -301,12 +305,9 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           
           setResultsData({ metric: 'time', res: finishers, grid: weekendProgress?.grid || null, replayData, objectiveId });
           
-          let earnings = 0;
-          if (sponsorRaceBonus > 0) {
-            earnings += sponsorRaceBonus;
-            s.team!.budget += earnings;
-          }
-          setStatusMessage(`${round!.name} Quick Sim complete. Car XP is now ${s.team!.carXP}/100.`);
+          const historyRecord = s.raceHistory[s.raceHistory.length - 1];
+          const financeReport = processRaceFinance(state, historyRecord, round);
+          setStatusMessage(`${round!.name} Quick Sim complete. Net finance result: ${financeReport.netProfit >= 0 ? "+" : ""}$${financeReport.netProfit}M. Car XP is now ${s.team!.carXP}/100.`);
           await syncGame();
         } catch(e: any) {
            setStatusMessage(`Race failed to simulate. ${e.message}`);
@@ -334,24 +335,19 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
 
       const historyRecord = s.raceHistory[s.raceHistory.length - 1];
 
-      let earnings = 0;
-      if (sponsorRaceBonus > 0) {
-        earnings += sponsorRaceBonus;
-        s.team!.budget += earnings;
-      }
-
       if (weekendProgress) {
         weekendProgress.raceComplete = true;
         weekendProgress.finalClassification = finalClassification;
       }
       const objId = weekendProgress?.selectedObjective || 'points';
+      const financeReport = processRaceFinance(state, historyRecord, round);
       applyRoundCarDevelopmentAll(state);
       s.season.round += 1;
       
       setResultsData({ metric: 'time', res, grid: weekendProgress?.grid || null, replayData, objectiveId: objId });
       validateFinalClassification(finalClassification, standingsBefore, s.standings, historyRecord);
 
-      setStatusMessage(`${round!.name} complete. ${earnings ? `Sponsor payout: $${earnings}M.` : "No sponsor payout earned."} Car XP is now ${s.team!.carXP}/100. Day simulation is now unlocked.`);
+      setStatusMessage(`${round!.name} complete. Net finance result: ${financeReport.netProfit >= 0 ? "+" : ""}$${financeReport.netProfit}M. Car XP is now ${s.team!.carXP}/100. Day simulation is now unlocked.`);
       await syncGame();
     } catch (error: any) {
       setStatusMessage(`Race processing failed. ${error.message}`);
@@ -480,6 +476,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const pendingUpg = s.team!.pendingUpgrades?.[0];
 
   const rainProb = Math.round(getTrackWetProbability(round.circuit) * 100);
+  const raceBonusChallenges = generateRaceBonusChallenges(s, round);
 
   return (
     <div style={{ paddingBottom: '64px' }}>
@@ -622,6 +619,23 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div style={{ ...glassCard({ padding: '20px' }), marginBottom: '24px' }}>
+        <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={14} /> Race Bonus Challenges</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          {raceBonusChallenges.map((challenge) => (
+            <div key={challenge.id} style={{ padding: '16px', background: 'rgba(255,255,255,0.025)', border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
+              <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional Objective</span>
+              <h4 style={{ fontSize: '14px', color: '#fff', margin: '6px 0 12px', fontFamily: HUB.fontBold }}>{challenge.label}</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '11px', color: HUB.textMuted }}>
+                <span>Cash <strong style={{ color: '#10b981' }}>+${challenge.cash}M</strong></span>
+                <span>Board <strong style={{ color: '#fff' }}>+{challenge.boardConfidence}</strong></span>
+                <span>Rep <strong style={{ color: '#fff' }}>+{challenge.reputation}</strong></span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
