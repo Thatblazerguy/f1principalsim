@@ -1,3 +1,4 @@
+import { state } from "../state.js";
 import {
   RACE_OVR_COEFF,
   QUALI_OVR_COEFF,
@@ -10,7 +11,33 @@ import {
 
 const SPEC_BASE = 85;
 
-function defaultSpecs(team) {
+function getCarSpecs(team) {
+  // Check if this is the player team and we have engineering.carSpecs
+  if (team.isPlayerTeam && state.engineering?.carSpecs) {
+    const cs = state.engineering.carSpecs;
+    // Derive aero, chassis, reliability from carSpecs
+    const aero = (cs.cornering + cs.downforce) / 2;
+    const chassis = (cs.mechanicalGrip + cs.balance + cs.tyreWear) / 3;
+    const reliability = cs.reliability;
+    const topSpeed = cs.topSpeed;
+    const acceleration = cs.acceleration;
+    const fuelEfficiency = cs.fuelEfficiency;
+    // Calculate overall performance based on carSpecs
+    const ovr = Math.round(
+      (aero + chassis + reliability + topSpeed + acceleration + fuelEfficiency) / 6
+    );
+    return {
+      aero,
+      chassis,
+      reliability,
+      ovr,
+      topSpeed,
+      acceleration,
+      fuelEfficiency,
+    };
+  }
+
+  // Fallback to original system for AI teams or if no engineering.carSpecs
   const ovr = team.carPerformance ?? SPEC_BASE;
   
   let baseAero = team.specs?.aero ?? ovr;
@@ -28,7 +55,7 @@ function defaultSpecs(team) {
     aero: baseAero,
     chassis: baseChassis,
     reliability: baseReliability,
-    ovr: ovr, // Use the real carPerformance which tracks manual upgrades accurately
+    ovr: ovr,
   };
 }
 
@@ -47,7 +74,7 @@ export function getTeamPerformanceBonus(team) {
  * Sessions weight aero / chassis / reliability differently.
  */
 export function getTeamLapCredit(team, session) {
-  const s = defaultSpecs(team);
+  const s = getCarSpecs(team);
   const ovr = s.ovr;
 
   // Base credit from overall rating (compressed coefficients)

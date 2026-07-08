@@ -559,6 +559,22 @@ function PerformanceTab({ s }: any) {
     { key: 'reliability', label: 'Reliability', color: '#22c55e' },
   ];
 
+  // Helper to get a team's spec value
+  const getTeamSpec = (team: any, key: string) => {
+    if (team.isPlayerTeam && specs[key]) {
+      return specs[key];
+    }
+    // For AI teams: use their specs or carPerformance as fallback
+    if (team.specs) {
+      // Map from our detailed specs to team.specs if available
+      if (key === 'cornering' || key === 'downforce') return team.specs.aero || team.carPerformance || 80;
+      if (key === 'mechanicalGrip' || key === 'tyreWear' || key === 'balance') return team.specs.chassis || team.carPerformance || 80;
+      if (key === 'reliability') return team.specs.reliability || team.carPerformance || 80;
+    }
+    // Default fallback
+    return team.carPerformance || 80;
+  };
+
   // Get development priorities based on circuit
   const getDevelopmentPriorities = () => {
     if (!nextRace) return [];
@@ -640,31 +656,43 @@ function PerformanceTab({ s }: any) {
         </div>
       )}
 
-      {/* Performance Metrics */}
-      <div style={{ ...glassCard({ padding: '24px' }) }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <BarChart2 size={16} color="#3b82f6" /> Car Performance Metrics
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-          {performanceMetrics.map((metric: any) => {
-            const val = specs[metric.key] || 70;
-            return (
-              <div key={metric.key} style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>{metric.label}</span>
-                <div style={{ marginBottom: '6px' }}>
-                  {statBar(val, 99, metric.color)}
-                </div>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>{val.toFixed(0)}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* Detailed Metric Comparisons */}
+      {performanceMetrics.map((metric: any) => {
+        // Sort teams by this specific metric
+        const sortedByMetric = [...allTeams].sort((a: any, b: any) => getTeamSpec(b, metric.key) - getTeamSpec(a, metric.key));
+        return (
+          <div key={metric.key} style={{ ...glassCard({ padding: '24px' }) }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '999px', background: metric.color }} />
+              {metric.label} Comparison
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sortedByMetric.map((team: any, i: number) => {
+                const isPlayer = team.name === s.team?.name;
+                const val = getTeamSpec(team, metric.key);
+                const playerVal = getTeamSpec(s.team, metric.key);
+                const delta = isPlayer ? 0 : parseFloat((val - playerVal).toFixed(1));
+                return (
+                  <div key={team.name} style={{ display: 'grid', gridTemplateColumns: '30px 200px 1fr 60px 70px', gap: '12px', alignItems: 'center', padding: '8px 0', borderBottom: i < sortedByMetric.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: isPlayer ? metric.color : '#fff', fontFamily: HUB.fontMono }}>P{i + 1}</span>
+                    <span style={{ fontSize: '12px', color: isPlayer ? metric.color : '#fff', fontWeight: isPlayer ? 800 : 400 }}>{team.name}</span>
+                    {statBar(val, 99, isPlayer ? metric.color : '#3b82f6')}
+                    <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: '#fff', textAlign: 'right' }}>{val.toFixed(0)}</span>
+                    <span style={{ fontSize: '11px', color: delta === 0 ? HUB.textMuted : delta > 0 ? '#ef4444' : '#10b981', textAlign: 'right' }}>
+                      {delta === 0 ? 'YOU' : (delta > 0 ? `+${delta}` : `${delta}`)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
 
-      {/* Field Comparison */}
+      {/* Constructor Car Performance Rankings */}
       <div style={{ ...glassCard({ padding: '24px' }) }}>
         <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <BarChart2 size={16} color="#3b82f6" /> Constructor Car Performance Rankings
+          <BarChart2 size={16} color="#3b82f6" /> Overall Constructor Performance Rankings
         </h3>
         {allTeams.map((team: any, i: number) => {
           const isPlayer = team.name === s.team?.name;

@@ -417,6 +417,38 @@ export function processProjectCompletions(appState) {
       });
     }
 
+    // Also update team.carPerformance and team.specs for backward compatibility
+    if (appState.team && gainMultiplier > 0) {
+      // Derive aero, chassis, reliability from project type
+      let aeroGain = 0, chassisGain = 0, reliabilityGain = 0;
+      
+      Object.entries(project.statBonuses).forEach(([stat, value]) => {
+        const adjustedValue = value * gainMultiplier;
+        if (["cornering", "downforce", "dragRatio"].includes(stat)) {
+          aeroGain += adjustedValue / 2; // Split these across aero
+        } else if (["mechanicalGrip", "balance", "tyreWear"].includes(stat)) {
+          chassisGain += adjustedValue / 2;
+        } else if (stat === "reliability") {
+          reliabilityGain += adjustedValue;
+        } else if (["topSpeed", "acceleration", "fuelEfficiency"].includes(stat)) {
+          // These can contribute to all, especially aero/chassis
+          aeroGain += adjustedValue / 4;
+          chassisGain += adjustedValue / 4;
+          reliabilityGain += adjustedValue / 4;
+        }
+      });
+
+      // Update team specs if they exist
+      if (!appState.team.specs) appState.team.specs = {};
+      appState.team.specs.aero = Math.min(99, Math.max(40, (appState.team.specs.aero || appState.team.carPerformance || 80) + aeroGain));
+      appState.team.specs.chassis = Math.min(99, Math.max(40, (appState.team.specs.chassis || appState.team.carPerformance || 80) + chassisGain));
+      appState.team.specs.reliability = Math.min(99, Math.max(40, (appState.team.specs.reliability || appState.team.carPerformance || 80) + reliabilityGain));
+
+      // Update team.carPerformance (overall rating)
+      const avgSpecGain = (aeroGain + chassisGain + reliabilityGain) / 3;
+      appState.team.carPerformance = Math.min(99, Math.max(40, (appState.team.carPerformance || 80) + avgSpecGain));
+    }
+
     // Add to upgrade history
     if (!eng.upgradeHistory) eng.upgradeHistory = [];
     eng.upgradeHistory.unshift({
