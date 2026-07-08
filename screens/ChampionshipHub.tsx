@@ -9,6 +9,7 @@ import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 import { ensureSeasonTimeline, getRoundRaceDay, formatSeasonDate, simulateNextDay, canSimulateNextDay } from "../utils/seasonTimeline.js";
 import { ensureTeamState, getActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
+import { generateUnifiedRaceWeekend } from "../utils/raceObjectives.js";
 
 import { renderWeekend } from "./weekend.js";
 import { renderOffice } from "./office.tsx";
@@ -38,6 +39,12 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
     const raceDay = nextRound ? getRoundRaceDay(nextRound.round) : null;
     const daysUntilRace = nextRound ? Math.max(0, raceDay - currentDay) : 0;
     const canAdvanceDay = canSimulateNextDay(state);
+
+    // Generate our unified race weekend object!
+    if (!state.raceWeekend || state.raceWeekend.round !== state.season.round) {
+        state.raceWeekend = generateUnifiedRaceWeekend(state.team);
+    }
+    const raceWeekend = state.raceWeekend;
 
     const activeDrivers = getActiveDrivers(state.team).slice(0, 2);
     const teams = [state.team, ...(state.aiTeams || [])].filter(Boolean);
@@ -137,7 +144,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                                     {isSeasonOver ? 'OFFSEASON PHASE' : nextRound.name.toUpperCase().replace(' GRAND PRIX', ' GP')}
                                 </h2>
                                 <p style={{ fontSize: '15px', color: '#94A3B8', margin: 0 }}>
-                                    {isSeasonOver ? 'Prepare strategy & sign roster contracts' : `Round ${nextRound.round} of ${totalRounds} | ${nextRound.laps} Laps | Monaco Circuit`}
+                                    {isSeasonOver ? 'Prepare strategy & sign roster contracts' : `Round ${nextRound.round} of ${totalRounds} | ${nextRound.laps} Laps | ${nextRound.circuit}`}
                                 </p>
                             </div>
                             <span style={{ padding: '6px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', borderRadius: '4px', textTransform: 'uppercase' }}>
@@ -149,15 +156,21 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', margin: '32px 0', padding: '20px 0', borderTop: '1px solid rgba(255,255,255,0.08)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                             <div>
                                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '6px', letterSpacing: '0.1em' }}>EXPECTED WEATHER</span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>⛅ Light Drizzle / 18°C</span>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
+                                    {raceWeekend?.weather?.isWet ? '🌧️ Wet Race' : '☀️ Dry Race'} / {raceWeekend?.weather?.airTemperature}°C
+                                </span>
                             </div>
                             <div>
                                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '6px', letterSpacing: '0.1em' }}>PRIMARY OBJECTIVE</span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>🎯 Double Points Finish (Top 10)</span>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{raceWeekend?.recommendedObjective?.label || '🎯 Balanced Race'}</span>
                             </div>
                             <div>
                                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '6px', letterSpacing: '0.1em' }}>STANDINGS IMPACT</span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>🔥 Defend P{myTeamPosition} from Alpine</span>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
+                                    {raceWeekend?.standingsImpact?.nearestRival ? 
+                                        `${raceWeekend.standingsImpact.gapToNearest >=0 ? '🔥 Defend' : '⚡ Attack'} P${myTeamPosition} from ${raceWeekend.standingsImpact.nearestRival}` 
+                                        : '🔥 Championship Battle'}
+                                </span>
                             </div>
                         </div>
 

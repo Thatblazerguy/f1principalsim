@@ -17,6 +17,8 @@ export const state = {
   notifications: [],
   /** Current season's sponsor offers (max 3) */
   sponsorOffers: [],
+  /** Unified Race Weekend state (single source of truth) */
+  raceWeekend: null,
   /** Per-round weekend flow: qualifying must run before race. */
   weekendProgress: null,
   /** Team Finance & Operations System */
@@ -108,6 +110,7 @@ export function hydrateState(payload) {
     state.signedSponsors = rawData.signedSponsors || {};
     state.notifications = rawData.notifications || [];
     state.sponsorOffers = rawData.sponsorOffers || [];
+    state.raceWeekend = rawData.raceWeekend || null;
     state.weekendProgress = rawData.weekendProgress || null;
     state.finance = rawData.finance || {
       cashFlow: [],

@@ -28,7 +28,7 @@ import {
 } from "../utils/seasonTimeline.js";
 import { startWeekendProgress, generateWeekendContext } from "../utils/weekendForm.js";
 import { ensureEngineeringState, getActiveComponent, COMPONENT_CATALOG, applyGridPenalties } from "../utils/engineeringSystem.js";
-import { RACE_OBJECTIVES } from "../utils/raceObjectives.js";
+import { RACE_OBJECTIVES, generateUnifiedRaceWeekend } from "../utils/raceObjectives.js";
 export { RACE_OBJECTIVES };
 
 import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
@@ -152,6 +152,12 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   ];
   ensureFinanceState(s);
   const weekendProgress: any = round ? ensureWeekendProgress(round.round) : null;
+
+  // Generate or retrieve unified race weekend state (single source of truth!)
+  if (!s.raceWeekend || s.raceWeekend.round !== s.season.round) {
+    s.raceWeekend = generateUnifiedRaceWeekend(s.team);
+  }
+  const raceWeekend = s.raceWeekend;
   
   if (round && weekendProgress && !weekendProgress.weekendContext && raceWindowOpen) {
     weekendProgress.weekendContext = generateWeekendContext(teams, round, s.raceHistory || []);
@@ -174,10 +180,14 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(initialFlashMessage);
   const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null, replayData?: any, objectiveId?: string } | null>(null);
-  const [raceIsWet, setRaceIsWet] = useState<boolean | null>(weekendProgress?.isWet !== undefined ? weekendProgress.isWet : null);
+  const [raceIsWet, setRaceIsWet] = useState<boolean | null>(
+    weekendProgress?.isWet !== undefined ? weekendProgress.isWet : (raceWeekend?.weather.isWet ?? null)
+  );
   const [liveRaceMode, setLiveRaceMode] = useState(false);
   const [showBriefingModal, setShowBriefingModal] = useState<'quick_sim' | 'race_control' | null>(null);
-  const [briefingSelectedObjective, setBriefingSelectedObjective] = useState(weekendProgress?.selectedObjective || RACE_OBJECTIVES[2].id);
+  const [briefingSelectedObjective, setBriefingSelectedObjective] = useState(
+    weekendProgress?.selectedObjective || (raceWeekend?.recommendedObjective?.id) || RACE_OBJECTIVES[2].id
+  );
 
   useEffect(() => {
     if (weekendProgress && weekendProgress.round === s.season.round && weekendProgress.raceComplete) {
@@ -505,12 +515,13 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
         <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
           <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={14} /> Weekend Overview</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit Type</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{getTrackTypeString(round.circuit)}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Weather Forecast</span><span style={{ fontSize: '12px', color: raceIsWet === true ? '#60a5fa' : raceIsWet === false ? '#fbbf24' : '#fff', fontWeight: 700 }}>{raceIsWet === true ? '🌧️ Wet Race' : raceIsWet === false ? '☀️ Dry Race' : '⛅ TBC'}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Rain Probability</span><span style={{ fontSize: '12px', color: rainProb > 30 ? '#ef4444' : rainProb > 10 ? '#f59e0b' : '#10b981', fontWeight: 700 }}>{rainProb}%</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Track Temp</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{Math.floor(25 + Math.random() * 15)}°C</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Tyre Degradation</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{trackProfile?.baseDegradation > 1.1 ? 'High' : 'Normal'}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Pit Lane Time Loss</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>22.4s</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.circuit}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit Type</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.circuitType}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Weather Forecast</span><span style={{ fontSize: '12px', color: raceWeekend?.weather.isWet ? '#60a5fa' : '#fbbf24', fontWeight: 700 }}>{raceWeekend?.weather.isWet ? '🌧️ Wet Race' : '☀️ Dry Race'}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Rain Probability</span><span style={{ fontSize: '12px', color: raceWeekend?.weather.rainProbability > 30 ? '#ef4444' : raceWeekend?.weather.rainProbability > 10 ? '#f59e0b' : '#10b981', fontWeight: 700 }}>{raceWeekend?.weather.rainProbability}%</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Track Temp</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.weather.trackTemperature}°C</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Race Status</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.raceStatus}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Countdown</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.countdown}</span></div>
           </div>
         </div>
 
@@ -583,7 +594,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
                <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Constructors</span>
-               <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>P{teamPos}</span>
+               <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>P{raceWeekend?.standingsImpact.currentConstructorPosition}</span>
             </div>
             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
                <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Lead Driver</span>
@@ -591,20 +602,45 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to Team Ahead:</span>
-            <span style={{ fontSize: '13px', color: gapAhead > 0 ? '#ef4444' : HUB.textMuted, fontWeight: 700, fontFamily: HUB.fontMono }}>{gapAhead > 0 ? `-${gapAhead} pts` : '—'}</span>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Nearest Rival:</span>
+            <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.standingsImpact.nearestRival}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to Team Behind:</span>
-            <span style={{ fontSize: '13px', color: gapBehind > 0 ? '#10b981' : HUB.textMuted, fontWeight: 700, fontFamily: HUB.fontMono }}>{gapBehind > 0 ? `+${gapBehind} pts` : '—'}</span>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to Rival:</span>
+            <span style={{ fontSize: '13px', color: raceWeekend?.standingsImpact.gapToRival > 0 ? '#ef4444' : raceWeekend?.standingsImpact.gapToRival < 0 ? '#10b981' : HUB.textMuted, fontWeight: 700, fontFamily: HUB.fontMono }}>
+              {Math.abs(raceWeekend?.standingsImpact.gapToRival) > 0 ? `${raceWeekend?.standingsImpact.gapToRival > 0 ? '-' : '+'}${Math.abs(raceWeekend?.standingsImpact.gapToRival)} pts` : '—'}
+            </span>
           </div>
         </div>
 
-        {/* Section 5: Track Insights (Span 4) */}
+        {/* Section 5: Dynamic Objectives (Span 4) */}
         <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Flag size={14} /> AI Track Insights</h4>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Flag size={14} /> Race Objectives</h4>
+          <div style={{ marginBottom: '12px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+            <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Team Tier</span>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{raceWeekend?.tier.label}</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {raceWeekend?.objectives.map((obj, i) => (
+               <div key={i} style={{ padding: '10px', background: obj.type === 'primary' ? 'rgba(225,6,0,0.08)' : 'rgba(255,255,255,0.02)', borderRadius: '6px', border: obj.type === 'primary' ? `1px solid ${HUB.accent}` : '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{obj.label}</span>
+                    <span style={{ fontSize: '10px', textTransform: 'uppercase', color: obj.riskLevel === 'High' || obj.riskLevel === 'Very High' ? '#ef4444' : '#10b981' }}>{obj.riskLevel} Risk</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: HUB.textMuted }}>
+                    <span>Expected: {obj.expectedFinish}</span>
+                    <span>{obj.successProbability}% Success</span>
+                  </div>
+               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 6: Track Insights (Span 4) */}
+        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={14} /> AI Track Insights</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {generateTrackInsights(round.circuit, raceIsWet, trackProfile).map((msg, i) => (
+            {generateTrackInsights(round.circuit, raceWeekend?.weather.isWet ?? null, trackProfile).map((msg, i) => (
                <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                   <ChevronRight size={14} color={HUB.accent} style={{ marginTop: '2px', flexShrink: 0 }} />
                   <p style={{ fontSize: '12px', color: '#ccc', margin: 0, lineHeight: '1.4' }}>{msg}</p>
@@ -723,22 +759,23 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       {resultsData && <div key={resultsData.metric}>{renderResults()}</div>}
 
       {/* Pre-Race Briefing Modal Overlay */}
-      <PreRaceBriefingModal 
-        isOpen={showBriefingModal !== null}
-        mode={showBriefingModal}
-        onClose={() => setShowBriefingModal(null)}
-        onConfirm={startSimulationMode}
-        selectedObjective={briefingSelectedObjective}
-        setSelectedObjective={setBriefingSelectedObjective}
-        briefingData={{
-          expectedFinish: 'P' + (roundStrats.length > 0 && roundStrats[0].rank ? roundStrats[0].rank + 4 : 8),
-          confidence: roundStrats.length > 0 ? roundStrats[0].confidence : 75,
-          rivalTeam: rivals[0]?.name || 'Rivals',
-          isWet: raceIsWet,
-          strategyType: roundStrats.length > 0 ? roundStrats[0].label : 'Balanced',
-          startTyre: 'Medium'
-        }}
-      />
+        <PreRaceBriefingModal
+          isOpen={showBriefingModal !== null}
+          mode={showBriefingModal}
+          onClose={() => setShowBriefingModal(null)}
+          onConfirm={startSimulationMode}
+          selectedObjective={briefingSelectedObjective}
+          setSelectedObjective={setBriefingSelectedObjective}
+          raceWeekend={raceWeekend}
+          briefingData={{
+            expectedFinish: 'P' + (roundStrats.length > 0 && roundStrats[0].rank ? roundStrats[0].rank + 4 : 8),
+            confidence: roundStrats.length > 0 ? roundStrats[0].confidence : 75,
+            rivalTeam: rivals[0]?.name || 'Rivals',
+            isWet: raceIsWet,
+            strategyType: roundStrats.length > 0 ? roundStrats[0].label : 'Balanced',
+            startTyre: 'Medium'
+          }}
+        />
 
     </div>
   );
