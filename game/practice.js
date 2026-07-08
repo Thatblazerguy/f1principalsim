@@ -20,7 +20,7 @@ export function simulatePractice(teams, track, weekendContext) {
         bestLap:
           (track.baseTime -
           (d.pace + getEnginePaceBoost(t)) * 0.032 -
-          getTeamLapCredit(t, "practice") -
+          getTeamLapCredit(t, "practice", d.name) -
           getTeamPerformanceBonus(t) * 0.02) * (weekendContext?.drivers?.[d.name]?.finalModifier ?? 1.0) +
           practiceNoise(d) * 0.5,
       }))

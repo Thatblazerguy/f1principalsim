@@ -58,7 +58,7 @@ export function simulateQualifying(teams, track, weekendContext) {
         const baseLap =
           track.baseTime -
           (d.quali + getQualifyingBoost(t)) * DRIVER_QUALI_COEFF -
-          getTeamLapCredit(t, "quali") -
+          getTeamLapCredit(t, "quali", d.name) -
           getTeamPerformanceBonus(t) * QUALI_PERF_BONUS_COEFF;
 
         // Form modifier from weekend context

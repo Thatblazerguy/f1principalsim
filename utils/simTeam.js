@@ -8,32 +8,66 @@ import {
   QUALI_AERO_COEFF,
   QUALI_CHASSIS_COEFF,
 } from "./raceBalance.js";
+import { getDriverPuPerformance } from "./engineeringSystem.js";
+import { ensureFinanceState } from "./financeSystem.js";
 
 const SPEC_BASE = 85;
+
+// Get bonuses from facilities and staff
+function getTeamBonusFactors(appState) {
+  const finance = ensureFinanceState(appState);
+  const facilities = finance.facilities || {};
+  const staff = finance.staff || [];
+
+  // Facility bonuses (each level 1-5 gives 0.5 bonus, max 2.5 each)
+  const windTunnelBonus = (facilities.windTunnel?.level || 1) * 0.5;
+  const cfdBonus = (facilities.cfdDepartment?.level || 1) * 0.5;
+  const simulatorBonus = (facilities.simulator?.level || 1) * 0.3;
+  const puLabBonus = (facilities.powerUnitLab?.level || 1) * 0.4;
+  const relCentreBonus = (facilities.reliabilityCentre?.level || 1) * 0.3;
+
+  // Staff bonuses (each rating 60-99 gives up to 2.0 bonus)
+  const techDir = staff.find(s => s.id === "technicalDirector")?.rating || 70;
+  const chiefDes = staff.find(s => s.id === "chiefDesigner")?.rating || 70;
+  const headAero = staff.find(s => s.id === "headAero")?.rating || 70;
+  const perfEng = staff.find(s => s.id === "performanceEngineer")?.rating || 70;
+
+  const staffBonus = ((techDir + chiefDes + headAero + perfEng) / 4 - 60) * (2.0 / 39); // ~0 to 2.0
+
+  return {
+    aero: windTunnelBonus + cfdBonus + staffBonus * 0.7,
+    chassis: simulatorBonus + staffBonus * 0.5,
+    reliability: relCentreBonus + puLabBonus * 0.3 + staffBonus * 0.3,
+    powerUnit: puLabBonus + staffBonus * 0.4,
+  };
+}
 
 function getCarSpecs(team) {
   // Check if this is the player team and we have engineering.carSpecs
   if (team.isPlayerTeam && state.engineering?.carSpecs) {
     const cs = state.engineering.carSpecs;
-    // Derive aero, chassis, reliability from carSpecs
-    const aero = (cs.cornering + cs.downforce) / 2;
-    const chassis = (cs.mechanicalGrip + cs.balance + cs.tyreWear) / 3;
-    const reliability = cs.reliability;
-    const topSpeed = cs.topSpeed;
-    const acceleration = cs.acceleration;
-    const fuelEfficiency = cs.fuelEfficiency;
+    const bonuses = getTeamBonusFactors(state);
+    
+    // Derive aero, chassis, reliability from carSpecs and apply bonus factors
+    const aero = ((cs.cornering + cs.downforce) / 2) + bonuses.aero;
+    const chassis = ((cs.mechanicalGrip + cs.balance + cs.tyreWear) / 3) + bonuses.chassis;
+    const reliability = cs.reliability + bonuses.reliability;
+    const topSpeed = cs.topSpeed + bonuses.powerUnit;
+    const acceleration = cs.acceleration + bonuses.powerUnit;
+    const fuelEfficiency = cs.fuelEfficiency + bonuses.powerUnit * 0.5;
+    
     // Calculate overall performance based on carSpecs
     const ovr = Math.round(
       (aero + chassis + reliability + topSpeed + acceleration + fuelEfficiency) / 6
     );
     return {
-      aero,
-      chassis,
-      reliability,
-      ovr,
-      topSpeed,
-      acceleration,
-      fuelEfficiency,
+      aero: Math.min(99, Math.max(40, aero)),
+      chassis: Math.min(99, Math.max(40, chassis)),
+      reliability: Math.min(99, Math.max(40, reliability)),
+      topSpeed: Math.min(99, Math.max(40, topSpeed)),
+      acceleration: Math.min(99, Math.max(40, acceleration)),
+      fuelEfficiency: Math.min(99, Math.max(40, fuelEfficiency)),
+      ovr: Math.min(99, Math.max(40, ovr)),
     };
   }
 
@@ -73,7 +107,7 @@ export function getTeamPerformanceBonus(team) {
  *
  * Sessions weight aero / chassis / reliability differently.
  */
-export function getTeamLapCredit(team, session) {
+export function getTeamLapCredit(team, session, driverName) {
   const s = getCarSpecs(team);
   const ovr = s.ovr;
 
@@ -93,6 +127,14 @@ export function getTeamLapCredit(team, session) {
       (s.chassis - SPEC_BASE)     * RACE_CHASSIS_COEFF +
       (s.aero - SPEC_BASE)        * RACE_AERO_COEFF +
       (s.reliability - SPEC_BASE) * RACE_REL_COEFF;
+  }
+
+  // Apply Power Unit component performance modifier (player team only)
+  if (team.isPlayerTeam && driverName) {
+    const puModifier = getDriverPuPerformance(state, driverName);
+    // puModifier is 0.4-1.0, convert to a lap credit bonus/penalty
+    const puBonus = (puModifier - 0.7) * 0.05; // -0.015 to +0.015 seconds
+    credit += puBonus;
   }
 
   // Non-linear top-end bonus: top teams (ovr > 92) get a small extra edge

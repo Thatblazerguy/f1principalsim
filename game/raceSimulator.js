@@ -259,7 +259,7 @@ export function simulateRaceEvent(
         track.baseTime -
         (driver.pace + getRaceBoost(team)) * DRIVER_PACE_COEFF -
         driver.racecraft * DRIVER_RACECRAFT_COEFF -
-        getTeamLapCredit(team, "race") -
+        getTeamLapCredit(team, "race", driver.name) -
         getTeamPerformanceBonus(team) * RACE_PERF_BONUS_COEFF;
 
       // ── Strategy win modifier ───────────────────────────────────────────
