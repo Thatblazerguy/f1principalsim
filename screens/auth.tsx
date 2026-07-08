@@ -154,7 +154,7 @@ export function renderAuth(root: HTMLElement) {
               fontStyle: 'italic'
             }}>F1<span style={{ color: HUB.accent }}>P</span></span>
             <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)' }} />
-            <span style={{ fontFamily: HUB.fontBold, fontSize: '10px', color: HUB.textMuted, letterSpacing: '0.15em' }}>SECURE ACCESS GATEWAY</span>
+            <span style={{ fontFamily: HUB.fontBold, fontSize: '10px', color: HUB.textMuted, letterSpacing: '0.15em' }}>- Principal Simulator</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.8 }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />

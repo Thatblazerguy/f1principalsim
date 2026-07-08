@@ -79,7 +79,7 @@ export function renderLanding(root: HTMLElement) {
                 fontSize: '11px', 
                 color: HUB.textMuted, 
                 letterSpacing: '0.2em' 
-              }}>PRINCIPAL SIMULATOR</span>
+              }}>- Principal Simulator</span>
             </div>
             
             <button 
