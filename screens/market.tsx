@@ -21,36 +21,18 @@ function isDriverEmployed(name) {
   return false;
 }
 
-export function renderMarket(root) {
-  if (!root) return;
-  ensureTeamState(state.team);
-
-  if (!state.team) {
-     const content = (
-       <div>
-         <div style={{marginBottom:'32px'}}>
-           {sectionLabel('Talent Scouting')}
-           {pageTitle('Driver Market')}
-           {pageSubtitle('Establish constructor setup registry before scouting prospective candidates.')}
-         </div>
-       </div>
-     );
-     mountLayout(root, 'market', content);
-     return;
-  }
+function MarketScreen({ onRefresh }) {
+  const [showScout, setShowScout] = useState(false);
+  const [scoutRequest, setScoutRequest] = useState('');
+  const [scoutResult, setScoutResult] = useState(null);
 
   const handleSign = async (d) => {
     if (isDriverEmployed(d.name)) return;
     if (state.team.reserveDriver) return;
     state.team.signDriver(d, "reserve");
     await syncGame();
-    renderMarket(root);
+    if (onRefresh) onRefresh();
   };
-
-  // Chief Scout panel state
-  const [showScout, setShowScout] = useState(false);
-  const [scoutRequest, setScoutRequest] = useState('');
-  const [scoutResult, setScoutResult] = useState(null);
 
   const quickActions = [
     { label: 'Replacement', icon: <UserPlus size={14} /> },
@@ -143,7 +125,7 @@ export function renderMarket(root) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {quickActions.map((action, i) => (
               <button
-                key={i}
+                key={`quick-action-${i}`}
                 onClick={() => handleQuickAction(action.label)}
                 style={{
                   background: 'rgba(255,255,255,0.05)',
@@ -199,7 +181,7 @@ export function renderMarket(root) {
               Scouting Report
             </h4>
             {scoutResult.recommendations.map((rec, idx) => (
-              <div key={idx} style={{ ...glassCard({ padding: '16px' }) }}>
+              <div key={`scout-rec-${idx}`} style={{ ...glassCard({ padding: '16px' }) }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img 
@@ -273,7 +255,7 @@ export function renderMarket(root) {
     </motion.div>
   );
 
-  const content = (
+  return (
     <div style={{ display: 'flex' }}>
       {/* Main Market Content */}
       <div style={{ flex: 1 }}>
@@ -309,7 +291,7 @@ export function renderMarket(root) {
             const isAcademy = d.driverRole === 'academy';
             
             return (
-              <SlideUp key={d.name} delay={i * 0.05}>
+              <SlideUp key={`driver-${d.name}-${i}`} delay={i * 0.05}>
               <motion.div 
                 layout
                 initial={{ opacity: 0, scale: 0.98 }}
@@ -368,6 +350,26 @@ export function renderMarket(root) {
       </AnimatePresence>
     </div>
   );
+}
 
+export function renderMarket(root) {
+  if (!root) return;
+  ensureTeamState(state.team);
+
+  if (!state.team) {
+     const content = (
+       <div>
+         <div style={{marginBottom:'32px'}}>
+           {sectionLabel('Talent Scouting')}
+           {pageTitle('Driver Market')}
+           {pageSubtitle('Establish constructor setup registry before scouting prospective candidates.')}
+         </div>
+       </div>
+     );
+     mountLayout(root, 'market', content);
+     return;
+  }
+
+  const content = <MarketScreen onRefresh={() => renderMarket(root)} />;
   mountLayout(root, 'market', content, () => renderMarket(root));
 }
