@@ -43,6 +43,7 @@ import {
   getTrackWetProbability,
   getTeamArchetype,
   getArchetypeWeights,
+  calculateRacePaceLapTime,
 } from "../utils/raceBalance.js";
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
@@ -254,26 +255,31 @@ export function simulateRaceEvent(
       const pos = gridPosition(qualifyingGrid, driver);
       const gridPos = pos; // store for incident targeting
 
-      // ── Base lap time ───────────────────────────────────────────────────
-      const baseLap =
-        track.baseTime -
-        (driver.pace + getRaceBoost(team)) * DRIVER_PACE_COEFF -
-        driver.racecraft * DRIVER_RACECRAFT_COEFF -
-        getTeamLapCredit(team, "race", driver.name) -
-        getTeamPerformanceBonus(team) * RACE_PERF_BONUS_COEFF;
-
-      // ── Strategy win modifier ───────────────────────────────────────────
-      const adjustedBaseLap = baseLap * (1 - winMod * 0.035);
-
-      // ── Effective base lap with weekend context ─────────────────────────
-      // The context has form, outliers, and track suitability baked in
+      // ── Weighted race pace model ───────────────────────────────────────
       const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
-      
-      // ── Power Unit Wear Penalty ─────────────────────────────────────────
       const puPerfMod = getDriverPuPerformance(state, driver.name); // 1.0 is healthy, lower is worse
-      const puPenalty = (1.0 - puPerfMod) * 3.5; // Up to 3.5 seconds per lap penalty for ruined engine
-
-      const effectiveBaseLap = adjustedBaseLap * finalModifier + objPaceMod + puPenalty;
+      const puPenalty = (1.0 - puPerfMod) * 0.18; // small penalty, keeping the field tight
+      const baseLap = calculateRacePaceLapTime({
+        team,
+        driver,
+        trackBaseTime: track.baseTime,
+        tyreHealth: clamp(1 - (0.12 + (driver.tyre / 100) * 0.06), 0.3, 1),
+        fuelLoad: 0.9,
+        trackGrip: finalModifier,
+        isWet,
+        randomVariation: (Math.random() - 0.5) * 0.15,
+        trafficPenalty: 0,
+        drsActive: false,
+        ersActive: false,
+        dirtyAirPenalty: 0,
+        driverMistake: 0,
+        safetyCar: false,
+        weatherDelta: 0,
+        lap: 1,
+        totalLaps: laps,
+      });
+      const adjustedBaseLap = baseLap * (1 - winMod * 0.01);
+      const effectiveBaseLap = adjustedBaseLap + objPaceMod + puPenalty;
 
       // ── Risk strategy: more variance and potential for incidents ─────────
       const riskVarianceMultiplier = (1 + (riskMod * 2.0)) * objVarMod;
@@ -354,7 +360,35 @@ export function simulateRaceEvent(
       // Lap time with variance
       const lapVar = lapVariance(f.driver, track, isWet, lap, laps)
         * f.riskVarianceMultiplier;
-      f.time += f.effectiveBaseLap + lapVar;
+      const tyreHealth = clamp(1 - ((lap / laps) * 0.45), 0.2, 1);
+      const fuelLoad = clamp(1 - (lap / laps) * 0.15, 0.45, 1);
+      const dirtyAirPenalty = lap > 1 && lap < 8 ? 0.08 : 0;
+      const trafficPenalty = lap <= 3 ? 0.04 : 0;
+      const drsActive = lap > 8 && lap < laps - 4 && Math.random() < 0.55;
+      const ersActive = lap > 4 && lap < 20 && Math.random() < 0.35;
+      const driverMistake = lap > 1 && Math.random() < 0.025 ? 0.25 : 0;
+      const safetyCar = hasSafetyCar && lap === safetyCarLap;
+      const weatherDelta = isWet ? (f.driver.wet - 85) * 0.003 : 0;
+      const dynamicLapTime = calculateRacePaceLapTime({
+        team: f.team,
+        driver: f.driver,
+        trackBaseTime: track.baseTime,
+        tyreHealth,
+        fuelLoad,
+        trackGrip: 1 - (lap / laps) * 0.005,
+        isWet,
+        randomVariation: (Math.random() - 0.5) * 0.12,
+        trafficPenalty,
+        drsActive,
+        ersActive,
+        dirtyAirPenalty,
+        driverMistake,
+        safetyCar,
+        weatherDelta,
+        lap,
+        totalLaps: laps,
+      });
+      f.time += dynamicLapTime + lapVar;
 
       // Pit stop: first stop
       if (lap === f.plannedPitLap) {
