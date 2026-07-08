@@ -1,4 +1,5 @@
 import { ensureFinanceState } from "./financeSystem.js";
+import { ensureDevProjectsState } from "./devProjects.js";
 
 // FIA Power Unit Regulations
 export const COMPONENT_CATALOG = {
@@ -38,6 +39,7 @@ export function ensureEngineeringState(appState) {
       reports: []
     };
   }
+  ensureDevProjectsState(appState);
   
   const eng = appState.engineering;
   if (!eng.driverPools) eng.driverPools = {};
@@ -251,6 +253,33 @@ export function getEngineeringAdvisorNotes(appState, driverName) {
   }
 
   return notes;
+}
+
+/**
+ * Returns a 0-100 overall car rating derived from carSpecs.
+ */
+export function getOverallCarRating(appState) {
+  const specs = appState.engineering?.carSpecs;
+  if (!specs) return appState.team?.carPerformance || 80;
+  const keys = ['cornering','downforce','mechanicalGrip','topSpeed','acceleration','fuelEfficiency','reliability','tyreWear','balance'];
+  const sum = keys.reduce((acc, k) => acc + (specs[k] || 75), 0);
+  return parseFloat((sum / keys.length).toFixed(1));
+}
+
+/**
+ * Compares current overall car rating against the rating 5 rounds ago.
+ * Returns { delta, trend: 'up'|'down'|'stable' }
+ */
+export function getPerformanceTrend(appState) {
+  const current = getOverallCarRating(appState);
+  const history = appState.engineering?.upgradeHistory || [];
+  if (history.length === 0) return { delta: 0, trend: 'stable' };
+  const oldest = history[Math.min(history.length - 1, 4)]?.carSpecsSnapshot;
+  if (!oldest) return { delta: 0, trend: 'stable' };
+  const keys = ['cornering','downforce','mechanicalGrip','topSpeed','acceleration','fuelEfficiency','reliability','tyreWear','balance'];
+  const oldAvg = keys.reduce((acc, k) => acc + (oldest[k] || 75), 0) / keys.length;
+  const delta = parseFloat((current - oldAvg).toFixed(1));
+  return { delta, trend: delta > 0.5 ? 'up' : delta < -0.5 ? 'down' : 'stable' };
 }
 
 /**

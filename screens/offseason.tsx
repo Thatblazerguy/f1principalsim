@@ -60,11 +60,17 @@ function getWeightedRandomReplacement(excludedNames = new Set()) {
   return weightedPool[Math.floor(Math.random() * weightedPool.length)];
 }
 
+// Keep track of used names when filling multiple seats to avoid duplicates
+const globalFillExclusions = new Set();
+
 function fillAiSeat(team: any) {
   if (team.drivers.length >= 2) return;
-  const replacement = getWeightedRandomReplacement();
+  const replacement = getWeightedRandomReplacement(globalFillExclusions);
   if (replacement) {
     addDriverToTeam(team, replacement);
+    globalFillExclusions.add(replacement.name);
+    // Clear the global exclusions after a short delay in case it's needed again
+    setTimeout(() => globalFillExclusions.delete(replacement.name), 1000);
   }
 }
 
@@ -181,28 +187,76 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlas
 
   const allDriversInPool = [...drivers];
   const getOvr = (d: any) => Math.round((d.pace + d.quali + d.racecraft + d.consistency) / 4);
+  const usedDriverNames = getAllAssignedDriverNames();
 
   if (s.aiTeams) {
+    // First, check and fix any AI teams that have duplicate drivers or drivers on player team
     s.aiTeams.forEach((aiTeam: any) => {
       ensureTeamState(aiTeam);
-      const isEmployed = (name: string) => getAllAssignedDriverNames().has(name);
-      const available85Plus = allDriversInPool.filter((d: any) => 
-        getOvr(d) >= 85 && !isEmployed(d.name)
+      // Filter out any drivers already on player team or other AI teams
+      aiTeam.drivers = aiTeam.drivers.filter((d: any) => {
+        if (usedDriverNames.has(d.name) && !s.team?.drivers.some(pd => pd.name === d.name) && !s.aiTeams.some(at => at !== aiTeam && at.drivers.some(td => td.name === d.name))) {
+          // Keep if only in this team
+          return true;
+        }
+        if (!usedDriverNames.has(d.name)) {
+          // Add to used and keep
+          usedDriverNames.add(d.name);
+          return true;
+        }
+        // Remove if already used elsewhere
+        return false;
+      });
+      // Check reserve driver too
+      if (aiTeam.reserveDriver) {
+        if (usedDriverNames.has(aiTeam.reserveDriver.name)) {
+          aiTeam.reserveDriver = null;
+        } else {
+          usedDriverNames.add(aiTeam.reserveDriver.name);
+        }
+      }
+    });
+
+    // Now, fill any empty seats with available drivers
+    s.aiTeams.forEach((aiTeam: any) => {
+      ensureTeamState(aiTeam);
+      const availableDrivers = allDriversInPool.filter((d: any) => 
+        !usedDriverNames.has(d.name) && (d.category === "FREE" || d.category === "F2")
       ).sort((a: any, b: any) => getOvr(b) - getOvr(a));
 
+      // Fill main seats first
+      while (aiTeam.drivers.length < 2 && availableDrivers.length > 0) {
+        const newDriver = availableDrivers.shift();
+        aiTeam.drivers.push(newDriver);
+        usedDriverNames.add(newDriver.name);
+      }
+
+      // Fill reserve seat
+      if (!aiTeam.reserveDriver && availableDrivers.length > 0) {
+        const newReserve = availableDrivers.shift();
+        aiTeam.reserveDriver = newReserve;
+        usedDriverNames.add(newReserve.name);
+      }
+
+      // Optional: Try to upgrade drivers if we have better available
+      const available85Plus = availableDrivers.filter(d => getOvr(d) >= 85);
       if (available85Plus.length > 0) {
         const teamDrivers = [...aiTeam.drivers];
         teamDrivers.sort((a, b) => getOvr(a) - getOvr(b));
         const weakest = teamDrivers[0];
-
         if (weakest && getOvr(available85Plus[0]) > getOvr(weakest) + 2) {
-          aiTeam.drivers = aiTeam.drivers.filter((d: any) => d.name !== weakest.name);
+          // Replace weakest driver with better available one
+          aiTeam.drivers = aiTeam.drivers.filter(d => d.name !== weakest.name);
+          usedDriverNames.delete(weakest.name);
           aiTeam.drivers.push(available85Plus[0]);
+          usedDriverNames.add(available85Plus[0].name);
         }
       }
     });
   }
 
+  // AI driver swaps (disabled for now to prevent duplicates, can re-enable with proper checks later)
+  /*
   if (s.aiTeams && s.aiTeams.length > 1) {
     s.aiTeams.forEach((aiTeam: any, idx: number) => {
       if (Math.random() < 0.15) { 
@@ -221,6 +275,7 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlas
       }
     });
   }
+  */
   
   import('../game/development.js').then(({ processSeasonDevelopment }) => {
      processSeasonDevelopment(s);
