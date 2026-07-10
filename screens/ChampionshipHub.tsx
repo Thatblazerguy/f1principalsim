@@ -87,7 +87,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
 
             <div style={{ position: 'relative', zIndex: 1 }}>
                 {/* Premium Snapshot Strip */}
-                <div style={{
+                <div className="top-metrics-carousel" style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(6, 1fr)',
                     gap: '16px',
@@ -116,10 +116,10 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                 </div>
 
                 {/* Main Command Center Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '40px' }}>
+                <div className="mobile-stack" style={{ display: 'flex', gap: '24px', marginBottom: '40px' }}>
                     
-                    {/* Hero: Upcoming Grand Prix (Span 8) */}
-                    <div style={{ gridColumn: 'span 8' }}>
+                    {/* Hero: Upcoming Grand Prix */}
+                    <div style={{ flex: 2 }}>
                     <SlideUp delay={0.05}>
                     <div style={{
                         background: 'radial-gradient(ellipse at bottom left, rgba(225,6,0,0.15) 0%, rgba(10,13,26,0.95) 70%)',
@@ -153,7 +153,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                         </div>
 
                         {/* Additional metadata: weather, objectives, implications */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', margin: '32px 0', padding: '20px 0', borderTop: '1px solid rgba(255,255,255,0.08)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', margin: '32px 0', padding: '20px 0', borderTop: '1px solid rgba(255,255,255,0.08)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                             <div>
                                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '6px', letterSpacing: '0.1em' }}>EXPECTED WEATHER</span>
                                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
@@ -174,10 +174,10 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="mobile-stack" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
                             {!isSeasonOver ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                                    <div>
+                                <div className="mobile-stack" style={{ display: 'flex', alignItems: 'center', gap: '24px', width: '100%' }}>
+                                    <div style={{ flexShrink: 0 }}>
                                         <span style={{ fontSize: '10px', color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>TELEMETRY TIME REMAINING</span>
                                         <div style={{ display: 'flex', gap: '16px', fontFamily: "'Formula1-Bold', sans-serif", fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', fontSize: '24px', color: 'white' }}>
                                             <span>{String(daysUntilRace).padStart(2,'0')}<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>D</span></span>
@@ -187,6 +187,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                                     </div>
                                     {daysUntilRace > 0 && (
                                         <button 
+                                            className="full-width-btn"
                                             onClick={handleSimulateDay} 
                                             disabled={!canAdvanceDay}
                                             style={{
@@ -202,7 +203,8 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                                                 cursor: canAdvanceDay ? 'pointer' : 'not-allowed',
                                                 opacity: canAdvanceDay ? 1 : 0.5,
                                                 transition: 'all 0.15s',
-                                                fontFamily: "'Formula1-Bold', sans-serif"
+                                                fontFamily: "'Formula1-Bold', sans-serif",
+                                                textAlign: 'center'
                                             }}
                                             onMouseEnter={e => { if (canAdvanceDay) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)'; }}
                                             onMouseLeave={e => { if (canAdvanceDay) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
@@ -211,13 +213,14 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                                         </button>
                                     )}
                                 </div>
-                            ) : <div />}
+                            ) : <div className="hide-on-mobile" />}
                             <button onClick={handleEnterPitWall}
+                                className="full-width-btn"
                                 style={{
                                     backgroundColor: teamThemeColor, color: 'white', padding: '18px 48px', borderRadius: '4px',
                                     fontSize: '14px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', border: 'none',
                                     cursor: 'pointer', boxShadow: '0 8px 32px rgba(225,6,0,0.4)', transition: 'all 0.15s',
-                                    fontFamily: "'Formula1-Bold', sans-serif"
+                                    fontFamily: "'Formula1-Bold', sans-serif", textAlign: 'center'
                                 }}>
                                 {isSeasonOver ? 'ENTER OFFSEASON PLANNING' : 'LAUNCH PIT WALL MODULE'}
                             </button>
@@ -226,8 +229,8 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                     </SlideUp>
                     </div>
 
-                    {/* Recent Activity Feed (Span 4) */}
-                    <div style={{ gridColumn: 'span 4' }}>
+                    {/* Recent Activity Feed */}
+                    <div style={{ flex: 1 }}>
                     <SlideUp delay={0.1}>
                     <div style={{
                         background: 'rgba(10,13,26,0.6)',
@@ -281,7 +284,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                             const ptsDelta = team.points - myTeamPoints;
                             const isAhead = ptsDelta > 0;
                             return (
-                                <div key={team.name} style={{ display: 'grid', gridTemplateColumns: '40px 200px 1fr 140px', alignItems: 'center', gap: '16px', padding: '10px 16px', background: isPlayer ? 'rgba(225,6,0,0.08)' : 'rgba(255,255,255,0.02)', borderRadius: '4px', border: isPlayer ? `1px solid ${teamThemeColor}` : '1px solid transparent' }}>
+                                <div key={team.name} className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '40px minmax(100px, 200px) 1fr minmax(100px, 140px)', alignItems: 'center', gap: '16px', padding: '10px 16px', background: isPlayer ? 'rgba(225,6,0,0.08)' : 'rgba(255,255,255,0.02)', borderRadius: '4px', border: isPlayer ? `1px solid ${teamThemeColor}` : '1px solid transparent' }}>
                                     <span style={{ fontSize: '14px', fontFamily: "'Formula1-Bold', sans-serif", color: isPlayer ? teamThemeColor : '#94A3B8' }}>P{idx+1}</span>
                                     <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{team.name.toUpperCase()}</span>
                                     {/* Bar slider delta representation */}
@@ -304,7 +307,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
 
                 {/* Driver Dossiers Quick-look Section */}
                 <SlideUp delay={0.2}>
-                <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                <section className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                     {activeDrivers.map((driver, idx) => (
                         <div key={driver.name} style={{
                             background: 'rgba(10,13,26,0.6)',
@@ -322,7 +325,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                                     Dossier
                                 </button>
                             </div>
-                            <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                            <div className="responsive-grid" style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
                                 {[
                                     { label: 'Pace', val: (driver.pace||0).toFixed(1) },
                                     { label: 'Quali', val: (driver.quali||0).toFixed(1) },

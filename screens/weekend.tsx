@@ -509,7 +509,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '24px' }}>
+      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '24px' }}>
         
         {/* Section 1: Weekend Overview (Span 4) */}
         <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
@@ -674,7 +674,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
 
       <div style={{ ...glassCard({ padding: '20px' }), marginBottom: '24px' }}>
         <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={14} /> Race Bonus Challenges</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+        <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {raceBonusChallenges.map((challenge) => (
             <div key={challenge.id} style={{ padding: '16px', background: 'rgba(255,255,255,0.025)', border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
               <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional Objective</span>
@@ -716,7 +716,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       )}
 
       {/* Bottom Actions Console */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
         <button 
           onClick={handlePractice} 
           style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', border: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)' }}

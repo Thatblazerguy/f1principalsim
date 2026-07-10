@@ -84,7 +84,7 @@ function OverviewTab({ s }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top stat bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {topStats.map((stat, i) => (
           <div key={i} style={{ ...glassCard({ padding: '20px' }), display: 'flex', gap: '14px', alignItems: 'center' }}>
             <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '10px', display: 'flex', alignItems: 'center' }}>
@@ -100,7 +100,7 @@ function OverviewTab({ s }: any) {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+      <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
         {/* Car Performance Radar */}
         <div style={{ ...glassCard({ padding: '28px' }) }}>
           <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#fff', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -220,9 +220,9 @@ function DevelopmentTab({ s, onFlash }: any) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '24px' }}>
+    <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '24px' }}>
       {/* Category Sidebar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="mobile-tabs" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {Object.entries(DEVELOPMENT_CATALOG).map(([id, c]: any) => (
           <button
             key={id}
@@ -951,7 +951,7 @@ function EngineeringHQ({ root }: { root: HTMLElement }) {
       )}
 
       {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '28px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0' }}>
+      <div className="mobile-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '28px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0' }}>
         {TABS.map(tab => (
           <button
             key={tab.id}

@@ -38,6 +38,7 @@ export const PreRaceBriefingModal = ({
         }}
       >
         <motion.div
+          className="mobile-fullscreen-modal"
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -69,7 +70,7 @@ export const PreRaceBriefingModal = ({
           <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
             {/* Briefing Summary */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
               
               {raceWeekend && (
                 <>

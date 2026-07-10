@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   LayoutDashboard, Flag, Wrench, Users, Activity,
   Bell, FastForward, LogOut, ShoppingCart, Star,
-  Trophy, CalendarDays, DollarSign, GraduationCap, History
+  Trophy, CalendarDays, DollarSign, GraduationCap, History,
+  Menu, MoreHorizontal, X, Crosshair
 } from 'lucide-react';
 import { state } from '../state.js';
 import { canSimulateNextDay, simulateNextDay, getRoundRaceDay, formatSeasonDate } from '../utils/seasonTimeline.js';
@@ -122,6 +123,7 @@ interface HubLayoutProps {
 }
 
 export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLayoutProps) {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const canAdvance = canSimulateNextDay(state);
   const totalRounds = Math.min(state.season.totalRounds || 24, 24);
 
@@ -212,31 +214,59 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
       history:     () => navigate(renderHistory),
     };
     map[id]?.();
+    setIsDrawerOpen(false); // Close drawer on navigation
   };
 
   let prevGroup: string | null = 'NONE';
+  const isRaceOrDashboard = activeScreen === 'dashboard' || activeScreen === 'weekend';
 
   return (
     <div style={{fontFamily:HUB.fontSans, backgroundColor:HUB.bg, color:'#fff', minHeight:'100vh'}}>
 
-      {/* ── Sidebar ── */}
-      <aside style={{
-        position:'fixed', left:0, top:0, height:'100vh', width:'256px', zIndex:50,
-        backgroundColor:HUB.sidebar, borderRight:`1px solid ${HUB.border}`,
-        display:'flex', flexDirection:'column', padding:'28px 0',
-      }}>
-        <div style={{padding:'0 28px', marginBottom:'40px'}}>
-          <h1 style={{
-            fontSize: `${Math.max(10, Math.min(18, 200 / Math.max(1, state.team.name.length * 1.15)))}px`, 
-            fontWeight: 800, 
-            letterSpacing: '-0.04em', 
-            color: '#fff', 
-            margin: 0, 
-            fontFamily: HUB.fontWide,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
+      {/* ── Mobile Drawer Overlay ── */}
+      {isDrawerOpen && (
+        <div 
+          className="mobile-drawer-overlay show-on-mobile" 
+          onClick={() => setIsDrawerOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar / Drawer ── */}
+      <aside 
+        className={`desktop-sidebar mobile-drawer ${isDrawerOpen ? 'open' : ''}`}
+        style={{
+          position:'fixed', left:0, top:0, height:'100vh', width:'256px', zIndex:101,
+          backgroundColor:HUB.sidebar, borderRight:`1px solid ${HUB.border}`,
+          display:'flex', flexDirection:'column', padding:'28px 0',
+        }}
+      >
+        <div style={{padding:'0 28px', marginBottom:'40px', display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+          <div>
+            <h1 style={{
+              fontSize: `${Math.max(10, Math.min(18, 200 / Math.max(1, state.team.name.length * 1.15)))}px`, 
+              fontWeight: 800, 
+              letterSpacing: '-0.04em', 
+              color: '#fff', 
+              margin: 0, 
+              fontFamily: HUB.fontWide,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              {state.team.name.toUpperCase()}
+            </h1>
+            <p style={{fontSize:'10px', fontWeight:700, color:HUB.accent, letterSpacing:'0.3em', textTransform:'uppercase', marginTop:'4px', marginBottom:0, fontFamily:HUB.fontRegular}}>
+              Command Hub
+            </p>
+          </div>
+          <button 
+            className="show-on-mobile"
+            onClick={() => setIsDrawerOpen(false)}
+            style={{background:'none', border:'none', color:'#fff', cursor:'pointer', padding:0}}
+          >
+            <X size={20} />
+          </button>
+        </div>
             {state.team.name.toUpperCase()}
           </h1>
           <p style={{fontSize:'10px', fontWeight:700, color:HUB.accent, letterSpacing:'0.3em', textTransform:'uppercase', marginTop:'4px', marginBottom:0, fontFamily:HUB.fontRegular}}>
@@ -330,19 +360,26 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
       </aside>
 
       {/* ── Top Header ── */}
-      <header style={{
+      <header className="mobile-header" style={{
         position:'fixed', top:0, left:'256px', right:0, height:'64px', zIndex:40,
         background:'rgba(26,30,46,0.6)', backdropFilter:'blur(12px)',
         borderBottom:`1px solid ${HUB.border}`,
         display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 32px',
       }}>
         <div style={{display:'flex', alignItems:'center', gap:'20px'}}>
+          <button 
+            className="show-on-mobile"
+            onClick={() => setIsDrawerOpen(true)}
+            style={{background:'none', border:'none', color:'#fff', cursor:'pointer', padding:0, display:'flex'}}
+          >
+            <Menu size={24} />
+          </button>
           <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
             <div style={{width:'7px', height:'7px', borderRadius:'50%', backgroundColor:'#22c55e'}}></div>
             <span style={{fontSize:'10px', fontWeight:700, color:HUB.textMuted, letterSpacing:'0.15em', textTransform:'uppercase', fontFamily:HUB.fontRegular}}>System Online</span>
           </div>
-          <div style={{width:'1px', height:'16px', background:'rgba(255,255,255,0.1)'}}></div>
-          <span style={{fontSize:'10px', fontWeight:700, color:HUB.textMuted, letterSpacing:'0.15em', textTransform:'uppercase', fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em'}}>v4.0.2 telemetry</span>
+          <div className="hide-on-mobile" style={{width:'1px', height:'16px', background:'rgba(255,255,255,0.1)'}}></div>
+          <span className="hide-on-mobile" style={{fontSize:'10px', fontWeight:700, color:HUB.textMuted, letterSpacing:'0.15em', textTransform:'uppercase', fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums'}}>v4.0.2 telemetry</span>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:'14px'}}>
           <button onClick={() => handleNav('standings')} style={{background:'none', border:'none', cursor:'pointer', color:HUB.textMuted, padding:0, display:'flex'}}>
@@ -369,8 +406,8 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
         </div>
       </main>
 
-      {/* ── Bottom Action Bar ── */}
-      <div style={{
+      {/* ── Bottom Action Bar (Desktop) ── */}
+      <div className="hide-on-mobile" style={{
         position:'fixed', bottom:0, left:'256px', right:0, height:'72px', zIndex:40,
         background:'rgba(26,30,46,0.6)', backdropFilter:'blur(12px)',
         borderTop:`1px solid ${HUB.border}`, padding:'0 32px',
@@ -407,6 +444,71 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
           >SKIP TO RACE <FastForward size={13}/></button>
         </div>
       </div>
+
+      {/* ── Bottom Navigation Bar (Mobile) ── */}
+      <div className="show-on-mobile" style={{
+        position:'fixed', bottom:0, left:0, right:0, height:'72px', zIndex:40,
+        background:'rgba(26,30,46,0.95)', backdropFilter:'blur(12px)',
+        borderTop:`1px solid ${HUB.border}`, padding:'0 16px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+      }}>
+        {[
+          { id:'dashboard',   icon:<LayoutDashboard size={20}/>, label: 'Hub' },
+          { id:'weekend',     icon:<Flag size={20}/>,            label: 'Race' },
+          { id:'engineering', icon:<Wrench size={20}/>,          label: 'Eng' },
+          { id:'drivers',     icon:<Users size={20}/>,           label: 'Drivers' },
+          { id:'finance',     icon:<DollarSign size={20}/>,      label: 'Finance' },
+        ].map(item => (
+          <button key={item.id} onClick={() => handleNav(item.id)}
+            style={{
+              flex: 1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'4px',
+              color: activeScreen === item.id ? HUB.accent : HUB.textMuted,
+              background:'none', border:'none', cursor:'pointer', transition:'all 0.15s',
+              fontFamily: HUB.fontBold, fontSize: '9px', textTransform: 'uppercase'
+            }}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+        <button onClick={() => setIsDrawerOpen(true)}
+          style={{
+            flex: 1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'4px',
+            color: HUB.textMuted, background:'none', border:'none', cursor:'pointer', transition:'all 0.15s',
+            fontFamily: HUB.fontBold, fontSize: '9px', textTransform: 'uppercase'
+          }}
+        >
+          <MoreHorizontal size={20}/>
+          <span>More</span>
+        </button>
+      </div>
+
+      {/* ── Floating Action Button (Mobile) ── */}
+      {isRaceOrDashboard && (
+        <button
+          className="show-on-mobile"
+          style={{
+            position: 'fixed',
+            bottom: '88px',
+            right: '16px',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            backgroundColor: HUB.accent,
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            boxShadow: '0 4px 16px rgba(225,6,0,0.4)',
+            zIndex: 39,
+            cursor: 'pointer'
+          }}
+          onClick={() => handleNav('weekend')}
+        >
+          <Crosshair size={24} />
+        </button>
+      )}
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }

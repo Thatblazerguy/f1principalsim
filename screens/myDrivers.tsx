@@ -23,6 +23,29 @@ import { Line } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ChartTitle, Tooltip, Legend, Filler);
 
+const ResponsiveAccordionSection = ({ title, children, gridColumn, defaultOpen = false }: any) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <div style={{ ...glassCard({ padding: 0 }), gridColumn, display: 'flex', flexDirection: 'column' }}>
+      <div className="section-header-desktop" style={{ padding: '24px 24px 0', borderBottom: 'none' }}>
+        <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', margin: 0 }}>{title}</h3>
+      </div>
+      <button 
+        className="section-header-mobile"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ width: '100%', padding: '20px 24px', background: 'transparent', border: 'none', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: '#fff', fontSize: '14px', fontFamily: HUB.fontBold, textTransform: 'uppercase' }}
+      >
+        {title}
+        <span style={{ fontSize: '16px', color: HUB.textMuted }}>{isOpen ? '−' : '+'}</span>
+      </button>
+      <div className={`section-content ${isOpen ? 'is-open' : ''}`} style={{ padding: '24px', flex: 1 }}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+
 // --- Helpers for Analytics ---
 const computeDriverAnalytics = (driverName: string, teamName: string, raceHistory: any[], currentYear: number) => {
   if (!raceHistory || raceHistory.length === 0) return null;
@@ -331,7 +354,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
     <div style={{ paddingBottom: '80px', maxWidth: '1400px', margin: '0 auto' }}>
       
       {/* --- HEADER --- */}
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="mobile-stack" style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           {sectionLabel('Personnel Management')}
           {pageTitle('Driver Intelligence Center')}
@@ -398,7 +421,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
           transition={{ duration: 0.22, ease: [0.32, 0.94, 0.6, 1] }}
         >
           {/* --- SECTION 1: DRIVER OVERVIEW --- */}
-          <div style={{ ...glassCard({ padding: 0 }), marginBottom: '24px', display: 'flex', overflow: 'hidden' }}>
+          <div className="mobile-stack" style={{ ...glassCard({ padding: 0 }), marginBottom: '24px', display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: '0 0 240px', background: 'rgba(0,0,0,0.3)', borderRight: `1px solid ${HUB.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
            <img src={getDriverHeadshotUrl(currentDriver)} alt={currentDriver.name} style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${HUB.accent}`, marginBottom: '16px' }} loading="lazy" />
            <h2 style={{ fontSize: '24px', color: '#fff', fontFamily: HUB.fontBold, margin: '0 0 4px', textAlign: 'center' }}>{currentDriver.name}</h2>
@@ -447,13 +470,11 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
       </div>
 
       {stats ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px' }}>
+        <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px' }}>
           
           {/* --- SECTION 3: CAR EXTRACTION INDEX --- */}
-          <div style={{ gridColumn: 'span 4', ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', marginBottom: '24px' }}>Car Extraction Index</h3>
-            
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <ResponsiveAccordionSection title="Car Extraction Index" gridColumn="span 4" defaultOpen={true}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ position: 'relative', width: '160px', height: '160px', borderRadius: '50%', border: `8px solid rgba(255,255,255,0.05)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 20px ${extractionColor}40` }}>
                  <div style={{ position: 'absolute', inset: -8, borderRadius: '50%', border: `8px solid ${extractionColor}`, clipPath: `polygon(0 0, 100% 0, 100% ${Math.max(0, 100 - ((extractionDelta + 5) / 10) * 100)}%, 0 ${Math.max(0, 100 - ((extractionDelta + 5) / 10) * 100)}%)`, transition: 'all 1s ease-out' }}></div>
                  <div style={{ textAlign: 'center', zIndex: 2 }}>
@@ -477,13 +498,11 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                 </div>
               </div>
             </div>
-          </div>
+          </ResponsiveAccordionSection>
 
           {/* --- SECTION 2: SEASON PERFORMANCE --- */}
-          <div style={{ gridColumn: 'span 8', ...glassCard({ padding: '24px' }) }}>
-             <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', marginBottom: '24px' }}>Season Performance</h3>
-             
-             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+          <ResponsiveAccordionSection title="Season Performance" gridColumn="span 8" defaultOpen={true}>
+             <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                {[
                  { label: 'Championship Pts', val: stats.totalPoints },
                  { label: 'Avg Finish', val: `P${stats.avgFinish.toFixed(1)}` },
@@ -503,12 +522,12 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                ))}
              </div>
              {stats.avgGrid === 0 && <span style={{display: 'block', marginTop: '16px', fontSize: '10px', color: HUB.textMuted}}>* Grid positions unavailable for historical simulation data.</span>}
-          </div>
+          </ResponsiveAccordionSection>
 
           {/* --- SECTION 8: AI PERFORMANCE REPORT --- */}
-          <div style={{ gridColumn: 'span 12', ...glassCard({ padding: '24px', borderLeft: `4px solid ${HUB.accent}` }), background: 'rgba(225,6,0,0.05)' }}>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-               <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(225,6,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.accent }}>
+          <ResponsiveAccordionSection title="AI Performance Report" gridColumn="span 12" defaultOpen={true}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', background: 'rgba(225,6,0,0.05)', padding: '16px', borderRadius: '8px', borderLeft: `4px solid ${HUB.accent}` }}>
+               <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(225,6,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.accent, flexShrink: 0 }}>
                  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                </div>
                <div>
@@ -516,19 +535,17 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                  <p style={{ margin: 0, fontSize: '14px', color: '#e2e8f0', lineHeight: 1.6 }}>{aiReport}</p>
                </div>
             </div>
-          </div>
+          </ResponsiveAccordionSection>
 
           {/* --- SECTION 5: PERFORMANCE TIMELINE --- */}
-          <div style={{ gridColumn: 'span 12', ...glassCard({ padding: '24px' }) }}>
-            <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', marginBottom: '24px' }}>Performance Timeline</h3>
+          <ResponsiveAccordionSection title="Performance Timeline" gridColumn="span 12">
             <div style={{ height: '300px' }}>
               {chartData ? <Line data={chartData} options={chartOptions} /> : <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.textMuted}}>No race data available.</div>}
             </div>
-          </div>
+          </ResponsiveAccordionSection>
 
           {/* --- SECTION 4 & 9: ATTRIBUTES --- */}
-          <div style={{ gridColumn: 'span 4', ...glassCard({ padding: '24px' }) }}>
-            <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', marginBottom: '24px' }}>Telemetry Attributes</h3>
+          <ResponsiveAccordionSection title="Telemetry Attributes" gridColumn="span 4">
             <div style={{ marginBottom: '24px' }}>
               <RadarChart pace={currentDriver.pace} quali={currentDriver.quali} racecraft={currentDriver.racecraft} consistency={currentDriver.consistency} />
             </div>
@@ -552,11 +569,10 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                  </div>
                ))}
             </div>
-          </div>
+          </ResponsiveAccordionSection>
 
           {/* --- SECTION 7: HEAD TO HEAD --- */}
-          <div style={{ gridColumn: 'span 8', ...glassCard({ padding: '24px' }) }}>
-            <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', marginBottom: '24px' }}>Teammate Comparison</h3>
+          <ResponsiveAccordionSection title="Teammate Comparison" gridColumn="span 8">
             {teammate && teammateStats ? (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', paddingBottom: '16px', borderBottom: `1px solid ${HUB.border}` }}>
@@ -596,13 +612,12 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                 </div>
               </div>
             ) : (
-              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.textMuted }}>No active teammate available for comparison.</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: HUB.textMuted }}>No active teammate available for comparison.</div>
             )}
-          </div>
+          </ResponsiveAccordionSection>
 
           {/* --- SECTION 11: SEASON HEATMAP --- */}
-          <div style={{ gridColumn: 'span 12', ...glassCard({ padding: '24px' }) }}>
-            <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', marginBottom: '24px' }}>Season Heatmap</h3>
+          <ResponsiveAccordionSection title="Season Heatmap" gridColumn="span 12">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                {stats.historyData.length > 0 ? stats.historyData.map((d, i) => {
                  let bg = '#1e293b'; // default dark
@@ -621,7 +636,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                  );
                }) : <div style={{ color: HUB.textMuted }}>No race data.</div>}
             </div>
-          </div>
+          </ResponsiveAccordionSection>
 
         </div>
       ) : (

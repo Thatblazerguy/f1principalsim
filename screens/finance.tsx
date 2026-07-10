@@ -84,7 +84,7 @@ function FinanceDashboard({ root }: { root: HTMLElement }) {
         </div>
       )}
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px', marginBottom:'24px'}}>
+      <div className="responsive-grid" style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px', marginBottom:'24px'}}>
         <div style={{...glassCard(), gridColumn:'span 7'}}>
           <h3 style={{fontSize:'16px', fontFamily:HUB.fontBold, color:'#fff', margin:'0 0 18px', textTransform:'uppercase', display:'flex', alignItems:'center', gap:'8px'}}><BarChart3 size={18}/> Monthly Cash Flow</h3>
           <div style={{display:'flex', alignItems:'end', gap:'10px', height:'180px', padding:'12px', border:`1px solid ${HUB.border}`, borderRadius:'8px', background:'rgba(0,0,0,0.16)'}}>
@@ -128,7 +128,7 @@ function FinanceDashboard({ root }: { root: HTMLElement }) {
         </div>
       </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px', marginBottom:'24px'}}>
+      <div className="responsive-grid" style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px', marginBottom:'24px'}}>
         <div style={{...glassCard(), gridColumn:'span 5'}}>
           <h3 style={{fontSize:'16px', fontFamily:HUB.fontBold, color:'#fff', margin:'0 0 16px', textTransform:'uppercase', display:'flex', alignItems:'center', gap:'8px'}}><Landmark size={18}/> Budget Allocation</h3>
           <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
@@ -175,7 +175,7 @@ function FinanceDashboard({ root }: { root: HTMLElement }) {
         </div>
       </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px', marginBottom:'24px'}}>
+      <div className="responsive-grid" style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px', marginBottom:'24px'}}>
         <div style={{...glassCard(), gridColumn:'span 6'}}>
           <h3 style={{fontSize:'16px', fontFamily:HUB.fontBold, color:'#fff', margin:'0 0 16px', textTransform:'uppercase', display:'flex', alignItems:'center', gap:'8px'}}><Users size={18}/> Driver Market Value</h3>
           <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
@@ -198,7 +198,7 @@ function FinanceDashboard({ root }: { root: HTMLElement }) {
 
         <div style={{...glassCard(), gridColumn:'span 6'}}>
           <h3 style={{fontSize:'16px', fontFamily:HUB.fontBold, color:'#fff', margin:'0 0 16px', textTransform:'uppercase', display:'flex', alignItems:'center', gap:'8px'}}><Building2 size={18}/> Facility Spending</h3>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
+          <div className="responsive-grid" style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
             {FACILITY_CATALOG.slice(0, 8).map((facility) => {
               const current = finance.facilities[facility.id];
               return (
@@ -215,7 +215,7 @@ function FinanceDashboard({ root }: { root: HTMLElement }) {
         </div>
       </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px'}}>
+      <div className="responsive-grid" style={{display:'grid', gridTemplateColumns:'repeat(12, 1fr)', gap:'24px'}}>
         <div style={{...glassCard(), gridColumn:'span 5'}}>
           <h3 style={{fontSize:'16px', fontFamily:HUB.fontBold, color:'#fff', margin:'0 0 16px', textTransform:'uppercase', display:'flex', alignItems:'center', gap:'8px'}}><Banknote size={18}/> Season Financial Report</h3>
           {latestReport ? (
