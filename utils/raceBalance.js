@@ -48,8 +48,8 @@ export const QUALI_NOISE_RANGE = 0.40; // was 0.20
 
 // ─── Lap Variance Constants ────────────────────────────────────────────────────
 
-export const LAP_VARIANCE_BASE        = 0.15;  // was 0.10
-export const LAP_CONSISTENCY_NOISE    = 0.005; // was 0.003
+export const LAP_VARIANCE_BASE        = 0.02;  // was 0.15
+export const LAP_CONSISTENCY_NOISE    = 0.001; // was 0.005
 export const SAFETY_CAR_COMPRESSION   = 3.5;
 
 // Weighted pace model for race laps.
@@ -65,13 +65,13 @@ export const PACING_WEIGHTS = {
   randomVariation: 0.02,
 };
 
-export const PACING_RANDOM_VARIATION = 0.15;
+export const PACING_RANDOM_VARIATION = 0.02;
 export const PACING_TYRE_DEGRADATION_SCALE = 0.012;
 export const PACING_FUEL_SCALE = 0.007;
-export const PACING_DIRTY_AIR_SCALE = 0.008;
-export const PACING_DRS_BONUS = 0.10;
-export const PACING_ERS_BONUS = 0.06;
-export const PACING_TRAFFIC_PENALTY = 0.04;
+export const PACING_DIRTY_AIR_SCALE = 0.025; // was 0.008, increased to make overtaking harder
+export const PACING_DRS_BONUS = 0.15; // increased to compensate
+export const PACING_ERS_BONUS = 0.10; // increased to compensate
+export const PACING_TRAFFIC_PENALTY = 0.08; // was 0.04
 export const PACING_MISTAKE_PENALTY = 0.22;
 export const PACING_WEATHER_SCALE = 0.04;
 export const PACING_SAFETY_CAR_SCALE = 0.12;
@@ -80,6 +80,7 @@ export function calculateRacePaceLapTime({
   team,
   driver,
   trackBaseTime,
+  weekendPerformanceScore = null,
   tyreHealth = 1,
   fuelLoad = 0.85,
   trackGrip = 1,
@@ -103,21 +104,31 @@ export function calculateRacePaceLapTime({
   const trackFactor = clamp(trackGrip, 0.8, 1.2);
   const weatherFactor = isWet ? 1 + weatherDelta * PACING_WEATHER_SCALE : 1;
 
-  const carPerformanceScore = (teamOvr - 70) / 30;
-  const driverPaceScore = (driverPace - 70) / 30;
-  const racecraftScore = (racecraft - 70) / 30;
-  const tyreScore = 0.5 + tyreCondition * 0.5;
-  const fuelScore = 0.5 + fuelFactor * 0.5;
-  const trackScore = 0.5 + trackFactor * 0.5;
+  let weightedBase = 0;
+  if (weekendPerformanceScore !== null) {
+    const tyreScore = 0.5 + tyreCondition * 0.5;
+    const fuelScore = 0.5 + fuelFactor * 0.5;
+    const trackScore = 0.5 + trackFactor * 0.5;
+    
+    // weekendPerformanceScore is heavily weighted (85%) over dynamic factors (15%)
+    weightedBase = weekendPerformanceScore * 0.85 + (tyreScore * 0.08 + fuelScore * 0.05 + trackScore * 0.02);
+  } else {
+    const carPerformanceScore = (teamOvr - 70) / 30;
+    const driverPaceScore = (driverPace - 70) / 30;
+    const racecraftScore = (racecraft - 70) / 30;
+    const tyreScore = 0.5 + tyreCondition * 0.5;
+    const fuelScore = 0.5 + fuelFactor * 0.5;
+    const trackScore = 0.5 + trackFactor * 0.5;
 
-  const weightedBase = (
-    carPerformanceScore * PACING_WEIGHTS.carPerformance +
-    driverPaceScore * PACING_WEIGHTS.driverPace +
-    racecraftScore * PACING_WEIGHTS.racecraft +
-    tyreScore * PACING_WEIGHTS.tyreCondition +
-    fuelScore * PACING_WEIGHTS.fuelLoad +
-    trackScore * PACING_WEIGHTS.trackConditions
-  );
+    weightedBase = (
+      carPerformanceScore * PACING_WEIGHTS.carPerformance +
+      driverPaceScore * PACING_WEIGHTS.driverPace +
+      racecraftScore * PACING_WEIGHTS.racecraft +
+      tyreScore * PACING_WEIGHTS.tyreCondition +
+      fuelScore * PACING_WEIGHTS.fuelLoad +
+      trackScore * PACING_WEIGHTS.trackConditions
+    );
+  }
 
   const lapProgress = lap / Math.max(totalLaps, 1);
   const tyreWearPenalty = (1 - tyreCondition) * PACING_TYRE_DEGRADATION_SCALE * (0.6 + lapProgress * 0.8);

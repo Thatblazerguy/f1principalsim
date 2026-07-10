@@ -1,5 +1,5 @@
 import { getTeamLapCredit, getTeamPerformanceBonus } from "../utils/simTeam.js";
-import { getTrackWetProbability } from "../utils/raceBalance.js";
+import { getTrackWetProbability, calculateRacePaceLapTime } from "../utils/raceBalance.js";
 import { rollForFailures, applySessionWear, getDriverPuPerformance, ensureEngineeringState } from "../utils/engineeringSystem.js";
 import { state } from "../state.js";
 
@@ -152,12 +152,30 @@ export class LiveRaceEngine {
     teams.forEach(team => {
       team.drivers.forEach(driver => {
         const gridPos = this.getGridPosition(qualifyingGrid, driver);
-        const baseLap = this.track.baseTime - (driver.pace * 0.03) - (team.carPerformance * 0.03);
-        const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
-        // PU wear penalty: apply up to +3s per lap for worn components (player only)
-        const puPerfMod = getDriverPuPerformance(state, driver.name);
-        const puPenalty = (1.0 - puPerfMod) * 3.0;
-        const effectiveBaseLap = baseLap * finalModifier + puPenalty;
+        const weekendPerformanceScore = weekendContext?.drivers?.[driver.name]?.weekendPerformanceScore ?? null;
+        let effectiveBaseLap;
+
+        if (weekendPerformanceScore !== null) {
+          effectiveBaseLap = calculateRacePaceLapTime({
+            team,
+            driver,
+            trackBaseTime: this.track.baseTime,
+            weekendPerformanceScore,
+            tyreHealth: 1.0,
+            fuelLoad: 1.0,
+            trackGrip: 1.0,
+            isWet: this.isWet,
+            lap: 1,
+            totalLaps: this.totalLaps
+          });
+        } else {
+          const baseLap = this.track.baseTime - (driver.pace * 0.03) - (team.carPerformance * 0.03);
+          const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
+          const puPerfMod = getDriverPuPerformance(state, driver.name);
+          const puPenalty = (1.0 - puPerfMod) * 3.0;
+          effectiveBaseLap = baseLap * finalModifier + puPenalty;
+        }
+
         const speedKms = (this.track.baseTime / effectiveBaseLap) * 220;
         
         cars.push({
@@ -490,10 +508,14 @@ export class LiveRaceEngine {
         let carLost = this.cars.find(c => c.id === driverLost);
         
         if (carGained && carLost && i < 10 && carGained.pitStopStatus === "None" && carLost.pitStopStatus === "None") {
-           if (Math.random() < 0.2) {
+           const paceAdvantage = carGained.currentSpeed / Math.max(0.001, carLost.currentSpeed);
+           if (paceAdvantage > 1.002 && Math.random() < 0.6) {
              this.addEvent(`LAP ${carGained.lap}: ${carGained.driver.name} overtakes ${carLost.driver.name} for P${i+1}`);
              if (carGained.isPlayer) this.addComm("Engineer", `Great job, that's P${i+1}.`, true);
              if (carLost.isPlayer) this.addComm("Engineer", `We lost the position to ${carGained.driver.name}.`, true);
+           } else {
+             // Overtake failed, revert order visually by pegging distance to car ahead minus tiny delta
+             carGained.distance = carLost.distance - 0.001;
            }
         }
       }

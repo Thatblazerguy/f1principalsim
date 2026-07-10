@@ -8,6 +8,7 @@
  */
 
 import { getDriverFormMultiplier } from "./raceBalance.js";
+import { getDriverPuPerformance } from "./engineeringSystem.js";
 
 // Explainable outliers that randomly occur to explain performance swings
 const OUTLIER_EVENTS = [
@@ -26,23 +27,69 @@ const OUTLIER_EVENTS = [
  * @param {Array} teams - Array of all teams and their drivers
  * @param {Object} track - The current track
  * @param {Array} raceHistory - Past races for form calculation
+ * @param {Object} appState - Global state to read component health
  * @returns {Object} Context mapping driver names to their modifiers and narratives
  */
-export function generateWeekendContext(teams, track, raceHistory = []) {
+export function generateWeekendContext(teams, track, raceHistory = [], appState = null) {
   const context = {
     drivers: {},
     trackEvents: []
   };
 
   teams.forEach(team => {
+    // 1. Car Performance (45%)
+    // Base scale is typically 70-100. Normalize to 0-1.
+    const teamOvr = team.specs?.ovr ?? team.carPerformance ?? 85;
+    const carPerfScore = Math.max(0, Math.min(1, (teamOvr - 70) / 30));
+
+    // 2. Engineering Quality (5%)
+    const reliability = team.specs?.reliability ?? 85;
+    const engQualityScore = Math.max(0, Math.min(1, (reliability - 60) / 40));
+
     team.drivers.forEach(driver => {
-      // 1. Seasonal Driver Form (0.92 - 1.08)
-      const formMult = getDriverFormMultiplier(driver.name, raceHistory);
+      // 3. Driver Pace (20%)
+      const driverPace = driver.pace ?? 85;
+      const driverPaceScore = Math.max(0, Math.min(1, (driverPace - 70) / 30));
 
-      // 2. Track Specialization (keeping base 1.0 for now)
-      const trackSuitability = 1.0; 
+      // 4. Current Form (5%)
+      // Form mult is usually 0.92 to 1.08. We invert and normalize so good form = higher score.
+      const rawFormMult = getDriverFormMultiplier(driver.name, raceHistory);
+      const formScore = Math.max(0, Math.min(1, (1.08 - rawFormMult) / 0.16));
 
-      // 3. Roll for Explainable Outliers
+      // 5. Track Suitability (5%) - Randomly slightly varied for now
+      const trackSuitabilityScore = 0.3 + Math.random() * 0.7;
+
+      // 6. Setup Quality (5%)
+      const setupQualityScore = 0.2 + Math.random() * 0.8;
+
+      // 7. Driver Confidence (5%)
+      const driverConfidenceScore = 0.2 + Math.random() * 0.8;
+
+      // 8. Component Health (5%)
+      let puHealthScore = 1.0;
+      if (appState) {
+        // getDriverPuPerformance returns 0 to 1, where 1 is perfect
+        puHealthScore = getDriverPuPerformance(appState, driver.name);
+      }
+
+      // 9. Weekend Random Variance (5%) - strictly bounded to +- 0.35% of total score
+      const randomVarianceScore = 0.5 + (Math.random() - 0.5) * 0.7; // 0.15 to 0.85
+
+      // Calculate the combined static Weekend Performance Score
+      // This is a normalized value between roughly 0 and 1
+      const weekendPerformanceScore = (
+        carPerfScore * 0.45 +
+        driverPaceScore * 0.20 +
+        formScore * 0.05 +
+        trackSuitabilityScore * 0.05 +
+        setupQualityScore * 0.05 +
+        driverConfidenceScore * 0.05 +
+        engQualityScore * 0.05 +
+        puHealthScore * 0.05 +
+        randomVarianceScore * 0.05
+      );
+
+      // Roll for Explainable Outliers (Narratives for UI)
       let narrativeEvent = null;
       let outlierMult = 1.0;
       
@@ -61,14 +108,19 @@ export function generateWeekendContext(teams, track, raceHistory = []) {
         }
       }
 
-      // Base random variance that still exists (tiny, 0.998 - 1.002) for natural fluctuation
-      const naturalVariance = 0.998 + (Math.random() * 0.004);
+      // Apply the outlier multiplier directly to the performance score so it has a real impact
+      // Since outlierMult > 1 means slower, we divide our positive-means-faster score
+      const finalWeekendPerformanceScore = Math.max(0.01, Math.min(1.5, weekendPerformanceScore / outlierMult));
 
-      const finalModifier = formMult * trackSuitability * outlierMult * naturalVariance;
+      // For backward compatibility with any other code expecting a finalModifier 
+      // (1.0 is neutral, lower is faster).
+      // A high weekendPerformanceScore means FASTER.
+      // So we map the score (0 to 1) into a modifier (e.g., 1.05 to 0.90)
+      const finalModifier = 1.05 - (finalWeekendPerformanceScore * 0.15);
 
       context.drivers[driver.name] = {
-        formMult,
-        trackSuitability,
+        weekendPerformanceScore: finalWeekendPerformanceScore,
+        formMult: rawFormMult,
         outlierMult,
         finalModifier,
         narrativeEvent

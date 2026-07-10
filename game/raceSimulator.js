@@ -257,12 +257,16 @@ export function simulateRaceEvent(
 
       // ── Weighted race pace model ───────────────────────────────────────
       const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
+      const weekendPerformanceScore = weekendContext?.drivers?.[driver.name]?.weekendPerformanceScore ?? null;
+      const narrativeEvent = weekendContext?.drivers?.[driver.name]?.narrativeEvent ?? null;
+
       const puPerfMod = getDriverPuPerformance(state, driver.name); // 1.0 is healthy, lower is worse
       const puPenalty = (1.0 - puPerfMod) * 0.18; // small penalty, keeping the field tight
       const baseLap = calculateRacePaceLapTime({
         team,
         driver,
         trackBaseTime: track.baseTime,
+        weekendPerformanceScore,
         tyreHealth: clamp(1 - (0.12 + (driver.tyre / 100) * 0.06), 0.3, 1),
         fuelLoad: 0.9,
         trackGrip: finalModifier,
@@ -314,7 +318,8 @@ export function simulateRaceEvent(
         time: startPenalty,
         retired: riskPenaltyApplied === "DNF",
         isPlayer,
-        objDnfMod
+        objDnfMod,
+        explanation: narrativeEvent ? narrativeEvent.label : null
       };
     })
   );
@@ -373,6 +378,7 @@ export function simulateRaceEvent(
         team: f.team,
         driver: f.driver,
         trackBaseTime: track.baseTime,
+        weekendPerformanceScore: weekendContext?.drivers?.[f.driver.name]?.weekendPerformanceScore ?? null,
         tyreHealth,
         fuelLoad,
         trackGrip: 1 - (lap / laps) * 0.005,
@@ -423,8 +429,9 @@ export function simulateRaceEvent(
     }
   });
 
-  // Generate Replay Snapshots (approximated for Quick Sim)
-  // We don't have true lap-by-lap simultaneous state, so we construct a synthetic timeline
+  // Generate Replay Snapshots and populate Events (approximated for Quick Sim)
+  const events = [];
+  
   for (let lap = 1; lap <= laps; lap++) {
     const lapSnapshot = { lap, time: lap * track.baseTime, cars: [] };
     finishers.forEach(f => {
@@ -432,13 +439,64 @@ export function simulateRaceEvent(
       const cTime = f.cumulativeTimes && f.cumulativeTimes[lap - 1] ? f.cumulativeTimes[lap - 1] : (f.cumulativeTimes && f.cumulativeTimes.length > 0 ? f.cumulativeTimes[f.cumulativeTimes.length - 1] : lap * track.baseTime);
       
       if (isRetiredLap) {
-        lapSnapshot.cars.push({ id: f.driver.name, distance: f.cumulativeTimes ? f.cumulativeTimes.length : 0, cumulativeTime: cTime, retired: true });
+        lapSnapshot.cars.push({ id: f.driver.name, team: f.team.name, distance: f.cumulativeTimes ? f.cumulativeTimes.length : 0, cumulativeTime: cTime, retired: true });
       } else {
-        lapSnapshot.cars.push({ id: f.driver.name, distance: lap, cumulativeTime: cTime, retired: false });
+        lapSnapshot.cars.push({ id: f.driver.name, team: f.team.name, distance: lap, cumulativeTime: cTime, retired: false });
       }
     });
+    
+    // Sort cars to get exact positions at the end of this lap
+    lapSnapshot.cars.sort((a, b) => {
+      if (a.retired && !b.retired) return 1;
+      if (!a.retired && b.retired) return -1;
+      return a.cumulativeTime - b.cumulativeTime;
+    });
+    
+    // Inject position into cars array
+    lapSnapshot.cars.forEach((c, i) => { c.pos = i + 1; });
+    
     snapshots.push(lapSnapshot);
   }
+
+  // Now identify pit stops by looking at position drops across pit laps
+  finishers.forEach(f => {
+    if (f.plannedPitLap) {
+      const preLapSnapshot = snapshots[f.plannedPitLap - 2]?.cars.find(c => c.id === f.driver.name);
+      const postLapSnapshot = snapshots[f.plannedPitLap - 1]?.cars.find(c => c.id === f.driver.name);
+      if (preLapSnapshot && postLapSnapshot) {
+        events.push({
+          type: 'PIT_STOP',
+          driver: f.driver.name,
+          team: f.team.name,
+          lap: f.plannedPitLap,
+          time: (2.0 + Math.random() * 0.8).toFixed(2), // simulated stationary time
+          oldPos: preLapSnapshot.pos,
+          newPos: postLapSnapshot.pos,
+          strategy: 'Change Tyres'
+        });
+      }
+    }
+    
+    if (f.secondPitLap) {
+      const preLapSnapshot = snapshots[f.secondPitLap - 2]?.cars.find(c => c.id === f.driver.name);
+      const postLapSnapshot = snapshots[f.secondPitLap - 1]?.cars.find(c => c.id === f.driver.name);
+      if (preLapSnapshot && postLapSnapshot) {
+        events.push({
+          type: 'PIT_STOP',
+          driver: f.driver.name,
+          team: f.team.name,
+          lap: f.secondPitLap,
+          time: (2.0 + Math.random() * 0.8).toFixed(2),
+          oldPos: preLapSnapshot.pos,
+          newPos: postLapSnapshot.pos,
+          strategy: 'Change Tyres'
+        });
+      }
+    }
+  });
+
+  // Sort events chronologically
+  events.sort((a, b) => a.lap - b.lap);
 
   // ── Sort: finishers first (by time), DNFs last ────────────────────────────
   const finalFinishers = finishers.sort((a, b) => {
@@ -455,5 +513,5 @@ export function simulateRaceEvent(
     applySessionWear(state, f.driver.name, trackIntensity, aggression, true);
   });
 
-  return { finishers: finalFinishers, replayData: { totalLaps: laps, snapshots, events: [] } };
+  return { finishers: finalFinishers, replayData: { totalLaps: laps, snapshots, events, scLaps: safetyCarLap ? [safetyCarLap, safetyCarLap + 3] : [], vscLaps: vscLap ? [vscLap, vscLap + 1] : [] } };
 }

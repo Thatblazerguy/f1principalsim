@@ -160,7 +160,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const raceWeekend = s.raceWeekend;
   
   if (round && weekendProgress && !weekendProgress.weekendContext && raceWindowOpen) {
-    weekendProgress.weekendContext = generateWeekendContext(teams, round, s.raceHistory || []);
+    weekendProgress.weekendContext = generateWeekendContext(teams, round, s.raceHistory || [], s);
   }
 
   const raceNeedsQuali = Boolean(round && weekendProgress && !weekendProgress.qualifyingComplete);

@@ -5,7 +5,7 @@ import { createAiTeams } from '../data/teams.js';
 import { calendar } from '../data/calendar.js';
 
 async function runValidation() {
-  const TOTAL_SEASONS = 50;
+  const TOTAL_SEASONS = 100;
 
   console.log(`Starting headless simulation of ${TOTAL_SEASONS} seasons for Performance Model Validation...`);
   
@@ -19,7 +19,10 @@ async function runValidation() {
     backmarkerQualiTop6: 0,
     dnfs: 0,
     totalStarters: 0,
-    outliersGenerated: 0
+    outliersGenerated: 0,
+    poleConversions: 0,
+    largePositionGains: 0,
+    teammateGaps: []
   };
 
   const allTeams = createAiTeams();
@@ -50,13 +53,34 @@ async function runValidation() {
       });
 
       // Race
-      const results = simulateRaceEvent(allTeams, track, track.laps, grid, {}, weekendContext);
+      const { finishers: results } = simulateRaceEvent(allTeams, track, track.laps, grid, {}, weekendContext);
       
       stats.racesRun++;
       stats.totalStarters += results.length;
 
-      results.forEach(r => {
+      // Pole conversion
+      if (results[0].driver.name === grid[0].driver.name && !results[0].retired) {
+        stats.poleConversions++;
+      }
+
+      // Teammate gaps
+      allTeams.forEach(t => {
+        const d1 = results.find(r => r.driver.name === t.drivers[0].name);
+        const d2 = results.find(r => r.driver.name === t.drivers[1].name);
+        if (d1 && d2 && !d1.retired && !d2.retired) {
+          stats.teammateGaps.push(Math.abs(d1.time - d2.time));
+        }
+      });
+
+      results.forEach((r, idx) => {
         if (r.retired) stats.dnfs++;
+        else {
+           const startPos = grid.findIndex(g => g.driver.name === r.driver.name) + 1;
+           const finishPos = idx + 1;
+           if (startPos - finishPos >= 10) {
+             stats.largePositionGains++;
+           }
+        }
       });
 
       results.slice(0, 3).forEach(entry => {
@@ -86,6 +110,15 @@ async function runValidation() {
   console.log(`  Top Tier Teams:        ${(stats.topTierPodiums / totalPodiums * 100).toFixed(1)}%`);
   console.log(`  Midfield Teams:        ${(stats.midTierPodiums / totalPodiums * 100).toFixed(1)}%`);
   console.log(`  Backmarker Teams:      ${(stats.backmarkerPodiums / totalPodiums * 100).toFixed(1)}%`);
+
+  console.log(`\nAdditional Metrics:`);
+  console.log(`  Pole Conversion Rate:  ${(stats.poleConversions / stats.racesRun * 100).toFixed(1)}%`);
+  console.log(`  Races with +10 Pos Gain: ${stats.largePositionGains}`);
+  
+  if (stats.teammateGaps.length > 0) {
+    const avgGap = stats.teammateGaps.reduce((a, b) => a + b, 0) / stats.teammateGaps.length;
+    console.log(`  Average Teammate Gap:  ${avgGap.toFixed(2)}s`);
+  }
 
   console.log("\nIf Top Tier teams dominate 85%+ of podiums and outliers provide occasional midfield disruption, the model is working as intended.");
 }
