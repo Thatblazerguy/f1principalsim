@@ -267,12 +267,6 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
             <X size={20} />
           </button>
         </div>
-            {state.team.name.toUpperCase()}
-          </h1>
-          <p style={{fontSize:'10px', fontWeight:700, color:HUB.accent, letterSpacing:'0.3em', textTransform:'uppercase', marginTop:'4px', marginBottom:0, fontFamily:HUB.fontRegular}}>
-            Command Hub
-          </p>
-        </div>
 
         <nav style={{flex:1, padding:'0 12px', display:'flex', flexDirection:'column', gap:'2px', overflowY:'auto', scrollbarWidth:'none'}}>
           {navItems.map((item, i) => {
