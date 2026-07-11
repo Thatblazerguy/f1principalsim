@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { HUB, glassCard, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
+import { HUB, glassCard, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../HubLayout.tsx';
 import { Settings, ShieldAlert, Zap, CloudRain, Shield, AlertTriangle, ChevronRight, Activity, Map, MapPin } from "lucide-react";
-import { calendar as ALL_CIRCUITS } from '../data/calendar.js';
-import { getCircuitProfile } from '../utils/devProjects.js';
-import { getCompetitivenessForecast } from '../utils/teamState.js';
-import { state } from '../state.js';
+import { calendar as ALL_CIRCUITS } from '../../data/calendar.js';
+import { getCircuitProfile } from '../../utils/devProjects.js';
+import { getCompetitivenessForecast } from '../../utils/teamState.js';
+import { state } from '../../state.js';
 
 export function SeasonSetup({ onComplete, initialRules = null }) {
   const [step, setStep] = useState(1);
