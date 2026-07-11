@@ -10,6 +10,7 @@ import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTit
 import { ShieldCheck, TrendingUp, Users, DollarSign, Activity, AlertCircle, ChevronRight, Target, CheckCircle, Zap, Star } from "lucide-react";
 import { motion } from 'framer-motion';
 import { SlideUp } from '../components/ui/motion.tsx';
+import { SeasonSetup } from '../components/ui/SeasonSetup.tsx';
 
 function removeDriverFromTeam(team: any, driverName: string) {
   ensureTeamState(team);
@@ -100,7 +101,7 @@ function getOffseasonCandidates() {
     .sort((a: any, b: any) => b.market - a.market || b.pace - a.pace);
 }
 
-async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlashMessage: (msg: string) => void) {
+async function startNextSeason(root: HTMLElement, keepSponsors: boolean, rules: any, newCalendar: any, setFlashMessage: (msg: string) => void) {
   const s = state as any;
   ensureTeamState(s.team!);
   const roster = getTeamRoster(s.team!);
@@ -174,8 +175,10 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, setFlas
   s.season = {
     round: 1,
     year: (s.season.year || 1) + 1,
-    totalRounds: s.season.totalRounds || 24,
+    totalRounds: rules.totalRounds || 24,
     currentDay: getRoundRaceDay(1),
+    rules: { ...rules },
+    calendar: newCalendar
   };
   s.notifications = [];
   s.team!.pendingUpgrades = [];
@@ -368,7 +371,7 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
 
   const OffseasonPage = () => {
     const s = state as any;
-    const [view, setView] = useState<'report' | 'headquarters'>('report');
+    const [view, setView] = useState<'report' | 'headquarters' | 'setup'>('report');
     const [flashMessage, setFlashMessage] = useState(initialFlashMessage);
     const [keepSponsors, setKeepSponsors] = useState<boolean | null>(null);
     const [rosterTick, setRosterTick] = useState(0);
@@ -602,6 +605,17 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
             PROCEED TO OFF-SEASON HEADQUARTERS
           </button>
         </div>
+      );
+    }
+    
+    if (view === 'setup') {
+      return (
+        <SeasonSetup 
+          onComplete={(rules, newCalendar) => {
+             startNextSeason(root, keepSponsors!, rules, newCalendar, setFlashMessage);
+          }} 
+          initialRules={s.season.rules}
+        />
       );
     }
 
@@ -840,14 +854,14 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
            </div>
 
            <button 
-             onClick={() => startNextSeason(root, keepSponsors!, setFlashMessage)} 
+             onClick={() => setView('setup')} 
              disabled={!isChecklistComplete || s.team!.budget < 0}
              style={{ 
                ...actionBtn({ padding: '20px 32px', fontSize: '16px', width: '100%', backgroundColor: (isChecklistComplete && s.team!.budget >= 0) ? HUB.accent : 'rgba(255,255,255,0.05)' }), 
                opacity: (isChecklistComplete && s.team!.budget >= 0) ? 1 : 0.5,
                cursor: (isChecklistComplete && s.team!.budget >= 0) ? 'pointer' : 'not-allowed'
              }}>
-             BEGIN NEXT SEASON
+             PROCEED TO SEASON CONFIGURATION
            </button>
         </div>
       </div>

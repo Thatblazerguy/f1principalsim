@@ -4,8 +4,6 @@ import {
 } from 'lucide-react';
 import { SlideUp, AnimatedNumber } from '../components/ui/motion.tsx';
 import { state } from "../state.js";
-import { calendar } from "../data/calendar.js";
-import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 import { ensureSeasonTimeline, getRoundRaceDay, formatSeasonDate, simulateNextDay, canSimulateNextDay } from "../utils/seasonTimeline.js";
 import { ensureTeamState, getActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
@@ -32,9 +30,9 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
     ensureTeamState(state.team);
     ensureSeasonTimeline(state);
     
-    const totalRounds = Math.min(state.season.totalRounds || 24, 24);
+    const totalRounds = Math.min(state.season.totalRounds || (state.season.calendar || []).length || 24, 24);
     const isSeasonOver = state.season.round > totalRounds || (state.weekendProgress?.raceComplete && state.season.round === totalRounds);
-    const nextRound = isSeasonOver ? null : calendar.find(r => r.round === state.season.round);
+    const nextRound = isSeasonOver ? null : (state.season.calendar || []).find(r => r.round === state.season.round);
     const currentDay = state.season.currentDay;
     const raceDay = nextRound ? getRoundRaceDay(nextRound.round) : null;
     const daysUntilRace = nextRound ? Math.max(0, raceDay - currentDay) : 0;

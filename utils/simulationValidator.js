@@ -21,7 +21,7 @@ import { simulateQualifying } from "../game/qualifying.js";
 import { updateStandings } from "../game/standings.js";
 import { applyRoundCarDevelopment } from "./carDevelopment.js";
 import { createAiTeams } from "../data/teams.js";
-import { calendar } from "../data/calendar.js";
+import { state } from "../state.js";
 import { generateWeekendContext } from "./weekendForm.js";
 
 // ─── Deep clone helpers ────────────────────────────────────────────────────────
@@ -73,10 +73,11 @@ function simulateSeason(teams, racesToRun = 24) {
   let totalGridDelta = 0;
   let totalGridDeltaCount = 0;
 
-  const trackCount = Math.min(racesToRun, calendar.length);
+  const activeCalendar = state.season.calendar || [];
+  const trackCount = Math.min(racesToRun, activeCalendar.length);
 
   for (let roundIdx = 0; roundIdx < trackCount; roundIdx++) {
-    const track = calendar[roundIdx];
+    const track = activeCalendar[roundIdx];
 
     const weekendContext = generateWeekendContext(teams, track, raceHistory);
 

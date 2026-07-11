@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { state } from "../state.js";
 import { syncGame } from "../lib/supabaseApi.js";
-import { ensureTeamState, getTeamRoster } from "../utils/teamState.js";
+import { ensureTeamState, getTeamRoster, getCompetitivenessForecast } from "../utils/teamState.js";
 import { ensureFinanceState, FACILITY_CATALOG, STAFF_CATALOG } from "../utils/financeSystem.js";
 import {
   COMPONENT_CATALOG, ensureEngineeringState, swapComponent, fitNewComponent,
@@ -10,12 +10,12 @@ import {
 import { DEVELOPMENT_CATALOG, startProject, processProjectCompletions, getCircuitProfile, ensureDevProjectsState } from "../utils/devProjects.js";
 import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
 import { getDriverHeadshotUrl } from '../data/drivers.js';
-import { calendar } from '../data/calendar.js';
+import { calendar as ALL_CIRCUITS } from '../data/calendar.js';
 import {
   Activity, AlertTriangle, BarChart2, BookOpen, CheckCircle, ChevronRight,
   Clock, Cpu, DollarSign, FlaskConical, Gauge, LayoutDashboard, RefreshCw,
   Settings, Shield, ShieldAlert, Target, Timer, TrendingDown, TrendingUp,
-  Wrench, Zap, Wind, Layers
+  Wrench, Zap, Wind, Layers, MapPin
 } from 'lucide-react';
 
 // ─── Shared Helpers ───────────────────────────────────────────────────────────
@@ -80,6 +80,10 @@ function OverviewTab({ s }: any) {
     { label: 'Staff Rating', value: `${avgStaffRating}/99`, color: '#fff', icon: <Settings size={18} color="#8b5cf6" /> },
     { label: 'Active Projects', value: String(activeProjects.length), color: activeProjects.length > 0 ? '#3b82f6' : HUB.textMuted, icon: <FlaskConical size={18} color="#3b82f6" /> },
   ];
+
+  const currentRound = s.season?.round || 1;
+  const activeCalendar = s.season?.calendar || ALL_CIRCUITS.map(c => c.name);
+  const upcomingRaces = activeCalendar.slice(currentRound - 1, currentRound + 2); // Next 3 races
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -188,6 +192,41 @@ function OverviewTab({ s }: any) {
                 <span style={{ fontSize: '11px', color: HUB.textMuted, textAlign: 'right' }}>{h.expectedGain}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming Races Forecast */}
+      {upcomingRaces.length > 0 && (
+        <div style={{ ...glassCard({ padding: '24px' }) }}>
+          <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MapPin size={16} color={HUB.accent} /> Upcoming Races Forecast
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${upcomingRaces.length}, 1fr)`, gap: '16px' }}>
+            {upcomingRaces.map((cName: string, i: number) => {
+              const c = ALL_CIRCUITS.find((circ: any) => circ.name === cName);
+              const profile = getCircuitProfile(c?.circuit);
+              const forecast = getCompetitivenessForecast(s, c?.circuit);
+              
+              return (
+                <div key={i} style={{ padding: '16px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: `1px solid rgba(255,255,255,0.05)` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {currentRound + i}</span>
+                    <span style={{ fontSize: '10px', color: HUB.textMuted }}>{c?.country}</span>
+                  </div>
+                  <h4 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 4px', color: '#fff' }}>{cName}</h4>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', color: '#fff' }}>{profile.type}</span>
+                  </div>
+                  <div style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, paddingTop: '12px' }}>
+                    <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '2px' }}>Expected Rank</div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: forecast.rank <= 3 ? '#10b981' : forecast.rank <= 6 ? '#f59e0b' : '#ef4444' }}>
+                      {forecast.rank === 1 ? 'Fastest Car' : `P${forecast.rank} / ${forecast.finish}`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

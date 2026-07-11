@@ -3,6 +3,8 @@ import { state } from "../state.js";
 import { ensureTeamState, getTeamRoster, getActiveDrivers, setTeamActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
+import { calendar as ALL_CIRCUITS } from '../data/calendar.js';
+import { getCircuitProfile } from '../utils/devProjects.js';
 import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue } from '../components/HubLayout.tsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedNumber, AnimatedBar } from '../components/ui/motion.tsx';
@@ -160,6 +162,23 @@ const generateAIReport = (driver: any, stats: any, extractionDelta: number) => {
   }
 
   return sentences.join(" ");
+  return sentences.join(" ");
+};
+
+const getDriverForecast = (driver: any, circuitName: string) => {
+  const profile = getCircuitProfile(circuitName);
+  let score = 0;
+  
+  if (profile.type === 'Power') score += driver.pace * 0.6 + driver.quali * 0.4;
+  else if (profile.type === 'Highspeed') score += driver.pace * 0.5 + driver.consistency * 0.5;
+  else if (profile.type === 'Street') score += driver.quali * 0.5 + driver.racecraft * 0.5;
+  else if (profile.type === 'Technical') score += driver.pace * 0.4 + driver.consistency * 0.3 + driver.quali * 0.3;
+  else score += driver.pace * 0.3 + driver.quali * 0.3 + driver.racecraft * 0.2 + driver.consistency * 0.2;
+  
+  if (score >= 88) return { label: 'Exceptional', color: '#10b981' };
+  if (score >= 80) return { label: 'Strong', color: '#3b82f6' };
+  if (score >= 70) return { label: 'Average', color: '#f59e0b' };
+  return { label: 'Weak', color: '#ef4444' };
 };
 
 export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
@@ -323,6 +342,10 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
       tooltip: { mode: 'index', intersect: false }
     }
   };
+
+  const activeCalendar = (state as any).season?.calendar || ALL_CIRCUITS.map((c:any) => c.name);
+  const currentRound = (state as any).season?.round || 1;
+  const upcomingRaces = activeCalendar.slice(currentRound - 1, currentRound + 2); // Next 3 races
 
   const chartData = stats && stats.historyData.length > 0 ? {
     labels: stats.historyData.map(d => `R${d.round}`),
@@ -602,10 +625,10 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                      }
                      
                      return (
-                       <div key={stat.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                         <span style={{ flex: 1, textAlign: 'left', fontSize: '14px', fontFamily: HUB.fontMono, color: winner === 1 ? HUB.accent : '#fff' }}>{stat.v1}</span>
-                         <span style={{ flex: 1, textAlign: 'center', fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase' }}>{stat.label}</span>
-                         <span style={{ flex: 1, textAlign: 'right', fontSize: '14px', fontFamily: HUB.fontMono, color: winner === 2 ? HUB.accent : '#fff' }}>{stat.v2}</span>
+                       <div key={stat.label} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 80px', gap: '16px', alignItems: 'center' }}>
+                         <span style={{ fontSize: '16px', fontFamily: HUB.fontMono, color: winner === 1 ? '#fff' : HUB.textMuted, textAlign: 'right' }}>{stat.v1}</span>
+                         <span style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', textAlign: 'center' }}>{stat.label}</span>
+                         <span style={{ fontSize: '16px', fontFamily: HUB.fontMono, color: winner === 2 ? '#fff' : HUB.textMuted, textAlign: 'left' }}>{stat.v2}</span>
                        </div>
                      );
                   })}
@@ -614,6 +637,38 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: HUB.textMuted }}>No active teammate available for comparison.</div>
             )}
+          </ResponsiveAccordionSection>
+
+          {/* --- SECTION 10: UPCOMING RACES FORECAST --- */}
+          <ResponsiveAccordionSection title="Upcoming Races Forecast" gridColumn="span 12">
+            {upcomingRaces.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${upcomingRaces.length}, 1fr)`, gap: '16px' }}>
+                {upcomingRaces.map((cName: string, i: number) => {
+                  const c = ALL_CIRCUITS.find(circ => circ.name === cName);
+                  const profile = getCircuitProfile(c?.circuit);
+                  const forecast = getDriverForecast(currentDriver, c?.circuit || '');
+                  
+                  return (
+                    <div key={i} style={{ padding: '16px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: `1px solid rgba(255,255,255,0.05)` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {currentRound + i}</span>
+                        <span style={{ fontSize: '10px', color: HUB.textMuted }}>{c?.country}</span>
+                      </div>
+                      <h4 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 4px', color: '#fff' }}>{cName}</h4>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', color: '#fff' }}>{profile.type}</span>
+                      </div>
+                      <div style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, paddingTop: '12px' }}>
+                        <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '2px' }}>Driver Suitability</div>
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: forecast.color }}>
+                          {forecast.label}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <div style={{ color: HUB.textMuted }}>No upcoming races found.</div>}
           </ResponsiveAccordionSection>
 
           {/* --- SECTION 11: SEASON HEATMAP --- */}

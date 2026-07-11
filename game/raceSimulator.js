@@ -203,18 +203,28 @@ export function simulateRaceEvent(
 ) {
   const roundStrategies = track.round ? (strategies[track.round] || []) : [];
 
+  // ── Season Rules Modifiers ───────────────────────────────────────────────
+  const seasonRules = state.season?.rules || {};
+  const scFreqMultiplier = seasonRules.scFrequency === 'low' ? 0.4
+    : seasonRules.scFrequency === 'high' ? 1.8
+    : 1.0; // normal
+  const failureMultiplier = seasonRules.failures === 'low' ? 0.3
+    : seasonRules.failures === 'high' ? 2.0
+    : 1.0; // normal
+  const weatherEnabled = seasonRules.weather !== false;
+
   // Race-wide conditions (determined once per race)
-  const wetChance = getTrackWetProbability(track.name || track.circuit || "");
+  const wetChance = weatherEnabled ? getTrackWetProbability(track.name || track.circuit || "") : 0;
   const isWet = Math.random() < wetChance;
 
-  // Safety car: ~28% of races
-  const hasSafetyCar = Math.random() < 0.28;
+  // Safety car: ~28% of races, scaled by scFrequency rule
+  const hasSafetyCar = Math.random() < (0.28 * scFreqMultiplier);
   const safetyCarLap = hasSafetyCar
     ? Math.floor(laps * (0.25 + Math.random() * 0.50))
     : null;
 
-  // Virtual safety car: separate from full SC, ~15% additional
-  const hasVSC = !hasSafetyCar && Math.random() < 0.15;
+  // Virtual safety car: separate from full SC, ~15% additional, also scaled
+  const hasVSC = !hasSafetyCar && Math.random() < (0.15 * scFreqMultiplier);
   const vscLap = hasVSC
     ? Math.floor(laps * (0.30 + Math.random() * 0.40))
     : null;
@@ -346,7 +356,7 @@ export function simulateRaceEvent(
     // We roll for failures once per race based on overall stress, 
     // and assign a random failure lap if they DNF.
     const stressMod = f.isHighRisk ? 1.2 : 1.0;
-    const failures = rollForFailures(state, f.driver.name, stressMod * f.objDnfMod);
+    const failures = rollForFailures(state, f.driver.name, stressMod * f.objDnfMod * failureMultiplier);
     const dnfLap = failures.length > 0 ? Math.floor(Math.random() * laps) + 1 : -1;
 
     for (let lap = 1; lap <= laps; lap++) {

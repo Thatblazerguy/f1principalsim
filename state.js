@@ -3,11 +3,12 @@ import { Team } from "./game/team.js";
 import { Driver } from "./game/driver.js";
 import { ensureFinanceState } from "./utils/financeSystem.js";
 import { ensureEngineeringState } from "./utils/engineeringSystem.js";
+import { calendar } from "./data/calendar.js";
 
 export const state = {
   team: null,
   aiTeams: createAiTeams(),
-  season: { round: 1, year: 1, totalRounds: 24, currentDay: 1 },
+  season: { round: 1, year: 1, totalRounds: 24, currentDay: 1, rules: { sprints: true, weather: true, scFrequency: 'normal', failures: 'normal', aiAggressiveness: 'normal' }, calendar: [...calendar] },
   standings: { drivers: {}, teams: {} },
   bestFinishes: {},
   driverWins: {},
@@ -86,7 +87,9 @@ export function hydrateState(payload) {
       }
     }
 
-    state.season = rawData.season || { round: 1, year: 1, totalRounds: 24, currentDay: 1 };
+    state.season = rawData.season || { round: 1, year: 1, totalRounds: 24, currentDay: 1, rules: { sprints: true, weather: true, scFrequency: 'normal', failures: 'normal', aiAggressiveness: 'normal' }, calendar: [...calendar] };
+    if (!state.season.rules) state.season.rules = { sprints: true, weather: true, scFrequency: 'normal', failures: 'normal', aiAggressiveness: 'normal' };
+    if (!state.season.calendar) state.season.calendar = [...calendar].slice(0, state.season.totalRounds || 24);
     state.standings = rawData.standings || { drivers: {}, teams: {} };
     state.bestFinishes = rawData.bestFinishes || {};
     state.driverWins = rawData.driverWins || {};

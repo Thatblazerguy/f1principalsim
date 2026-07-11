@@ -8,6 +8,7 @@ import { syncGame } from "../lib/supabaseApi.js";
 import { getRoundRaceDay } from "../utils/seasonTimeline.js";
 import { renderToAppRoot } from "../utils/reactRoot.tsx";
 import { HUB, glassCard, actionBtn, pageTitle, pageSubtitle } from "../components/HubLayout.tsx";
+import { SeasonSetup } from "../components/ui/SeasonSetup.tsx";
 
 const teamTiers = [
   {
@@ -47,12 +48,12 @@ export function renderSetup(root: HTMLElement) {
 
     const [teamName, setTeamName] = useState('');
     const [budget, setBudget] = useState(300);
-    const [seasonLength, setSeasonLength] = useState(24);
     const [selectedTier, setSelectedTier] = useState(teamTiers[2]);
     const [selectedEngine, setSelectedEngine] = useState(engineProviders[5]);
     const [selectedDriverNames, setSelectedDriverNames] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
+    const [setupStep, setSetupStep] = useState<'team' | 'season'>('team');
 
     const toggleDriver = (name: string) => {
       setSelectedDriverNames(prev => {
@@ -68,8 +69,11 @@ export function renderSetup(root: HTMLElement) {
     const remainingBudget = budget - totalUpfrontCost;
     const canSubmit = teamName.trim() !== '' && selectedDriverNames.length === 2 && remainingBudget >= 0;
 
-    const handleCreate = async () => {
-      if (!canSubmit) return;
+    const handleNext = () => {
+      if (canSubmit) setSetupStep('season');
+    };
+
+    const handleCreate = async (rules: any, newCalendar: any) => {
       setLoading(true);
       try {
         resetAiTeams();
@@ -105,7 +109,14 @@ export function renderSetup(root: HTMLElement) {
         selectedDrivers.forEach(driver => team.signDriver(driver));
 
         state.team = team;
-        state.season = { round: 1, year: 1, totalRounds: seasonLength, currentDay: getRoundRaceDay(1) };
+        state.season = { 
+          round: 1, 
+          year: 1, 
+          totalRounds: rules.totalRounds, 
+          currentDay: getRoundRaceDay(1),
+          rules: { ...rules },
+          calendar: newCalendar
+        };
         state.standings = { drivers: {}, teams: {} };
         state.bestFinishes = {};
         state.signedSponsors = {};
@@ -121,6 +132,16 @@ export function renderSetup(root: HTMLElement) {
 
     const inputStyle = { width: '100%', background: 'rgba(255,255,255,0.05)', border: `1px solid ${HUB.borderMid}`, padding: '12px 16px', borderRadius: '8px', color: '#fff', outline: 'none', fontFamily: HUB.fontRegular, boxSizing: 'border-box' as const };
     const labelStyle = { fontSize: '10px', fontWeight: 700, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 8px', display: 'block' as const };
+
+    if (setupStep === 'season') {
+      return (
+        <div style={{ backgroundColor: HUB.bg, color: HUB.textPrimary, minHeight: '100vh', fontFamily: HUB.fontRegular, position: 'relative', overflowY: 'auto' }}>
+           <SeasonSetup 
+              onComplete={handleCreate}
+           />
+        </div>
+      );
+    }
 
     return (
       <div style={{ backgroundColor: HUB.bg, color: HUB.textPrimary, minHeight: '100vh', fontFamily: HUB.fontRegular, position: 'relative', overflowY: 'auto', padding: '48px 24px' }}>
@@ -145,14 +166,6 @@ export function renderSetup(root: HTMLElement) {
                      <option value="300">Medium ($300M)</option>
                      <option value="500">High ($500M)</option>
                      <option value="800">Billionaire ($800M)</option>
-                   </select>
-                 </div>
-                 <div>
-                   <label style={labelStyle}>Season Length</label>
-                   <select value={seasonLength} onChange={e => setSeasonLength(Number(e.target.value))} style={inputStyle}>
-                     <option value="6">Short (6 races)</option>
-                     <option value="16">Standard (16 races)</option>
-                     <option value="24">Full (24 races)</option>
                    </select>
                  </div>
               </div>
@@ -248,8 +261,8 @@ export function renderSetup(root: HTMLElement) {
 
                    {errorMsg && <div style={{ padding: '12px', background: 'rgba(225,6,0,0.1)', border: `1px solid ${HUB.accent}`, borderRadius: '8px', color: '#fff', fontSize: '13px', marginBottom: '16px' }}>{errorMsg}</div>}
 
-                   <button onClick={handleCreate} disabled={!canSubmit || loading} style={{ ...actionBtn({ width: '100%', opacity: (!canSubmit || loading) ? 0.5 : 1 }), cursor: (!canSubmit || loading) ? 'not-allowed' : 'pointer' }}>
-                     {loading ? 'Creating Team...' : 'Finalize & Enter Paddock'}
+                   <button onClick={handleNext} disabled={!canSubmit || loading} style={{ ...actionBtn({ width: '100%', padding: '16px', backgroundColor: canSubmit ? HUB.accent : 'rgba(255,255,255,0.05)' }), opacity: canSubmit ? 1 : 0.5, cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
+                     {loading ? 'Processing...' : 'Next: Season Setup'}
                    </button>
                 </div>
               </div>

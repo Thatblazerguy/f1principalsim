@@ -1,4 +1,5 @@
 import { LOAN_DESTINATIONS } from "./academy.js";
+import { getCircuitProfile } from "../utils/devProjects.js";
 
 /**
  * Helper to clamp values
@@ -213,8 +214,33 @@ function processAiTeamDevelopment(state) {
     // Staff progression abstractly represented by small random boosts to overall specs if they didn't upgrade facilities
     if (Math.random() > upgradeChance && aiTeam.specs) {
       const specsList = Object.keys(aiTeam.specs);
-      const randomSpec = specsList[Math.floor(Math.random() * specsList.length)];
-      aiTeam.specs[randomSpec] = Math.min(99, aiTeam.specs[randomSpec] + 1);
+      
+      // Target upcoming tracks
+      const upcomingTracks = state.season?.calendar?.slice(state.season?.round || 0) || [];
+      const trackProfiles = upcomingTracks.map(t => getCircuitProfile(t));
+      const weights = { aero: 1, chassis: 1, engine: 1, reliability: 1 };
+      trackProfiles.forEach(p => {
+        if (p.type === 'Power') { weights.engine += 2; weights.aero += 1; }
+        else if (p.type === 'Highspeed') { weights.aero += 2; weights.engine += 1; }
+        else if (p.type === 'Street') { weights.chassis += 2; }
+        else if (p.type === 'Technical') { weights.chassis += 1; weights.aero += 1; }
+      });
+      
+      // Weighted random selection
+      const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+      let rand = Math.random() * totalWeight;
+      let targetSpec = 'aero';
+      for (const [spec, weight] of Object.entries(weights)) {
+        if (rand < weight) { targetSpec = spec; break; }
+        rand -= weight;
+      }
+      
+      if (aiTeam.specs[targetSpec]) {
+        aiTeam.specs[targetSpec] = Math.min(99, aiTeam.specs[targetSpec] + 1);
+      } else {
+        const randomSpec = specsList[Math.floor(Math.random() * specsList.length)];
+        aiTeam.specs[randomSpec] = Math.min(99, aiTeam.specs[randomSpec] + 1);
+      }
     }
   });
 }

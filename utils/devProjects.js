@@ -255,8 +255,18 @@ export function estimateLapGain(statBonuses) {
   return parseFloat(Math.max(0, gain).toFixed(2));
 }
 
-export function getManufacturingCost(baseCost) {
-  return parseFloat((baseCost * 0.35).toFixed(1));
+/**
+ * Returns a 0-1 multiplier based on season length compared to the canonical 24-race season.
+ * Used to scale costs and development times proportionally.
+ */
+export function getSeasonScaleFactor(appState) {
+  const totalRounds = appState?.season?.totalRounds || 24;
+  return Math.max(0.15, Math.min(1.0, totalRounds / 24));
+}
+
+export function getManufacturingCost(baseCost, appState = null) {
+  const scaleFactor = appState ? getSeasonScaleFactor(appState) : 1.0;
+  return parseFloat((baseCost * 0.35 * scaleFactor).toFixed(1));
 }
 
 export function getOutcomeSuccessRating(outcome) {
@@ -314,8 +324,13 @@ export function startProject(appState, categoryId, itemId) {
   );
   if (alreadyRunning) return { ok: false, reason: "Project already in progress" };
 
-  const devCost = item.baseCost;
-  const mfgCost = getManufacturingCost(item.baseCost);
+  // ── Season-length scaling ──────────────────────────────────────────────────
+  // Costs and development time scale with season length so upgrades remain
+  // meaningful whether the player is running a 6-race sprint or a 24-race season.
+  const scaleFactor = getSeasonScaleFactor(appState);
+
+  const devCost = parseFloat((item.baseCost * scaleFactor).toFixed(1));
+  const mfgCost = getManufacturingCost(item.baseCost, appState);
   const totalCost = parseFloat((devCost + mfgCost).toFixed(1));
   if ((appState.team?.budget || 0) < totalCost) {
     return { ok: false, reason: `Insufficient budget. Requires $${totalCost}M (Dev $${devCost}M + Mfg $${mfgCost}M).` };
@@ -331,10 +346,13 @@ export function startProject(appState, categoryId, itemId) {
   const techDir = staff.find(s => s.id === "technicalDirector");
   const perfEngineer = staff.find(s => s.id === "performanceEngineer");
 
+  // Scale base races with season length — shorter season = faster delivery
+  const scaledBaseRaces = Math.max(1, Math.round(item.baseRaces * scaleFactor));
+
   // Allocation affects completion time — higher current-car focus = faster delivery
   const alloc = eng.devAllocation || { currentCar: 70 };
   const allocSpeedBonus = Math.max(0.85, Math.min(1.15, 0.85 + (alloc.currentCar / 100) * 0.30));
-  const adjustedRaces = Math.max(1, Math.round(item.baseRaces / allocSpeedBonus));
+  const adjustedRaces = Math.max(1, Math.round(scaledBaseRaces / allocSpeedBonus));
   const expectedLapGain = estimateLapGain(item.statBonuses);
 
   const project = {

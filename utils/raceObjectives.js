@@ -1,5 +1,5 @@
 import { state } from "../state.js";
-import { calendar } from "../data/calendar.js";
+
 
 // ============================================
 // DYNAMIC RACE OBJECTIVES SYSTEM
@@ -560,7 +560,8 @@ function calculateStandingsImpact(team) {
 // 8. UNIFIED RACE WEEKEND GENERATOR
 // ============================================
 export function generateUnifiedRaceWeekend(team, currentRound = state.season.round) {
-  const round = calendar[currentRound - 1];
+  const activeCalendar = state.season.calendar || [];
+  const round = activeCalendar[currentRound - 1];
   if (!round) return null;
 
   // Weather calculation (from circuit data)

@@ -1,12 +1,12 @@
 import React from 'react';
-import { calendar } from "../data/calendar.js";
 import { state } from "../state.js";
 import { ensureSeasonTimeline, getRoundRaceDay, formatSeasonDate } from "../utils/seasonTimeline.js";
 import { mountLayout, HUB, glassCard, statCell, pill, actionBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue } from '../components/HubLayout.tsx';
 
 export function renderCalendar(root) {
   ensureSeasonTimeline(state);
-  const totalRounds = Math.min(state.season.totalRounds || calendar.length, calendar.length);
+  const activeCalendar = state.season.calendar || [];
+  const totalRounds = activeCalendar.length;
   const currentDay = state.season.currentDay;
 
   const content = (
@@ -24,7 +24,7 @@ export function renderCalendar(root) {
       </div>
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:'20px'}}>
-        {calendar.slice(0, totalRounds).map(r => {
+        {activeCalendar.map(r => {
           const raceDay = getRoundRaceDay(r.round);
           const isCompleted = currentDay > raceDay;
           const isToday = currentDay === raceDay;

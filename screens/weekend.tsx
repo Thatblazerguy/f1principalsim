@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { calendar } from "../data/calendar.js";
 import { strategies } from "../data/strategies.js";
 import { getTrackStrategyProfile } from "../data/strategyProfiles.js";
 import { simulatePractice } from "../game/practice.js";
@@ -137,8 +136,9 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   ensureTeamState(s.team!);
   ensureSeasonTimeline(s);
   
-  const totalRounds = Math.min(s.season.totalRounds || calendar.length, calendar.length);
-  const round = s.season.round <= totalRounds ? calendar[s.season.round - 1] : null;
+  const activeCalendar = s.season.calendar || [];
+  const totalRounds = activeCalendar.length;
+  const round = s.season.round <= totalRounds ? activeCalendar[s.season.round - 1] : null;
   const currentDay = s.season.currentDay;
   const raceDay = round ? getRoundRaceDay(round.round) : null;
   const raceDateLabel = round ? formatSeasonDate(s.season.year || 1, raceDay!) : "";

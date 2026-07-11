@@ -1,5 +1,6 @@
 import { Team } from "../game/team.js";
 import { ensureSponsorSlots } from "./sponsorDeals.js";
+import { getCircuitProfile } from "./devProjects.js";
 
 function getRosterFromNormalizedTeam(team) {
   return [...team.drivers, ...(team.reserveDriver ? [team.reserveDriver] : [])];
@@ -93,6 +94,39 @@ export function ensureTeamState(team) {
   // so callers who have the global state can ensure it when needed.
 
   return team;
+}
+
+export function getCompetitivenessForecast(state, circuitName) {
+  if (!state.team || !state.team.specs) return { rank: 5, finish: 'Midfield/Backmarker' };
+  const profile = getCircuitProfile(circuitName);
+  const car = state.team.specs; // aero, chassis, reliability
+  
+  // Very basic forecast algorithm for preview
+  let score = 0;
+  if (profile.type === 'Power') score += car.aero * 0.4 + car.chassis * 0.2 + car.reliability * 0.4;
+  else if (profile.type === 'Highspeed') score += car.aero * 0.6 + car.chassis * 0.3 + car.reliability * 0.1;
+  else if (profile.type === 'Street') score += car.aero * 0.2 + car.chassis * 0.7 + car.reliability * 0.1;
+  else score += car.aero * 0.4 + car.chassis * 0.4 + car.reliability * 0.2;
+  
+  // Sort AI teams to find rank
+  const aiScores = state.aiTeams.map(t => {
+     const specs = t.specs || { aero: t.carPerformance, chassis: t.carPerformance, reliability: t.carPerformance };
+     let s = 0;
+     if (profile.type === 'Power') s += specs.aero * 0.4 + specs.chassis * 0.2 + specs.reliability * 0.4;
+     else if (profile.type === 'Highspeed') s += specs.aero * 0.6 + specs.chassis * 0.3 + specs.reliability * 0.1;
+     else if (profile.type === 'Street') s += specs.aero * 0.2 + specs.chassis * 0.7 + specs.reliability * 0.1;
+     else s += specs.aero * 0.4 + specs.chassis * 0.4 + specs.reliability * 0.2;
+     return s;
+  });
+  
+  let rank = 1;
+  aiScores.forEach(s => { if (s > score) rank++; });
+  
+  let finish = 'Podium Contender';
+  if (rank > 3 && rank <= 6) finish = 'Points Finisher';
+  else if (rank > 6) finish = 'Midfield/Backmarker';
+  
+  return { rank, finish };
 }
 
 export function getActiveDrivers(team) {
