@@ -343,7 +343,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
     }
   };
 
-  const activeCalendar = (state as any).season?.calendar || ALL_CIRCUITS.map((c:any) => c.name);
+  const activeCalendar: any[] = (state as any).season?.calendar || ALL_CIRCUITS;
   const currentRound = (state as any).season?.round || 1;
   const upcomingRaces = activeCalendar.slice(currentRound - 1, currentRound + 2); // Next 3 races
 
@@ -643,18 +643,21 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
           <ResponsiveAccordionSection title="Upcoming Races Forecast" gridColumn="span 12">
             {upcomingRaces.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${upcomingRaces.length}, 1fr)`, gap: '16px' }}>
-                {upcomingRaces.map((cName: string, i: number) => {
-                  const c = ALL_CIRCUITS.find(circ => circ.name === cName);
-                  const profile = getCircuitProfile(c?.circuit);
-                  const forecast = getDriverForecast(currentDriver, c?.circuit || '');
+                {upcomingRaces.map((entry: any, i: number) => {
+                  // calendar entries are always full objects {name, circuit, country, ...}
+                  const raceObj = typeof entry === 'string'
+                    ? ALL_CIRCUITS.find(circ => circ.name === entry)
+                    : entry;
+                  const profile = getCircuitProfile(raceObj?.circuit);
+                  const forecast = getDriverForecast(currentDriver, raceObj?.circuit || '');
                   
                   return (
                     <div key={i} style={{ padding: '16px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: `1px solid rgba(255,255,255,0.05)` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {currentRound + i}</span>
-                        <span style={{ fontSize: '10px', color: HUB.textMuted }}>{c?.country}</span>
+                        <span style={{ fontSize: '10px', color: HUB.textMuted }}>{raceObj?.country}</span>
                       </div>
-                      <h4 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 4px', color: '#fff' }}>{cName}</h4>
+                      <h4 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 4px', color: '#fff' }}>{raceObj?.name}</h4>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                         <span style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', color: '#fff' }}>{profile.type}</span>
                       </div>

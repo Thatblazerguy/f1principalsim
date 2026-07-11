@@ -217,7 +217,8 @@ function processAiTeamDevelopment(state) {
       
       // Target upcoming tracks
       const upcomingTracks = state.season?.calendar?.slice(state.season?.round || 0) || [];
-      const trackProfiles = upcomingTracks.map(t => getCircuitProfile(t));
+      // calendar entries are full objects {name, circuit, ...}; extract the circuit name
+      const trackProfiles = upcomingTracks.map(t => getCircuitProfile(typeof t === 'string' ? t : t?.circuit));
       const weights = { aero: 1, chassis: 1, engine: 1, reliability: 1 };
       trackProfiles.forEach(p => {
         if (p.type === 'Power') { weights.engine += 2; weights.aero += 1; }
