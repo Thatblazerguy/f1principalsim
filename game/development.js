@@ -107,6 +107,7 @@ export function processSeasonDevelopment(state) {
 
       // Develop
       const improved = developAcademyDriver(driver, state.academy);
+      if (!driver.careerTimeline) driver.careerTimeline = [];
       if (improved) {
         driver.careerTimeline.unshift({ seasonYear: currentYear, event: 'Developed', detail: 'Attributes improved over the season.' });
       } else {
@@ -149,6 +150,7 @@ export function processSeasonDevelopment(state) {
          driver.loanStatus = null;
          driver.driverRole = 'academy';
          driver.roleLabel = 'Academy Prospect';
+         if (!driver.careerTimeline) driver.careerTimeline = [];
          driver.careerTimeline.unshift({ seasonYear: currentYear, event: 'Loan Ended', detail: 'Returned to academy.' });
          
          // Move back to academy

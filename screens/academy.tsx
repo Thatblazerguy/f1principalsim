@@ -122,6 +122,7 @@ export function renderAcademy(root, initialFlashMessage = "") {
          prospect.driverRole = 'academy';
          prospect.roleLabel = 'Academy Prospect';
          prospect.morale = Math.max(0, prospect.morale - 15);
+         if (!prospect.careerTimeline) prospect.careerTimeline = [];
          prospect.careerTimeline.unshift({ seasonYear: state.season.year || 1, event: 'Loan Recalled', detail: 'Recalled early by parent team.' });
          academy.prospects.push(prospect);
          await syncGame();

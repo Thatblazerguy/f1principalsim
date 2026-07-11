@@ -93,6 +93,7 @@ export class Team {
     academyDriver.driverRole = 'reserve';
     academyDriver.roleLabel = 'Reserve Driver';
     academyDriver.salary = Math.max(3, academyDriver.salary * 1.5); // Bump salary
+    if (!academyDriver.careerTimeline) academyDriver.careerTimeline = [];
     academyDriver.careerTimeline.unshift({ seasonYear: globalState.season.year || 1, event: 'Promoted', detail: 'Promoted from Academy to Reserve Driver' });
     
     this.reserveDriver = academyDriver;
@@ -114,6 +115,7 @@ export class Team {
     reserve.driverRole = this.drivers.length === 0 ? 'lead' : 'second';
     reserve.roleLabel = 'Race Driver';
     reserve.salary = Math.max(6, reserve.salary * 2);
+    if (!reserve.careerTimeline) reserve.careerTimeline = [];
     reserve.careerTimeline.unshift({ seasonYear: globalState.season.year || 1, event: 'Race Seat', detail: 'Promoted to active Race Seat' });
     
     this.drivers.push(reserve);
@@ -127,6 +129,7 @@ export class Team {
       globalState.academy.prospects.splice(idx, 1);
       academyDriver.loanStatus = { destination: destination.id, series: destination.label, seasonYear: globalState.season.year || 1 };
       academyDriver.roleLabel = `On Loan (${destination.label})`;
+      if (!academyDriver.careerTimeline) academyDriver.careerTimeline = [];
       academyDriver.careerTimeline.unshift({ seasonYear: globalState.season.year || 1, event: 'Loaned Out', detail: `Sent on loan to ${destination.label}` });
       globalState.academy.loanedOut.push(academyDriver);
       return true;

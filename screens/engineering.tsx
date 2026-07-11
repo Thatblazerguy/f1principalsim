@@ -585,7 +585,7 @@ function PerformanceTab({ s }: any) {
   const specs = s.engineering?.carSpecs || {};
   const allTeams = [s.team, ...(s.aiTeams || [])].filter(Boolean);
   const nextRound = s.season?.round || 1;
-  const nextRace = calendar.find((r: any) => r.round === nextRound);
+  const nextRace = (s.season?.calendar || ALL_CIRCUITS).find((r: any) => r.round === nextRound);
   const circuitProfile = nextRace ? getCircuitProfile(nextRace.circuit) : { strengths: [], weaknesses: [], type: 'Mixed' };
 
   allTeams.sort((a: any, b: any) => b.carPerformance - a.carPerformance);

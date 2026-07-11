@@ -55,7 +55,22 @@ export function getSerializedState() {
 
 // Helper to reliably restore Class methods stripped by JSON serialization
 function hydrateClass(obj, clazz) {
-  if (obj) Object.setPrototypeOf(obj, clazz.prototype);
+  if (obj) {
+    Object.setPrototypeOf(obj, clazz.prototype);
+    if (clazz === Driver) {
+      if (obj.careerTimeline === undefined || obj.careerTimeline === null) {
+        obj.careerTimeline = [];
+      }
+      if (obj.morale === undefined) obj.morale = 75;
+      if (obj.hiddenTraits === undefined) {
+        obj.hiddenTraits = {
+          workEthic: 60 + Math.floor(Math.random() * 30),
+          professionalism: 60 + Math.floor(Math.random() * 30),
+          pressureResistance: 55 + Math.floor(Math.random() * 35),
+        };
+      }
+    }
+  }
   return obj;
 }
 
