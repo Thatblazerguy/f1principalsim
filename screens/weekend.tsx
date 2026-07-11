@@ -27,8 +27,9 @@ import {
 } from "../utils/seasonTimeline.js";
 import { startWeekendProgress, generateWeekendContext } from "../utils/weekendForm.js";
 import { ensureEngineeringState, getActiveComponent, COMPONENT_CATALOG, applyGridPenalties } from "../utils/engineeringSystem.js";
-import { RACE_OBJECTIVES, generateUnifiedRaceWeekend } from "../utils/raceObjectives.js";
+import { RACE_OBJECTIVES, generateUnifiedRaceWeekend, evaluateObjective } from "../utils/raceObjectives.js";
 export { RACE_OBJECTIVES };
+import { ObjectiveCardsList, FinishDistributionBar } from '../components/ui/ObjectiveCards.tsx';
 
 import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
 import { CloudRain, Sun, Wind, ChevronRight, Activity, Award, ShieldAlert, Cpu, CheckCircle, AlertTriangle, MessageSquare, Flag, ArrowUpRight, ArrowDownRight, Minus, Timer, Zap, DollarSign } from "lucide-react";
@@ -186,7 +187,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const [liveRaceMode, setLiveRaceMode] = useState(false);
   const [showBriefingModal, setShowBriefingModal] = useState<'quick_sim' | 'race_control' | null>(null);
   const [briefingSelectedObjective, setBriefingSelectedObjective] = useState(
-    weekendProgress?.selectedObjective || (raceWeekend?.recommendedObjective?.id) || RACE_OBJECTIVES[2].id
+    weekendProgress?.selectedObjective || (raceWeekend?.recommendedObjective?.id) || RACE_OBJECTIVES[1].id
   );
 
   useEffect(() => {
@@ -295,7 +296,14 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const startSimulationMode = async (objectiveId: string) => {
     const mode = showBriefingModal;
     setShowBriefingModal(null);
-    if (weekendProgress) weekendProgress.selectedObjective = objectiveId;
+    if (weekendProgress) {
+      weekendProgress.selectedObjective = objectiveId;
+      // Store full objective object + finish distribution for post-race evaluation
+      const objDef = raceWeekend?.objectives?.find((o: any) => o.id === objectiveId);
+      if (objDef) {
+        weekendProgress.selectedObjectiveData = { ...objDef, finishDistribution: raceWeekend?.finishDistribution };
+      }
+    }
 
     if (mode === 'quick_sim') {
       setLoading(true);
@@ -613,27 +621,26 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           </div>
         </div>
 
-        {/* Section 5: Dynamic Objectives (Span 4) */}
+        {/* Section 5: AI Race Objectives (Span 4) */}
         <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Flag size={14} /> Race Objectives</h4>
-          <div style={{ marginBottom: '12px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
-            <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Team Tier</span>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{raceWeekend?.tier.label}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <h4 style={{ margin: 0, fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Flag size={14} /> AI Race Objectives
+            </h4>
+            <span style={{ fontSize: '10px', color: HUB.textMuted }}>{raceWeekend?.tier.label}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {raceWeekend?.objectives.map((obj, i) => (
-               <div key={i} style={{ padding: '10px', background: obj.type === 'primary' ? 'rgba(225,6,0,0.08)' : 'rgba(255,255,255,0.02)', borderRadius: '6px', border: obj.type === 'primary' ? `1px solid ${HUB.accent}` : '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{obj.label}</span>
-                    <span style={{ fontSize: '10px', textTransform: 'uppercase', color: obj.riskLevel === 'High' || obj.riskLevel === 'Very High' ? '#ef4444' : '#10b981' }}>{obj.riskLevel} Risk</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: HUB.textMuted }}>
-                    <span>Expected: {obj.expectedFinish}</span>
-                    <span>{obj.successProbability}% Success</span>
-                  </div>
-               </div>
-            ))}
-          </div>
+          {raceWeekend?.finishDistribution && (
+            <div style={{ marginBottom: '14px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+              <FinishDistributionBar finishDist={raceWeekend.finishDistribution} compact={true} />
+            </div>
+          )}
+          <ObjectiveCardsList
+            objectives={raceWeekend?.objectives || []}
+            recommendedObjective={raceWeekend?.recommendedObjective}
+            selectedObjectiveId={briefingSelectedObjective}
+            onSelect={setBriefingSelectedObjective}
+            compact={true}
+          />
         </div>
 
         {/* Section 6: Track Insights (Span 4) */}

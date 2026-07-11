@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HUB, glassCard, actionBtn, pill } from '../HubLayout.tsx';
-import { Target, AlertTriangle, Settings, CloudRain, Sun, Activity, Flag } from 'lucide-react';
+import { HUB, glassCard, actionBtn } from '../HubLayout.tsx';
+import { Target, CloudRain, Sun, Activity, Flag, Brain, TrendingUp } from 'lucide-react';
+import { FinishDistributionBar, ObjectiveCardsList } from './ObjectiveCards.tsx';
 
 export const PreRaceBriefingModal = ({
   isOpen,
@@ -11,13 +12,16 @@ export const PreRaceBriefingModal = ({
   selectedObjective,
   setSelectedObjective,
   briefingData,
-  raceWeekend // New unified raceWeekend prop!
+  raceWeekend,
 }) => {
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
-    onConfirm(selectedObjective);
-  };
+  const handleConfirm = () => onConfirm(selectedObjective);
+
+  const objectives = raceWeekend?.objectives || [];
+  const finishDist = raceWeekend?.finishDistribution;
+  const circuitHistory = raceWeekend?.circuitHistory;
+  const selectedObj = objectives.find(o => o.id === selectedObjective);
 
   return (
     <AnimatePresence>
@@ -26,218 +30,185 @@ export const PreRaceBriefingModal = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          position: 'fixed', inset: 0, zIndex: 9999,
+          backgroundColor: 'rgba(0,0,0,0.88)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '24px'
         }}
       >
         <motion.div
           className="mobile-fullscreen-modal"
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          initial={{ opacity: 0, scale: 0.96, y: 24 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          exit={{ opacity: 0, scale: 0.96, y: 24 }}
+          transition={{ type: 'spring', bounce: 0.15, duration: 0.35 }}
           style={{
             ...glassCard({ padding: 0 }),
-            width: '100%',
-            maxWidth: '700px',
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1) inset'
+            width: '100%', maxWidth: '780px', maxHeight: '92vh',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08) inset',
           }}
         >
-          {/* Header */}
-          <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(10,10,10,0.5)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-              <Target size={20} color={HUB.accent} />
-              <h2 style={{ margin: 0, fontSize: '18px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                AI Race Engineer Briefing
-              </h2>
+          {/* ── Header ── */}
+          <div style={{ padding: '22px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(6,6,6,0.6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+              <div style={{ background: `${HUB.accent}20`, borderRadius: '8px', padding: '8px', display: 'flex' }}>
+                <Brain size={18} color={HUB.accent} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '17px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  AI Race Engineer Briefing
+                </h2>
+                <p style={{ margin: 0, fontSize: '12px', color: HUB.textMuted }}>
+                  {raceWeekend ? `${raceWeekend.grandPrix} • ${raceWeekend.circuit}` : 'Pre-Race Strategy Briefing'}
+                </p>
+              </div>
             </div>
-            <p style={{ margin: 0, fontSize: '13px', color: HUB.textMuted }}>
-              {raceWeekend ? `${raceWeekend.grandPrix} • ${raceWeekend.circuit}` : 'Review pre‑race analysis and set strategic objective'}
-            </p>
           </div>
 
-          {/* Body */}
-          <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* Briefing Summary */}
-            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-              
-              {raceWeekend && (
-                <>
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Team Tier</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>{raceWeekend.tier.label}</div>
-                    <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>Expectation Score: {raceWeekend.expectationScore}</div>
-                  </div>
+          {/* ── Body ── */}
+          <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Main Rival</div>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff' }}>{raceWeekend.standingsImpact.nearestRival || 'Rivals'}</div>
-                    <div style={{ fontSize: '11px', color: HUB.textMuted, marginTop: '4px' }}>Gap: {Math.abs(raceWeekend.standingsImpact.gapToRival)} pts</div>
-                  </div>
+            {/* Row 1: Context cards */}
+            {raceWeekend && (
+              <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Team Tier</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>{raceWeekend.tier.label}</div>
+                  <div style={{ fontSize: '10px', color: '#10b981', marginTop: '3px' }}>Expectation Score: {raceWeekend.expectationScore}</div>
+                </div>
 
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Weather & Conditions</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>
-                      {raceWeekend.weather.isWet ? <CloudRain size={16} color="#60a5fa" /> : <Sun size={16} color="#fbbf24" />}
-                      {raceWeekend.weather.isWet ? 'Wet Race Expected' : 'Dry Race'} • {raceWeekend.weather.trackTemperature}°C
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Weather & Conditions</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '14px', fontWeight: 800 }}>
+                    {raceWeekend.weather.isWet ? <CloudRain size={16} color="#60a5fa" /> : <Sun size={16} color="#fbbf24" />}
+                    {raceWeekend.weather.isWet ? 'Wet Race Expected' : 'Dry Conditions'} • {raceWeekend.weather.trackTemperature}°C
+                  </div>
+                  <div style={{ fontSize: '10px', color: HUB.textMuted, marginTop: '3px' }}>Rain probability: {raceWeekend.weather.rainProbability}%</div>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Main Rival</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>{raceWeekend.standingsImpact.nearestRival || '—'}</div>
+                  <div style={{ fontSize: '10px', color: HUB.textMuted, marginTop: '3px' }}>
+                    Gap: {Math.abs(raceWeekend.standingsImpact.gapToRival)} pts
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
+                  <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Circuit Type</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>{raceWeekend.circuitType}</div>
+                  <div style={{ fontSize: '10px', color: HUB.textMuted, marginTop: '3px' }}>
+                    {raceWeekend.circuitProfile?.type || 'Mixed'} layout
+                    {circuitHistory?.sampleSize > 0 && ` • ${circuitHistory.sampleSize} race(s) of history`}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Row 2: Finish Distribution */}
+            {finishDist && (
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <Activity size={13} color={HUB.accent} />
+                  <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                    AI Performance Model — Expected Outcomes
+                  </span>
+                </div>
+                <FinishDistributionBar finishDist={finishDist} />
+
+                {circuitHistory?.sampleSize >= 2 && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: '9px', color: HUB.textMuted }}>CIRCUIT HISTORY</div>
+                      <div style={{ fontSize: '11px', color: '#fff', fontWeight: 700 }}>
+                        Avg Finish: P{circuitHistory.avgFinish ?? '—'} • Best: P{circuitHistory.bestFinish ?? '—'}
+                      </div>
                     </div>
+                    {circuitHistory.safetyCarFrequency > 0 && (
+                      <div>
+                        <div style={{ fontSize: '9px', color: HUB.textMuted }}>SC FREQUENCY</div>
+                        <div style={{ fontSize: '11px', color: '#fff', fontWeight: 700 }}>{circuitHistory.safetyCarFrequency}% of races</div>
+                      </div>
+                    )}
+                    {circuitHistory.dnfRate > 0 && (
+                      <div>
+                        <div style={{ fontSize: '9px', color: HUB.textMuted }}>DNF RATE HERE</div>
+                        <div style={{ fontSize: '11px', color: circuitHistory.dnfRate > 30 ? '#ef4444' : '#fff', fontWeight: 700 }}>{circuitHistory.dnfRate}%</div>
+                      </div>
+                    )}
                   </div>
+                )}
+              </div>
+            )}
 
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Recommended Objective</div>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{raceWeekend.recommendedObjective?.label || 'Balanced'}</div>
-                    <div style={{ fontSize: '11px', color: HUB.textMuted, marginTop: '4px' }}>Success: {raceWeekend.recommendedObjective?.successProbability}%</div>
-                  </div>
-                </>
-              )}
-
-              {!raceWeekend && (
-                <>
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Expected Finish</div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>{briefingData.expectedFinish}</div>
-                    <div style={{ fontSize: '11px', color: '#10b981', marginTop: '4px' }}>{briefingData.confidence}% Confidence</div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Main Rival</div>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff' }}>{briefingData.rivalTeam}</div>
-                    <div style={{ fontSize: '11px', color: HUB.textMuted, marginTop: '4px' }}>Nearest constructor threat</div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Weather & Conditions</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>
-                      {briefingData.isWet ? <CloudRain size={16} color="#60a5fa" /> : <Sun size={16} color="#fbbf24" />}
-                      {briefingData.isWet ? 'Wet Race Expected' : 'Dry Race'}
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Recommended Strategy</div>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{briefingData.strategyType}</div>
-                    <div style={{ fontSize: '11px', color: HUB.textMuted, marginTop: '4px' }}>Start on {briefingData.startTyre}</div>
-                  </div>
-                </>
-              )}
-
-            </div>
-
-            {/* Objective Selection */}
+            {/* Row 3: Objective Selection */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <Flag size={14} color={HUB.accent} />
-                <h3 style={{ margin: 0, fontSize: '12px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Select Race Objective</h3>
+                <Flag size={13} color={HUB.accent} />
+                <h3 style={{ margin: 0, fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  Select Race Objective — {objectives.length} AI-Generated Options
+                </h3>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {raceWeekend ? raceWeekend.objectives.map((obj) => {
-                  const isSelected = selectedObjective === obj.id;
-                  return (
-                    <button
-                      key={obj.id}
-                      onClick={() => setSelectedObjective(obj.id)}
-                      style={{
-                        padding: '12px 16px',
-                        backgroundColor: isSelected ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)',
-                        border: `1px solid ${isSelected ? HUB.accent : 'rgba(255,255,255,0.05)'}`,
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#fff' : 'rgba(255,255,255,0.8)', marginBottom: '4px' }}>
-                          {obj.label}
-                        </div>
-                        <div style={{ fontSize: '11px', color: HUB.textMuted }}>
-                          Expected: {obj.expectedFinish} • Success: {obj.successProbability}% • {obj.sponsorBonus ? `Sponsor Bonus: +${obj.sponsorBonus}` : ''}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Risk</span>
-                        <span style={{ ...pill(isSelected), backgroundColor: isSelected ? HUB.accent : 'transparent', color: isSelected ? '#fff' : obj.riskLevel === 'High' || obj.riskLevel === 'Very High' ? '#ef4444' : HUB.textMuted, padding: '2px 8px' }}>
-                          {obj.riskLevel}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                }) : RACE_OBJECTIVES.map((obj) => {
-                  const isSelected = selectedObjective === obj.id;
-                  return (
-                    <button
-                      key={obj.id}
-                      onClick={() => setSelectedObjective(obj.id)}
-                      style={{
-                        padding: '12px 16px',
-                        backgroundColor: isSelected ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)',
-                        border: `1px solid ${isSelected ? HUB.accent : 'rgba(255,255,255,0.05)'}`,
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#fff' : 'rgba(255,255,255,0.8)', marginBottom: '4px' }}>
-                          {obj.label}
-                        </div>
-                        <div style={{ fontSize: '11px', color: HUB.textMuted }}>
-                          AI behaviour modifier applied to both simulation models.
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Risk</span>
-                        <span style={{ ...pill(isSelected), backgroundColor: isSelected ? HUB.accent : 'transparent', color: isSelected ? '#fff' : HUB.textMuted, padding: '2px 8px' }}>
-                          {obj.risk}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+
+              {objectives.length > 0 ? (
+                <ObjectiveCardsList
+                  objectives={objectives}
+                  recommendedObjective={raceWeekend?.recommendedObjective}
+                  selectedObjectiveId={selectedObjective}
+                  onSelect={setSelectedObjective}
+                  compact={true}
+                />
+              ) : (
+                <p style={{ color: HUB.textMuted, fontSize: '13px' }}>No objectives available.</p>
+              )}
             </div>
 
+            {/* Selected objective detail (if selected and has rationale) */}
+            {selectedObj && (
+              <motion.div
+                key={selectedObj.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ background: 'rgba(225,6,0,0.06)', border: `1px solid ${HUB.accent}30`, borderRadius: '8px', padding: '14px' }}
+              >
+                <div style={{ fontSize: '9px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>
+                  Selected Objective — AI Rationale
+                </div>
+                <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#ccc', lineHeight: '1.5', fontStyle: 'italic' }}>
+                  "{selectedObj.rationale}"
+                </p>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '11px', color: HUB.textMuted }}>
+                  <span>Expected: <strong style={{ color: '#fff' }}>{selectedObj.expectedFinishRange}</strong></span>
+                  <span>Success: <strong style={{ color: selectedObj.successProbability >= 65 ? '#10b981' : selectedObj.successProbability >= 40 ? '#f59e0b' : '#ef4444' }}>{selectedObj.successProbability}%</strong></span>
+                  <span>Sponsor: <strong style={{ color: '#10b981' }}>+${selectedObj.sponsorRewardM}M</strong></span>
+                  <span>Pts: <strong style={{ color: '#fff' }}>{selectedObj.championshipImpact}</strong></span>
+                </div>
+              </motion.div>
+            )}
           </div>
 
-          {/* Footer actions */}
-          <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(10,10,10,0.5)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button onClick={onClose} style={actionBtn({ padding: '10px 20px', backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' })}>
-              Cancel
-            </button>
-            <button onClick={handleConfirm} style={actionBtn({ padding: '10px 24px', backgroundColor: HUB.accent, color: '#fff' })}>
-              {mode === 'quick_sim' ? 'Start Quick Sim' : 'Start Race Control'}
-            </button>
+          {/* ── Footer ── */}
+          <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(6,6,6,0.6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <div style={{ fontSize: '11px', color: HUB.textMuted }}>
+              {selectedObj ? `▶ ${selectedObj.emoji} ${selectedObj.label}` : 'Select an objective above'}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={onClose} style={{ ...actionBtn({ padding: '10px 20px' }), background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={!selectedObjective}
+                style={{ ...actionBtn({ padding: '10px 28px' }), background: selectedObjective ? HUB.accent : 'rgba(255,255,255,0.1)', color: '#fff', opacity: selectedObjective ? 1 : 0.5 }}
+              >
+                {mode === 'quick_sim' ? '⚡ Start Quick Sim' : '🏁 Start Race Control'}
+              </button>
+            </div>
           </div>
-
         </motion.div>
       </motion.div>
     </AnimatePresence>
   );
 };
-
-// Add RACE_OBJECTIVES for backward compatibility
-const RACE_OBJECTIVES = [
-  { id: 'win',          label: '🏆 Push For Win',         risk: 'High'    },
-  { id: 'podium',       label: '🥈 Fight For Podium',      risk: 'Medium'  },
-  { id: 'points',       label: '🎯 Finish In Points',       risk: 'Low'     },
-  { id: 'conservative', label: '💰 Conservative Points',   risk: 'Minimal' },
-  { id: 'gamble',       label: '🌧 Strategy Gamble',        risk: 'Extreme' },
-];

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { HUB, glassCard, pill } from '../HubLayout.tsx';
 import { Target, Flag, Clock, Zap, Activity, Users, ChevronRight, BarChart3, AlertCircle } from 'lucide-react';
 import { getDriverHeadshotUrl } from '../../data/drivers.js';
-import { RACE_OBJECTIVES } from '../../utils/raceObjectives.js';
+import { RACE_OBJECTIVES, evaluateObjective } from '../../utils/raceObjectives.js';
 
 import {
   Chart as ChartJS,
@@ -1000,20 +1000,32 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
 
 export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, replayData }) => {
   const [activeTab, setActiveTab] = useState('summary');
-  
-  const objDef = RACE_OBJECTIVES.find(o => o.id === objectiveId) || RACE_OBJECTIVES[2];
-  
-  let targetPos = 10;
-  if (objectiveId === 'win') targetPos = 1;
-  else if (objectiveId === 'podium') targetPos = 3;
-  else if (objectiveId === 'conservative') targetPos = 12;
-  else if (objectiveId === 'gamble') targetPos = 5;
+
+  // Retrieve the full objective definition from weekendProgress if available
+  const storedObjData = (state as any)?.weekendProgress?.selectedObjectiveData;
+  // Build a minimal fallback from the legacy static list
+  const legacyObj = RACE_OBJECTIVES.find(o => o.id === objectiveId) || RACE_OBJECTIVES[2];
+  const legacyFallback = {
+    ...legacyObj,
+    rationale: 'Pre-race strategy briefing analysis.',
+    expectedFinishRange: legacyObj.targetPosition ? `P${legacyObj.targetPosition}` : 'Points',
+    successProbability: 60,
+    riskLevel: legacyObj.risk || 'Medium',
+    sponsorRewardM: 1.4,
+    boardImpact: 'Medium',
+    championshipImpact: legacyObj.targetPosition ? `+${Math.max(0, [25,18,15,12,10,8,6,4,2,1][legacyObj.targetPosition-1]||0)} pts` : 'Varies',
+    targetPosition: legacyObj.targetPosition || 10,
+  };
+  const objectiveDef = storedObjData || legacyFallback;
+
+  // Run the AI evaluator
+  const evaluation = evaluateObjective(objectiveDef, results, grid, state.team, track, replayData);
+  const { status, successScore, aiPredictionAccuracy, keyEvents, driverRating, engineeringRating, actualPosition } = evaluation;
+
+  const statusColor = status === 'Achieved' ? '#10b981' : status === 'Partially Achieved' ? '#f59e0b' : '#ef4444';
+  const statusEmoji = status === 'Achieved' ? '✅' : status === 'Partially Achieved' ? '⚠️' : '❌';
 
   const playerResults = results.map((r, i) => ({ r, pos: i+1 })).filter(x => x.r.team?.name === state.team?.name);
-  const bestPos = playerResults.length > 0 ? playerResults[0].pos : 20;
-
-  const achieved = bestPos <= targetPos;
-  const score = achieved ? Math.min(100, 80 + (targetPos - bestPos) * 10) : Math.max(10, 80 - (bestPos - targetPos) * 15);
 
   const tabs = [
     { id: 'summary', label: 'Race Summary' },
@@ -1035,8 +1047,8 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
          <div style={{ display: 'flex', gap: '16px' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Race Rating</div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>
-                {(score / 10).toFixed(1)} <span style={{ fontSize: '12px', color: HUB.textMuted }}>/ 10</span>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: successScore >= 80 ? '#10b981' : successScore >= 50 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>
+                {(successScore / 10).toFixed(1)} <span style={{ fontSize: '12px', color: HUB.textMuted }}>/ 10</span>
               </div>
             </div>
          </div>
@@ -1076,39 +1088,86 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
         {activeTab === 'summary' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
              
-             {/* Objective Review */}
-             <div style={{ backgroundColor: 'rgba(10,10,10,0.85)', border: `1px solid ${achieved ? '#10b981' : '#ef4444'}`, borderRadius: '8px', padding: '24px', display: 'flex', gap: '32px', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <Target size={18} color={HUB.accent} />
-                    <span style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Objective Review</span>
-                  </div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>{objDef.label}</div>
-                  <p style={{ margin: '8px 0 0', fontSize: '13px', color: HUB.textMuted, lineHeight: '1.5' }}>
-                    {achieved 
-                      ? "The strategic targets were met successfully. The data shows strong execution matching our pre-race simulations."
-                      : "We fell short of our strategic targets. We need to review the telemetry to understand where we lost time."}
-                  </p>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '32px', paddingLeft: '32px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Result</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: achieved ? '#10b981' : '#ef4444' }}>{achieved ? 'ACHIEVED' : 'FAILED'}</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Target</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>P{targetPos}</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Actual</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: achieved ? '#10b981' : '#ef4444', fontFamily: HUB.fontMono }}>P{bestPos}</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Strategy Score</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', fontFamily: HUB.fontMono }}>{score}%</div>
-                  </div>
-                </div>
+             {/* ── Objective Review Card ── */}
+             <div style={{
+               backgroundColor: 'rgba(10,10,10,0.85)',
+               border: `1px solid ${statusColor}40`,
+               borderRadius: '10px', padding: '24px',
+               position: 'relative', overflow: 'hidden'
+             }}>
+               {/* Accent line */}
+               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${statusColor}, transparent)` }} />
+
+               {/* Selected objective header */}
+               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                 <Target size={16} color={HUB.accent} />
+                 <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Selected Objective — Post-Race Evaluation</span>
+               </div>
+
+               <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                 {/* Left: objective info */}
+                 <div style={{ flex: 1, minWidth: '200px' }}>
+                   <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', marginBottom: '6px', fontFamily: HUB.fontBold }}>
+                     {objectiveDef.emoji || ''} {objectiveDef.label}
+                   </div>
+                   <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#aaa', lineHeight: '1.5', fontStyle: 'italic' }}>
+                     "{objectiveDef.rationale || 'Pre-race strategic target.'}"
+                   </p>
+                   {/* Key Events */}
+                   {keyEvents.length > 0 && (
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                       {keyEvents.map((evt, i) => (
+                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                           <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: HUB.accent, flexShrink: 0 }} />
+                           <span style={{ fontSize: '11px', color: '#ccc' }}>{evt}</span>
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                 </div>
+
+                 {/* Right: evaluation metrics */}
+                 <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
+                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Status</div>
+                     <div style={{ fontSize: '14px', fontWeight: 900, color: statusColor }}>{statusEmoji} {status}</div>
+                   </div>
+                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
+                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Expected</div>
+                     <div style={{ fontSize: '14px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono }}>{objectiveDef.expectedFinishRange || `P${objectiveDef.targetPosition || '?'}`}</div>
+                   </div>
+                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
+                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Actual</div>
+                     <div style={{ fontSize: '14px', fontWeight: 900, color: statusColor, fontFamily: HUB.fontMono }}>P{actualPosition}</div>
+                   </div>
+                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
+                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Success</div>
+                     <div style={{ fontSize: '14px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono }}>{successScore}%</div>
+                   </div>
+                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
+                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>AI Accuracy</div>
+                     <div style={{ fontSize: '14px', fontWeight: 900, color: '#3b82f6', fontFamily: HUB.fontMono }}>{aiPredictionAccuracy}%</div>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Driver & Engineering ratings */}
+               <div style={{ display: 'flex', gap: '16px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Driver Rating</span>
+                   <span style={{ fontSize: '18px', fontWeight: 900, color: driverRating >= 8 ? '#10b981' : driverRating >= 6 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>{driverRating}<span style={{ fontSize: '11px', color: HUB.textMuted }}>/10</span></span>
+                 </div>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Engineering Rating</span>
+                   <span style={{ fontSize: '18px', fontWeight: 900, color: engineeringRating >= 8 ? '#10b981' : engineeringRating >= 6 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>{engineeringRating}<span style={{ fontSize: '11px', color: HUB.textMuted }}>/10</span></span>
+                 </div>
+                 {objectiveDef.sponsorRewardM && (
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Sponsor Reward</span>
+                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#10b981', fontFamily: HUB.fontMono }}>{status !== 'Not Achieved' ? `+$${objectiveDef.sponsorRewardM}M` : '$0M'}</span>
+                   </div>
+                 )}
+               </div>
              </div>
 
              {/* Engineer Report */}
@@ -1130,8 +1189,8 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
                        <p style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.5', margin: 0 }}>
                          {r.retired 
                            ? `Unfortunately we had to retire the car. Reliability cost us heavily today.` 
-                           : (pos <= targetPos 
-                                ? `Excellent drive. Managed the pace perfectly and executed the strategy flawlessly to hit our target.` 
+                           : (status === 'Achieved' 
+                                ? `Excellent drive. Managed the pace perfectly and executed the strategy flawlessly to hit our target.` : status === 'Partially Achieved' ? `A solid effort — close to the target. Tyre management in the final stint was key.` 
                                 : `Struggled to maintain the required delta. Tyre deg was slightly higher than expected, leaving us exposed.`)}
                        </p>
                      </div>
