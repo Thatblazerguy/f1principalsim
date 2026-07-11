@@ -8,6 +8,7 @@ import { ensureSeasonTimeline, getRoundRaceDay, formatSeasonDate, simulateNextDa
 import { ensureTeamState, getActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { generateUnifiedRaceWeekend } from "../utils/raceObjectives.js";
+import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 
 import { renderWeekend } from "./weekend.js";
 import { renderOffice } from "./office.tsx";
