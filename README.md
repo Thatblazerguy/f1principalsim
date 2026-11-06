@@ -1,6 +1,6 @@
 # 🏎️ F1 Principal Simulator: Championship Hub & FIA Suite
 
-[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Demo-black?style=for-the-badge&logo=vercel&logoColor=white)](https://f1principalsim.vercel.app)
+[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Demo-black?style=for-the-badge&logo=vercel&logoColor=white)](https://f1principalsim-orpin.vercel.app/)
 [![Deploy with Vercel](https://img.shields.io/badge/Deploy%20with-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FThatblazerguy%2Ff1principalsim&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY&envDescription=Supabase%20API%20Credentials&project-name=f1principalsim)
 [![React 19](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
@@ -9,7 +9,7 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-red?style=for-the-badge)](./LICENSE)
 
-> **Live Deployment:** [https://f1principalsim.vercel.app](https://f1principalsim.vercel.app)  
+> **Live Deployment:** [https://f1principalsim-orpin.vercel.app/](https://f1principalsim-orpin.vercel.app/)  
 > *An authentic Formula 1 team principal and FIA regulatory management simulator. Manage drivers, engineering R&D, real-time pit wall strategies, and World Motor Sport Council governance across an entire 24-race championship.*
 
 ---
@@ -42,7 +42,7 @@
 
 The application is deployed live on Vercel with automatic CI/CD and production asset optimization:
 
-- **Production URL:** [https://f1principalsim.vercel.app](https://f1principalsim.vercel.app)
+- **Production URL:** [https://f1principalsim-orpin.vercel.app/](https://f1principalsim-orpin.vercel.app/)
 - **Deployment Platform:** Vercel (Edge Network + Global CDN)
 - **SPA Routing:** Configured with zero-config `vercel.json` URL rewrites
 - **Environment Fallback:** Resilient startup logic handles missing or unconfigured Supabase variables without crashing
@@ -341,7 +341,7 @@ Click the button below to fork and deploy directly with pre-configured project s
 
    > **Note on Supabase:** If you don't provide Supabase credentials, the app **automatically operates in Demo/Local Mode** using localStorage, ensuring seamless exploration with zero crashes!
 
-6. **Deploy:** Click **Deploy**. Vercel will build and assign your live URL (e.g., `https://f1principalsim.vercel.app`).
+6. **Deploy:** Click **Deploy**. Vercel will build and assign your live URL (e.g., `https://f1principalsim-orpin.vercel.app/`).
 
 ---
 
@@ -455,4 +455,4 @@ The simulator incorporates an authentic Formula 1 broadcast design system:
 
 ---
 
-*Ready to lead your team to World Championship glory? Take the pit wall at [f1principalsim.vercel.app](https://f1principalsim.vercel.app)! 🏁*
+*Ready to lead your team to World Championship glory? Take the pit wall at [f1principalsim-orpin.vercel.app](https://f1principalsim-orpin.vercel.app/)! 🏁*
