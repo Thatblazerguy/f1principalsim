@@ -2,6 +2,7 @@ import React from 'react';
 import { checkAuthAndRoute } from "./auth.tsx";
 import { renderToAppRoot } from "../utils/reactRoot.tsx";
 import { HUB, glassCard, actionBtn } from "../components/HubLayout.tsx";
+import { renderFIADashboard } from "../fia/FIADashboard.tsx";
 import { 
   Trophy, 
   Wrench, 
@@ -82,25 +83,49 @@ export function renderLanding(root: HTMLElement) {
               }}>- Principal Simulator</span>
             </div>
             
-            <button 
-              onClick={() => checkAuthAndRoute(root)}
-              style={{
-                fontFamily: HUB.fontBold,
-                fontSize: '11px',
-                color: '#fff',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                padding: '10px 24px',
-                borderRadius: '6px',
-                letterSpacing: '0.1em',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = HUB.accent; e.currentTarget.style.background = 'rgba(225,6,0,0.05)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-            >
-              TELEMETRY PORTAL
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button 
+                onClick={() => renderFIADashboard(root)}
+                style={{
+                  fontFamily: HUB.fontBold,
+                  fontSize: '11px',
+                  color: '#fff',
+                  background: 'rgba(225,6,0,0.12)',
+                  border: '1px solid rgba(225,6,0,0.3)',
+                  padding: '10px 18px',
+                  borderRadius: '6px',
+                  letterSpacing: '0.1em',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = HUB.accent; e.currentTarget.style.background = 'rgba(225,6,0,0.2)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(225,6,0,0.3)'; e.currentTarget.style.background = 'rgba(225,6,0,0.12)'; }}
+              >
+                <Shield size={13} color={HUB.accent} /> FIA HEADQUARTERS
+              </button>
+              <button 
+                onClick={() => checkAuthAndRoute(root)}
+                style={{
+                  fontFamily: HUB.fontBold,
+                  fontSize: '11px',
+                  color: '#fff',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  padding: '10px 22px',
+                  borderRadius: '6px',
+                  letterSpacing: '0.1em',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = HUB.accent; e.currentTarget.style.background = 'rgba(225,6,0,0.05)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+              >
+                TELEMETRY PORTAL
+              </button>
+            </div>
           </header>
 
           {/* Hero Section */}
@@ -133,7 +158,7 @@ export function renderLanding(root: HTMLElement) {
                   color: HUB.accent, 
                   textTransform: 'uppercase', 
                   letterSpacing: '0.2em' 
-                }}>TEAM PRINCIPAL SIMULATOR</span>
+                }}>FORMULA 1 PRINCIPAL &amp; FIA GOVERNANCE SIMULATOR</span>
               </div>
 
               <h1 style={{ 
@@ -148,8 +173,8 @@ export function renderLanding(root: HTMLElement) {
                 maxWidth: '600px'
               }}>
                 RUN THE TEAM.<br />
-                BUILD THE CAR.<br />
-                WIN THE CHAMPIONSHIP.
+                GOVERN THE SPORT.<br />
+                DESIGN CIRCUITS.
               </h1>
 
               <p style={{ 
@@ -158,17 +183,31 @@ export function renderLanding(root: HTMLElement) {
                 color: HUB.textMuted, 
                 lineHeight: '1.6', 
                 maxWidth: '520px', 
-                margin: '0 0 40px' 
+                margin: '0 0 36px' 
               }}>
-                Manage drivers, engineers, finances, car development and race strategy across an entire Formula 1 season.
+                Choose your career: manage drivers, car engineering, and pit stop strategy as a Team Principal, or take control of the FIA to design circuits, ratify calendars, and enact championship regulations.
               </p>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '16px' }}>
                 <button 
                   onClick={() => checkAuthAndRoute(root)} 
-                  style={{ ...actionBtn({ padding: '16px 36px', fontSize: '12px' }) }}
+                  style={{ ...actionBtn({ padding: '16px 28px', fontSize: '12px' }) }}
                 >
-                  START YOUR CAREER <span style={{ marginLeft: '8px' }}>→</span>
+                  TEAM PRINCIPAL <span style={{ marginLeft: '6px' }}>→</span>
+                </button>
+                <button 
+                  onClick={() => renderFIADashboard(root)} 
+                  style={{ 
+                    ...actionBtn({ padding: '16px 28px', fontSize: '12px' }),
+                    background: 'linear-gradient(135deg, rgba(225,6,0,0.18), rgba(225,6,0,0.06))',
+                    border: '1px solid rgba(225,6,0,0.4)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Shield size={14} color={HUB.accent} /> FIA GOVERNOR MODE →
                 </button>
                 <button 
                   onClick={scrollToFeatures}
@@ -180,7 +219,7 @@ export function renderLanding(root: HTMLElement) {
                     backgroundColor: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.08)',
                     borderRadius: '8px',
-                    padding: '16px 32px',
+                    padding: '16px 24px',
                     letterSpacing: '0.1em',
                     cursor: 'pointer',
                     transition: 'all 0.15s'
@@ -188,7 +227,7 @@ export function renderLanding(root: HTMLElement) {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'; }}
                 >
-                  EXPLORE FEATURES
+                  FEATURES
                 </button>
               </div>
 

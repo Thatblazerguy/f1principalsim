@@ -25,6 +25,7 @@ import {
 } from "../utils/engineeringSystem.js";
 import { getTeamLapCredit, getTeamPerformanceBonus } from "../utils/simTeam.js";
 import { strategies } from "../data/strategies.js";
+import { computeCircuitSuitability } from "../utils/circuitSuitability.js";
 import {
   DRIVER_PACE_COEFF,
   DRIVER_RACECRAFT_COEFF,
@@ -272,10 +273,23 @@ export function simulateRaceEvent(
 
       const puPerfMod = getDriverPuPerformance(state, driver.name); // 1.0 is healthy, lower is worse
       const puPenalty = (1.0 - puPerfMod) * 0.18; // small penalty, keeping the field tight
+
+      // ── Circuit Suitability Delta ────────────────────────────────────────
+      // Adjusts base lap time by ±0–1.2s based on how well the team's car
+      // attributes (engine, aero, chassis, tyre, wet) match the circuit's
+      // performance demands. Ensures car-circuit fit is meaningful without
+      // breaking the existing simulation balance.
+      let circuitSuitabilityDelta = 0;
+      try {
+        const { timeDelta } = computeCircuitSuitability(team, track.circuit || track.name || '');
+        // Apply 40% of the delta to preserve existing balance (±0.48s max)
+        circuitSuitabilityDelta = timeDelta * 0.4;
+      } catch (_) { /* ignore if circuit not found */ }
+
       const baseLap = calculateRacePaceLapTime({
         team,
         driver,
-        trackBaseTime: track.baseTime,
+        trackBaseTime: track.baseTime + circuitSuitabilityDelta,
         weekendPerformanceScore,
         tyreHealth: clamp(1 - (0.12 + (driver.tyre / 100) * 0.06), 0.3, 1),
         fuelLoad: 0.9,
@@ -329,6 +343,7 @@ export function simulateRaceEvent(
         retired: riskPenaltyApplied === "DNF",
         isPlayer,
         objDnfMod,
+        circuitSuitabilityDelta,
         explanation: narrativeEvent ? narrativeEvent.label : null
       };
     })
@@ -387,7 +402,7 @@ export function simulateRaceEvent(
       const dynamicLapTime = calculateRacePaceLapTime({
         team: f.team,
         driver: f.driver,
-        trackBaseTime: track.baseTime,
+        trackBaseTime: track.baseTime + (f.circuitSuitabilityDelta || 0),
         weekendPerformanceScore: weekendContext?.drivers?.[f.driver.name]?.weekendPerformanceScore ?? null,
         tyreHealth,
         fuelLoad,
@@ -404,6 +419,7 @@ export function simulateRaceEvent(
         lap,
         totalLaps: laps,
       });
+
       f.time += dynamicLapTime + lapVar;
 
       // Pit stop: first stop

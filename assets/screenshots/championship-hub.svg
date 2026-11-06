@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="100%" height="100%">
+  <defs>
+    <linearGradient id="hubBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080B12"/>
+      <stop offset="50%" stop-color="#0B0F19"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="ferrariRed" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E10600"/>
+      <stop offset="100%" stop-color="#C00000"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.95"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="675" fill="url(#hubBg)"/>
+
+  <!-- Left Sidebar Navigation (Width 220) -->
+  <rect x="0" y="0" width="220" height="675" fill="#080B12" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  
+  <!-- Logo -->
+  <rect x="24" y="24" width="36" height="24" rx="4" fill="url(#ferrariRed)"/>
+  <text x="32" y="41" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="14">F1</text>
+  <text x="68" y="41" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="14" letter-spacing="1">MANAGER</text>
+  
+  <!-- Sidebar Links -->
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="600">
+    <!-- Active Hub -->
+    <rect x="12" y="80" width="196" height="38" rx="8" fill="rgba(225,6,0,0.15)" stroke="#E10600" stroke-width="1"/>
+    <text x="32" y="104" fill="#FFFFFF">🏎️ Championship Hub</text>
+
+    <text x="32" y="146" fill="#94A3B8">🏁 Race Weekend</text>
+    <text x="32" y="186" fill="#94A3B8">🔧 Engineering R&amp;D</text>
+    <text x="32" y="226" fill="#94A3B8">🎓 Driver Academy</text>
+    <text x="32" y="266" fill="#94A3B8">👥 Roster &amp; Market</text>
+    <text x="32" y="306" fill="#94A3B8">💰 Finance &amp; Sponsors</text>
+    <text x="32" y="346" fill="#94A3B8">🏛️ FIA Governance</text>
+    <text x="32" y="386" fill="#94A3B8">📊 History &amp; Replay</text>
+    <text x="32" y="426" fill="#94A3B8">🏆 Leaderboard</text>
+  </g>
+
+  <!-- Team Profile Footer in Sidebar -->
+  <rect x="12" y="590" width="196" height="65" rx="8" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <circle cx="36" cy="622" r="14" fill="#E8002D"/>
+  <text x="30" y="626" fill="#FFF" font-family="monospace" font-weight="bold" font-size="12">SF</text>
+  <text x="58" y="618" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="12">Ferrari HP</text>
+  <text x="58" y="634" fill="#4ADE80" font-family="monospace" font-size="11">$84.2M Budget</text>
+
+  <!-- Main Content Area -->
+  <!-- Top Header -->
+  <text x="250" y="48" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="24" letter-spacing="1">CHAMPIONSHIP HUB</text>
+  <text x="250" y="70" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13">2026 FIA Formula One World Championship • Round 7 of 24</text>
+  
+  <rect x="1010" y="32" width="165" height="38" rx="8" fill="url(#ferrariRed)"/>
+  <text x="1032" y="56" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="13" letter-spacing="0.5">START WEEKEND →</text>
+
+  <!-- Hero Banner: Next Grand Prix Card -->
+  <rect x="250" y="96" width="925" height="150" rx="14" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+  <rect x="250" y="96" width="6" height="150" fill="#E10600" rx="3"/>
+  
+  <text x="276" y="128" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" letter-spacing="1.5">NEXT GRAND PRIX</text>
+  <text x="276" y="165" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="28">GRAND PRIX DE MONACO</text>
+  <text x="276" y="195" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13">Circuit de Monaco • 78 Laps • High Downforce • 75% Safety Car Probability</text>
+  <text x="276" y="222" fill="#FACC15" font-family="monospace" font-size="12">AI OBJECTIVE: QUALIFY BOTH CARS IN TOP 4 • TARGET POINTS: 28+</text>
+
+  <!-- Track Minimap Badge -->
+  <rect x="1020" y="116" width="135" height="110" rx="10" fill="rgba(0,0,0,0.4)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <path d="M 1040 190 C 1030 150 1060 130 1090 140 C 1120 150 1140 180 1120 200 C 1090 215 1060 210 1040 190 Z" fill="none" stroke="#E10600" stroke-width="3"/>
+  <text x="1045" y="215" fill="#94A3B8" font-family="monospace" font-size="10">3.337 km</text>
+
+  <!-- Three Columns: Drivers, Standings, Car Performance -->
+  
+  <!-- Column 1: Driver Lineup Cards (Width 290) -->
+  <rect x="250" y="266" width="290" height="380" rx="12" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="270" y="296" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" letter-spacing="1.5">DRIVER ROSTER</text>
+
+  <!-- Driver 1 Card -->
+  <rect x="266" y="312" width="258" height="145" rx="8" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <rect x="276" y="324" width="4" height="24" rx="2" fill="#E8002D"/>
+  <text x="288" y="342" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="15">Charles Leclerc</text>
+  <text x="475" y="342" fill="#FACC15" font-family="monospace" font-weight="bold" font-size="16">93 OVR</text>
+  
+  <g font-family="monospace" font-size="11" fill="#94A3B8">
+    <text x="276" y="375">Pace: 95</text><text x="350" y="375">Quali: 97</text><text x="430" y="375">Race: 91</text>
+    <text x="276" y="400">Tyre: 89</text><text x="350" y="400">Wet: 88</text><text x="430" y="400">Morale: 98%</text>
+    <text x="276" y="435" fill="#4ADE80">P1 in Drivers Standings (118 pts)</text>
+  </g>
+
+  <!-- Driver 2 Card -->
+  <rect x="266" y="470" width="258" height="145" rx="8" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <rect x="276" y="482" width="4" height="24" rx="2" fill="#E8002D"/>
+  <text x="288" y="500" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="15">Lewis Hamilton</text>
+  <text x="475" y="500" fill="#FACC15" font-family="monospace" font-weight="bold" font-size="16">92 OVR</text>
+  
+  <g font-family="monospace" font-size="11" fill="#94A3B8">
+    <text x="276" y="533">Pace: 92</text><text x="350" y="533">Quali: 91</text><text x="430" y="533">Race: 96</text>
+    <text x="276" y="558">Tyre: 95</text><text x="350" y="558">Wet: 96</text><text x="430" y="558">Morale: 94%</text>
+    <text x="276" y="593" fill="#4ADE80">P3 in Drivers Standings (86 pts)</text>
+  </g>
+
+  <!-- Column 2: Car Performance & R&D (Width 290) -->
+  <rect x="565" y="266" width="290" height="380" rx="12" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="585" y="296" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" letter-spacing="1.5">CAR PERFORMANCE (RANK 1ST)</text>
+
+  <!-- Car Bars -->
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">
+    <text x="585" y="335" fill="#FFF" font-weight="bold">Aerodynamics</text>
+    <text x="815" y="335" fill="#38BDF8" font-family="monospace">91 / 100</text>
+    <rect x="585" y="345" width="250" height="8" rx="4" fill="rgba(255,255,255,0.1)"/>
+    <rect x="585" y="345" width="228" height="8" rx="4" fill="#38BDF8"/>
+
+    <text x="585" y="385" fill="#FFF" font-weight="bold">Power Unit (Engine)</text>
+    <text x="815" y="385" fill="#E10600" font-family="monospace">94 / 100</text>
+    <rect x="585" y="395" width="250" height="8" rx="4" fill="rgba(255,255,255,0.1)"/>
+    <rect x="585" y="395" width="235" height="8" rx="4" fill="#E10600"/>
+
+    <text x="585" y="435" fill="#FFF" font-weight="bold">Chassis &amp; Suspension</text>
+    <text x="815" y="435" fill="#FACC15" font-family="monospace">88 / 100</text>
+    <rect x="585" y="445" width="250" height="8" rx="4" fill="rgba(255,255,255,0.1)"/>
+    <rect x="585" y="445" width="220" height="8" rx="4" fill="#FACC15"/>
+
+    <text x="585" y="485" fill="#FFF" font-weight="bold">Reliability</text>
+    <text x="815" y="485" fill="#4ADE80" font-family="monospace">90 / 100</text>
+    <rect x="585" y="495" width="250" height="8" rx="4" fill="rgba(255,255,255,0.1)"/>
+    <rect x="585" y="495" width="225" height="8" rx="4" fill="#4ADE80"/>
+  </g>
+
+  <!-- Active Upgrades in Pipeline -->
+  <rect x="585" y="525" width="250" height="100" rx="8" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <text x="597" y="550" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="10" letter-spacing="1">R&amp;D IN PROGRESS</text>
+  <text x="597" y="575" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="12">Floor Upgrade Spec B (+1.8 Aero)</text>
+  <text x="597" y="595" fill="#94A3B8" font-family="monospace" font-size="11">Ready in: 1 Race (Canadian GP)</text>
+
+  <!-- Column 3: Constructors Standings & Finances (Width 290) -->
+  <rect x="880" y="266" width="295" height="380" rx="12" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="900" y="296" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" letter-spacing="1.5">CONSTRUCTORS CHAMPIONSHIP</text>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">
+    <!-- P1 Ferrari -->
+    <rect x="896" y="312" width="263" height="36" rx="6" fill="rgba(225,6,0,0.15)" stroke="#E10600" stroke-width="1"/>
+    <text x="910" y="335" fill="#FFF" font-weight="bold">1. Ferrari HP</text>
+    <text x="1115" y="335" fill="#4ADE80" font-family="monospace" font-weight="bold">204 pts</text>
+
+    <!-- P2 Red Bull -->
+    <rect x="896" y="356" width="263" height="34" rx="6" fill="rgba(0,0,0,0.2)"/>
+    <text x="910" y="378" fill="#CBD5E1">2. Red Bull Racing</text>
+    <text x="1115" y="378" fill="#FFF" font-family="monospace">188 pts</text>
+
+    <!-- P3 McLaren -->
+    <rect x="896" y="398" width="263" height="34" rx="6" fill="rgba(0,0,0,0.2)"/>
+    <text x="910" y="420" fill="#CBD5E1">3. McLaren F1 Team</text>
+    <text x="1115" y="420" fill="#FFF" font-family="monospace">172 pts</text>
+
+    <!-- P4 Mercedes -->
+    <rect x="896" y="440" width="263" height="34" rx="6" fill="rgba(0,0,0,0.2)"/>
+    <text x="910" y="462" fill="#CBD5E1">4. Mercedes-AMG</text>
+    <text x="1115" y="462" fill="#FFF" font-family="monospace">114 pts</text>
+
+    <!-- P5 Aston Martin -->
+    <rect x="896" y="482" width="263" height="34" rx="6" fill="rgba(0,0,0,0.2)"/>
+    <text x="910" y="504" fill="#CBD5E1">5. Aston Martin</text>
+    <text x="1115" y="504" fill="#FFF" font-family="monospace">46 pts</text>
+  </g>
+
+  <!-- Budget Cap Snapshot -->
+  <rect x="896" y="530" width="263" height="95" rx="8" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <text x="910" y="555" fill="#64748B" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="bold" font-size="10" letter-spacing="1">FIA FINANCIAL CAP USAGE</text>
+  <text x="910" y="580" fill="#FFF" font-family="monospace" font-size="16" font-weight="bold">$92.4M / $145.0M CAP</text>
+  <rect x="910" y="595" width="235" height="6" rx="3" fill="rgba(255,255,255,0.1)"/>
+  <rect x="910" y="595" width="150" height="6" rx="3" fill="#22C55E"/>
+</svg>
+

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Flag, Wrench, Users, Activity,
   Bell, FastForward, LogOut, ShoppingCart, Star,
   Trophy, CalendarDays, DollarSign, GraduationCap, History,
-  Menu, MoreHorizontal, X, Crosshair
+  Menu, MoreHorizontal, X, Crosshair, Shield
 } from 'lucide-react';
 import { state } from '../state.js';
 import { canSimulateNextDay, simulateNextDay, getRoundRaceDay, formatSeasonDate } from '../utils/seasonTimeline.js';
@@ -176,10 +176,17 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     { id: 'standings',    icon: <Activity size={18}/>,        label: 'FIA Timing Center', group: 'Championship' },
     { id: 'calendar',     icon: <CalendarDays size={18}/>,    label: 'Season Planner',  group: 'Championship' },
     { id: 'history',      icon: <History size={18}/>,         label: 'Season History',  group: 'Championship' },
+    { id: 'fia',          icon: <Shield size={18}/>,          label: 'FIA Organization', group: 'Championship' },
   ];
 
   const handleNav = async (id: string) => {
     if (id === activeScreen) return;
+    if (id === 'fia') {
+      const { renderFIADashboard } = await import('../fia/FIADashboard.tsx');
+      renderFIADashboard(document.getElementById('app')!);
+      setIsDrawerOpen(false);
+      return;
+    }
     // Lazy imports to avoid circular deps at module load
     const { renderDashboard }  = await import('../screens/dashboard.tsx');
     const { renderWeekend }    = await import('../screens/weekend.tsx');

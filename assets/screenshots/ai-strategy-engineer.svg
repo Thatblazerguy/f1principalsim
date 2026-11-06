@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="100%" height="100%">
+  <defs>
+    <linearGradient id="aiBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070A11"/>
+      <stop offset="50%" stop-color="#0C101D"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="cardGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="675" fill="url(#aiBg)"/>
+
+  <!-- Top Bar -->
+  <rect x="0" y="0" width="1200" height="60" fill="#080B12" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="32" y="38" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="18" letter-spacing="1">🧠 AI STRATEGY &amp; PRE-RACE OBJECTIVES</text>
+  <text x="500" y="38" fill="#94A3B8" font-family="monospace" font-size="13">CIRCUIT DE MONACO • 78 LAPS • DRY TO DAMP FORECAST</text>
+
+  <!-- 3 Objectives Cards (Horizontal row) -->
+  <text x="32" y="92" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" letter-spacing="1.5">BOARD OBJECTIVES (RACE CONTRACT BONUS: +$2.5M)</text>
+
+  <!-- Card 1: Primary Objective -->
+  <rect x="32" y="106" width="360" height="150" rx="12" fill="url(#cardGrad2)" stroke="#E10600" stroke-width="1.5"/>
+  <rect x="48" y="122" width="70" height="22" rx="4" fill="#E10600" fill-opacity="0.2"/>
+  <text x="56" y="137" fill="#FF4D4D" font-family="monospace" font-size="10" font-weight="bold">PRIMARY</text>
+  <text x="48" y="172" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16">Double Podium Finish</text>
+  <text x="48" y="196" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">Both Charles Leclerc and Lewis Hamilton must finish P1–P3.</text>
+  <text x="48" y="235" fill="#4ADE80" font-family="monospace" font-size="12" font-weight="bold">Reward: +$1,500,000 • +12 Board Confidence</text>
+
+  <!-- Card 2: Secondary Strategy Objective -->
+  <rect x="420" y="106" width="360" height="150" rx="12" fill="url(#cardGrad2)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+  <rect x="436" y="122" width="80" height="22" rx="4" fill="#3B82F6" fill-opacity="0.2"/>
+  <text x="444" y="137" fill="#60A5FA" font-family="monospace" font-size="10" font-weight="bold">TECHNICAL</text>
+  <text x="436" y="172" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16">Tyre Management Index &gt; 75%</text>
+  <text x="436" y="196" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">Extend Stint 1 beyond Lap 26 without dropping below 1:16.200 pace.</text>
+  <text x="436" y="235" fill="#4ADE80" font-family="monospace" font-size="12" font-weight="bold">Reward: +$650,000 • +0.4 Tyre Dev XP</text>
+
+  <!-- Card 3: Rival Battle -->
+  <rect x="808" y="106" width="360" height="150" rx="12" fill="url(#cardGrad2)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+  <rect x="824" y="122" width="70" height="22" rx="4" fill="#EAB308" fill-opacity="0.2"/>
+  <text x="832" y="137" fill="#FACC15" font-family="monospace" font-size="10" font-weight="bold">RIVALRY</text>
+  <text x="824" y="172" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16">Outscore Red Bull Racing</text>
+  <text x="824" y="196" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12">Score more constructor points than VER / PER combined.</text>
+  <text x="824" y="235" fill="#4ADE80" font-family="monospace" font-size="12" font-weight="bold">Reward: +$850,000 • Morale Boost +5</text>
+
+  <!-- ML Strategy Simulation Engine (Bottom Left, Width 650) -->
+  <rect x="32" y="280" width="650" height="365" rx="12" fill="url(#cardGrad2)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="52" y="310" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" letter-spacing="1.5">ML STRATEGY ASSISTANT • MONTE CARLO STINT SIMULATION</text>
+
+  <!-- Strategy 1: Soft -> Hard (Recommended) -->
+  <rect x="52" y="328" width="610" height="92" rx="8" fill="rgba(225,6,0,0.1)" stroke="#E10600" stroke-width="1"/>
+  <text x="68" y="352" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="14">Strategy A (Recommended) • 1-Stop [Soft L1-22 → Hard L23-78]</text>
+  <text x="560" y="352" fill="#4ADE80" font-family="monospace" font-size="12" font-weight="bold">EST: 1h 41m 18s</text>
+  
+  <!-- Stint bars visual -->
+  <rect x="68" y="366" width="170" height="18" rx="4" fill="#E10600"/>
+  <text x="125" y="380" fill="#FFF" font-family="monospace" font-size="11" font-weight="bold">SOFT (22L)</text>
+  
+  <rect x="242" y="366" width="418" height="18" rx="4" fill="#FFFFFF"/>
+  <text x="410" y="380" fill="#000" font-family="monospace" font-size="11" font-weight="bold">HARD (56 LAPS)</text>
+
+  <text x="68" y="408" fill="#CBD5E1" font-family="monospace" font-size="11">Clean Air Pace: 1:13.1s • Traffic Risk: LOW (Rejoin P4) • Win Probability: 72%</text>
+
+  <!-- Strategy 2: Medium -> Hard -->
+  <rect x="52" y="432" width="610" height="92" rx="8" fill="rgba(0,0,0,0.25)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <text x="68" y="456" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="14">Strategy B (Flexible) • 1-Stop [Medium L1-34 → Hard L35-78]</text>
+  <text x="560" y="456" fill="#94A3B8" font-family="monospace" font-size="12">+2.4s Delta</text>
+  
+  <rect x="68" y="470" width="260" height="18" rx="4" fill="#EAB308"/>
+  <text x="165" y="484" fill="#000" font-family="monospace" font-size="11" font-weight="bold">MEDIUM (34L)</text>
+  
+  <rect x="332" y="470" width="328" height="18" rx="4" fill="#FFFFFF"/>
+  <text x="460" y="484" fill="#000" font-family="monospace" font-size="11" font-weight="bold">HARD (44 LAPS)</text>
+
+  <text x="68" y="512" fill="#94A3B8" font-family="monospace" font-size="11">Safety Car Window: Optimal L24-34 • Overcut Potential: High vs RUS</text>
+
+  <!-- Strategy 3: Aggressive 2-Stop -->
+  <rect x="52" y="536" width="610" height="92" rx="8" fill="rgba(0,0,0,0.25)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <text x="68" y="560" fill="#FFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="14">Strategy C (Aggressive) • 2-Stop [Soft L1-18 → Medium L19-48 → Soft L49-78]</text>
+  <text x="560" y="560" fill="#EF4444" font-family="monospace" font-size="12">+8.1s Delta</text>
+  
+  <rect x="68" y="574" width="140" height="18" rx="4" fill="#E10600"/>
+  <text x="110" y="588" fill="#FFF" font-family="monospace" font-size="10">SOFT (18L)</text>
+  <rect x="212" y="574" width="230" height="18" rx="4" fill="#EAB308"/>
+  <text x="295" y="588" fill="#000" font-family="monospace" font-size="10">MED (30L)</text>
+  <rect x="446" y="574" width="214" height="18" rx="4" fill="#E10600"/>
+  <text x="520" y="588" fill="#FFF" font-family="monospace" font-size="10">SOFT (30L)</text>
+
+  <text x="68" y="616" fill="#94A3B8" font-family="monospace" font-size="11">High traffic vulnerability on Monaco narrow sectors • High risk of undercut trap</text>
+
+  <!-- Right: ML Probability Engine & Pit Deltas (Width 470) -->
+  <rect x="702" y="280" width="466" height="365" rx="12" fill="url(#cardGrad2)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="722" y="310" fill="#E10600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="11" letter-spacing="1.5">CIRCUIT PIT LOSS &amp; STRATEGY METRICS</text>
+
+  <g font-family="monospace" font-size="12">
+    <rect x="722" y="328" width="205" height="75" rx="8" fill="rgba(0,0,0,0.3)"/>
+    <text x="736" y="352" fill="#64748B" font-size="10">TOTAL PIT LOSS TIME</text>
+    <text x="736" y="378" fill="#FFF" font-size="20" font-weight="bold">21.8 SEC</text>
+    <text x="736" y="396" fill="#94A3B8" font-size="10">Pit Lane Limit: 60 km/h</text>
+
+    <rect x="943" y="328" width="205" height="75" rx="8" fill="rgba(0,0,0,0.3)"/>
+    <text x="957" y="352" fill="#64748B" font-size="10">SAFETY CAR PROBABILITY</text>
+    <text x="957" y="378" fill="#FACC15" font-size="20" font-weight="bold">78% CHANCE</text>
+    <text x="957" y="396" fill="#4ADE80" font-size="10">Cheap Pit Save: -9.5s</text>
+
+    <rect x="722" y="415" width="205" height="75" rx="8" fill="rgba(0,0,0,0.3)"/>
+    <text x="736" y="439" fill="#64748B" font-size="10">UNDERCUT POWER (LAP 20)</text>
+    <text x="736" y="465" fill="#4ADE80" font-size="20" font-weight="bold">+1.84 SEC</text>
+    <text x="736" y="483" fill="#94A3B8" font-size="10">New tyre warmup: 1 Lap</text>
+
+    <rect x="943" y="415" width="205" height="75" rx="8" fill="rgba(0,0,0,0.3)"/>
+    <text x="957" y="439" fill="#64748B" font-size="10">OVERTAKING DIFFICULTY</text>
+    <text x="957" y="465" fill="#EF4444" font-size="20" font-weight="bold">EXTREME (9.8/10)</text>
+    <text x="957" y="483" fill="#94A3B8" font-size="10">Track pos paramount</text>
+  </g>
+
+  <!-- ML Strategy Notes Box -->
+  <rect x="722" y="505" width="426" height="120" rx="8" fill="rgba(6,182,212,0.08)" stroke="#06B6D4" stroke-width="1"/>
+  <text x="738" y="530" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="bold" font-size="12">AI RACE STRATEGIST VERDICT</text>
+  <text x="738" y="555" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11">"Given extreme track position importance at Monaco, qualifying P1/P2 enables controlling pace. Soft-to-Hard 1-stop offers lowest risk. Trigger undercut immediately if Red Bull enters pit window."</text>
+  <text x="738" y="612" fill="#38BDF8" font-family="monospace" font-size="10">Model trained on 500+ simulated Grand Prix telemetry runs</text>
+</svg>
+
