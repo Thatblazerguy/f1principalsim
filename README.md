@@ -54,37 +54,51 @@ The application is deployed live on Vercel with automatic CI/CD and production a
 ## 📸 Screenshots Showcase
 
 ### 1. Live Pit Wall Command Center (Race Control)
-*Real-time GPS track telemetry, broadcast-style timing tower, 4-wheel tire thermals, AI race engineer comms, and player strategic orders.*
+*Real-time GPS circuit telemetry, broadcast-style timing tower, 4-wheel tire surface thermals, AI race engineer recommendations, and live driver orders.*
 
-![Live Pit Wall Command Center](./assets/screenshots/pitwall-dashboard.svg)
+![Live Pit Wall Command Center](./assets/screenshots/pitwall-dashboard.png)
 
 ---
 
 ### 2. Championship Hub & Team Overview
 *24-race season calendar, driver lineup cards with ratings & morale, constructor standings, and FIA budget cap tracking.*
 
-![Championship Hub](./assets/screenshots/championship-hub.svg)
+![Championship Hub](./assets/screenshots/championship-hub.png)
 
 ---
 
-### 3. AI Race Objectives & ML Strategy Suite
-*Dynamic board contract objectives, Monte Carlo stint comparison (Soft/Med/Hard), undercut/overcut predictions, and circuit pit loss analytics.*
+### 3. Race Weekend (Practice, Qualifying & Strategy Briefing)
+*Full weekend workflow: setup fine-tuning, 3-tier knockout qualifying shootout, and pre-race tactical objectives.*
 
-![AI Strategy & Race Objectives](./assets/screenshots/ai-strategy-engineer.svg)
+![Race Weekend](./assets/screenshots/race-weekend.png)
 
 ---
 
 ### 4. Car Development & Engineering R&D
-*Aerodynamic, Power Unit, Chassis, and Reliability upgrade trees, active project pipelines, and FIA ATR Wind Tunnel/CFD allowances.*
+*Aerodynamic, Power Unit, Chassis, and Reliability upgrade trees, active project development pipelines, and FIA ATR Wind Tunnel/CFD allocations.*
 
-![Car Development & Engineering](./assets/screenshots/engineering-rd.svg)
+![Car Development & Engineering](./assets/screenshots/engineering-rd.png)
 
 ---
 
 ### 5. FIA Governance & Circuit Designer
 *World Motor Sport Council regulatory management, Cost Cap & Sporting rules, custom Circuit Designer, and 24+ circuit library.*
 
-![FIA Governance & Circuit Designer](./assets/screenshots/fia-governance.svg)
+![FIA Governance & Circuit Designer](./assets/screenshots/fia-governance.png)
+
+---
+
+### 6. Driver Academy & Junior Development
+*Scout young prospects across 5 continental regions, assign specialized training regimens, and promote talent to race seats.*
+
+![Driver Academy](./assets/screenshots/driver-academy.png)
+
+---
+
+### 7. Landing & Career Selection Portal
+*Atmospheric entrance portal with telemetry styling, career progression selection, and telemetry gateway.*
+
+![Landing Portal](./assets/screenshots/landing.png)
 
 ---
 
@@ -205,12 +219,14 @@ The application is deployed live on Vercel with automatic CI/CD and production a
 f1manager/
 ├── assets/                          # Static brand assets & typography
 │   ├── fonts/                       # Official Formula 1 typeface family
-│   └── screenshots/                 # High-resolution screenshot graphics
-│       ├── pitwall-dashboard.svg    # Live pit wall command center
-│       ├── championship-hub.svg     # Championship hub dashboard
-│       ├── ai-strategy-engineer.svg # AI race objectives & ML strategy
-│       ├── engineering-rd.svg       # Car development & R&D projects
-│       └── fia-governance.svg       # FIA governance & circuit designer
+│   └── screenshots/                 # High-resolution screenshots captured from the app
+│       ├── pitwall-dashboard.png    # Live pit wall command center
+│       ├── championship-hub.png     # Championship hub dashboard
+│       ├── race-weekend.png         # Race weekend practice, quali & race
+│       ├── engineering-rd.png       # Car development & R&D projects
+│       ├── fia-governance.png       # FIA governance & circuit designer
+│       ├── driver-academy.png       # Driver academy & prospect scouting
+│       └── landing.png              # Landing and career portal
 ├── components/                      # Reusable UI & HUD components
 │   ├── HubLayout.tsx                # Championship hub navigation shell
 │   ├── NavDropdown.tsx              # Navigation menu popovers
