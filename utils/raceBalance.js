@@ -334,16 +334,18 @@ export function getDriverFormMultiplier(driverName, raceHistory) {
  */
 export function getTrackWetProbability(trackName = "") {
   const t = trackName.toLowerCase();
-  if (t.includes("spa") || t.includes("belgian"))    return 0.40;
+  // Match whole names: "spa" alone would also hit "Spanish Grand Prix"
+  if (t.includes("francorchamps") || t.includes("belgian")) return 0.40;
   if (t.includes("brazil") || t.includes("paulo"))   return 0.35;
-  if (t.includes("britain") || t.includes("silver"))  return 0.30;
+  if (t.includes("britain") || t.includes("british") || t.includes("silver"))  return 0.30;
   if (t.includes("japan") || t.includes("suzuka"))    return 0.25;
-  if (t.includes("china") || t.includes("shanghai"))  return 0.22;
-  if (t.includes("singapore") || t.includes("marina")) return 0.20;
+  if (t.includes("china") || t.includes("chinese") || t.includes("shanghai"))  return 0.22;
+  if (t.includes("singapore") || t.includes("marina bay")) return 0.20; // not "Yas Marina"
   if (t.includes("canada") || t.includes("gilles"))   return 0.20;
   if (t.includes("monaco"))                           return 0.18;
   if (t.includes("baku") || t.includes("azerbaijan")) return 0.10;
-  if (t.includes("bahrain") || t.includes("saudi") || t.includes("abu dhabi")) return 0.03;
+  if (t.includes("bahrain") || t.includes("saudi") || t.includes("abu dhabi") || t.includes("qatar") || t.includes("lusail")) return 0.03;
+  if (t.includes("vegas")) return 0.05;
   return WET_RACE_PROBABILITY;
 }
 

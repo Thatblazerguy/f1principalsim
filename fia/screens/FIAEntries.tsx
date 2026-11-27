@@ -75,7 +75,7 @@ function FIAEntriesScreen({ appRoot }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ minHeight: 'calc(100*var(--vh))', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 1000, margin: '0 auto' }}>
       {notification && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>
           {notification}

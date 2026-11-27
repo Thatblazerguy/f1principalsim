@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   LayoutDashboard, Flag, Wrench, Users, Activity,
   Bell, FastForward, LogOut, ShoppingCart, Star,
   Trophy, CalendarDays, DollarSign, GraduationCap, History,
-  Menu, MoreHorizontal, X, Crosshair, Shield
+  Menu, MoreHorizontal, X, Crosshair, Shield, Sun, Moon
 } from 'lucide-react';
 import { state } from '../state.js';
 import { getTrackPath } from '../data/realTrackLayouts.js';
@@ -13,28 +13,34 @@ import { syncGame, logoutUser } from '../lib/supabaseApi.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageTransition, AnimatedNumber, microTransition } from './ui/motion.tsx';
 import { CommandPalette, CommandPaletteTrigger } from './CommandPalette.tsx';
+import { SeasonSimulator, type AdvanceRequest } from './season/SeasonSimulator.tsx';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 // Graphite ramp, one accent (racing red), display type family.
+// Two palettes. HUB holds the active one: applyTheme() swaps the values and the
+// layout remounts, so inline styles, SVG attributes and canvas charts all
+// repaint. Stylesheets read the matching CSS variables set on <html data-theme>.
+export const HUB_THEMES = {
+  dark: {
+    bg: '#060607', sidebar: '#08080a', surface: 'rgba(17,17,19,0.94)', raised: '#1c1c1f',
+    accent: '#E10600', accentInk: '#ff4d47', accentSoft: 'rgba(225,6,0,0.12)',
+    textPrimary: '#ededed', textSecondary: '#a1a1a6', textMuted: '#a1a1a6', textFaint: '#85858b',
+    border: 'rgba(237,237,237,0.1)', borderMid: 'rgba(237,237,237,0.14)',
+    positive: '#4cc38a', negative: '#e5484d', warning: '#d9a43a',
+    tyre: { soft: '#e5484d', medium: '#e8c547', hard: '#ededed', inter: '#4cc38a', wet: '#4a8fe0' } as Record<string, string>,
+  },
+  light: {
+    bg: '#f3f3f1', sidebar: '#ebebe8', surface: 'rgba(255,255,255,0.96)', raised: '#ecece9',
+    accent: '#E10600', accentInk: '#c20500', accentSoft: 'rgba(225,6,0,0.08)',
+    textPrimary: '#141416', textSecondary: '#4d4d53', textMuted: '#4d4d53', textFaint: '#66666c',
+    border: 'rgba(22,22,26,0.12)', borderMid: 'rgba(22,22,26,0.18)',
+    positive: '#17804f', negative: '#c4323a', warning: '#8f6210',
+    tyre: { soft: '#d6363c', medium: '#c49a12', hard: '#8e8e94', inter: '#1f9e63', wet: '#2f74c9' } as Record<string, string>,
+  },
+};
+export type ThemePref = 'dark' | 'light' | 'system';
 export const HUB = {
-  bg:           '#060607',
-  sidebar:      '#08080a',
-  surface:      'rgba(17,17,19,0.94)',
-  raised:       '#1c1c1f',
-  accent:       '#E10600',
-  accentInk:    '#ff4d47',            // accent used as text on dark surfaces
-  accentSoft:   'rgba(225,6,0,0.12)', // selection fill
-  textPrimary:  '#ededed',
-  textSecondary:'#a1a1a6',
-  textMuted:    '#a1a1a6',
-  textFaint:    '#85858b',
-  border:       'rgba(237,237,237,0.1)',
-  borderMid:    'rgba(237,237,237,0.14)',
-  positive:     '#4cc38a',
-  negative:     '#e5484d',
-  warning:      '#d9a43a',
-  // Signature: tyre compound dots
-  tyre: { soft: '#e5484d', medium: '#e8c547', hard: '#ededed', inter: '#4cc38a', wet: '#4a8fe0' } as Record<string, string>,
+  ...HUB_THEMES.dark,
   radius:       '14px',
   ease:         'cubic-bezier(0.22, 1, 0.36, 1)',
   fontWide:     "'Formula1-Wide', sans-serif",
@@ -43,6 +49,35 @@ export const HUB = {
   fontMono:     "'Formula1-Bold', sans-serif",
   fontSans:     "'Formula1-Regular', sans-serif",
 };
+
+const THEME_KEY = 'f1p-theme';
+export function getThemePref(): ThemePref {
+  try { const v = localStorage.getItem(THEME_KEY); if (v === 'dark' || v === 'light' || v === 'system') return v; } catch { /* storage blocked */ }
+  return 'system';
+}
+export function resolveTheme(pref: ThemePref): 'dark' | 'light' {
+  if (pref !== 'system') return pref;
+  try { return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; } catch { return 'dark'; }
+}
+/** Switch palettes: HUB values, <html data-theme>, and the Tailwind/shadcn `dark` class. */
+export function applyTheme(pref: ThemePref = getThemePref()) {
+  const mode = resolveTheme(pref);
+  Object.assign(HUB, HUB_THEMES[mode]);
+  HUB.tyre = { ...HUB_THEMES[mode].tyre };
+  if (typeof document !== 'undefined') {
+    const root = document.documentElement;
+    root.dataset.theme = mode;
+    root.classList.toggle('dark', mode === 'dark');
+  }
+  return mode;
+}
+export function setThemePref(pref: ThemePref) {
+  try { localStorage.setItem(THEME_KEY, pref); } catch { /* storage blocked: still applies for this session */ }
+  const mode = applyTheme(pref);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('f1p-theme', { detail: mode }));
+  return mode;
+}
+if (typeof window !== 'undefined') applyTheme();
 
 export const tyreDot = (compound: string, size = 8) => {
   const key = String(compound || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -99,10 +134,11 @@ const BTN_SIZES: Record<BtnSize, React.CSSProperties> = {
 // Liquid glass (components/ui/liquid-glass-button.tsx): the light ring and refraction come
 // from the .hub-btn-* pseudo-elements in style.css; these set the tint underneath.
 const BTN_VARIANTS: Record<BtnVariant, React.CSSProperties> = {
+  // colours are CSS variables so they follow the theme without recomputing
   primary:   { backgroundColor: 'rgba(225,6,0,0.82)', color: '#fff', border: '1px solid transparent', boxShadow: 'none', fontFamily: HUB.fontBold },
-  secondary: { backgroundColor: 'rgba(237,237,237,0.035)', color: HUB.textPrimary, border: '1px solid transparent', boxShadow: 'none', fontFamily: HUB.fontBold },
-  ghost:     { backgroundColor: 'transparent', color: HUB.textMuted, border: '1px solid transparent', boxShadow: 'none', fontFamily: HUB.fontRegular },
-  danger:    { backgroundColor: 'rgba(229,72,77,0.07)', color: HUB.negative, border: '1px solid transparent', boxShadow: 'none', fontFamily: HUB.fontBold },
+  secondary: { backgroundColor: 'rgba(var(--ink),0.045)', color: 'var(--hub-t1)', border: '1px solid transparent', boxShadow: 'none', fontFamily: HUB.fontBold },
+  ghost:     { backgroundColor: 'transparent', color: 'var(--hub-t2)', border: '1px solid transparent', boxShadow: 'none', fontFamily: HUB.fontRegular },
+  danger:    { backgroundColor: 'rgba(229,72,77,0.08)', color: 'var(--hub-neg)', border: '1px solid transparent', boxShadow: 'none', fontFamily: HUB.fontBold },
 };
 export const btn = (variant: BtnVariant = 'secondary', size: BtnSize = 'md', extra: React.CSSProperties = {}): React.CSSProperties => ({
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -127,7 +163,7 @@ export const sectionLabel = (text: string) => (
 
 export const pageTitle = (text: string) => (
   <h2 className="hub-title" key={text} style={{
-    fontSize:'clamp(28px, 2.6vw, 40px)', fontWeight:400, color:HUB.textPrimary,
+    fontSize:'clamp(28px, calc(2.6*var(--vw)), 40px)', fontWeight:400, color:HUB.textPrimary,
     margin:'0 0 12px', fontFamily:HUB.fontWide, lineHeight:1.05,
     textTransform:'uppercase',
   }}>
@@ -165,6 +201,23 @@ interface HubLayoutProps {
 
 export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLayoutProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => resolveTheme(getThemePref()));
+  const toggleTheme = () => setThemePref(themeMode === 'dark' ? 'light' : 'dark');
+  // Follow the system setting until the player picks a theme
+  useEffect(() => {
+    if (getThemePref() !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const on = () => setThemeMode(applyTheme('system'));
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
+  useEffect(() => {
+    const on = (e: Event) => setThemeMode((e as CustomEvent).detail);
+    const flip = () => setThemePref(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+    window.addEventListener('f1p-theme', on);
+    window.addEventListener('f1p-theme-toggle', flip);
+    return () => { window.removeEventListener('f1p-theme', on); window.removeEventListener('f1p-theme-toggle', flip); };
+  }, []);
   const canAdvance = canSimulateNextDay(state);
   const totalRounds = Math.min(state.season.totalRounds || 24, 24);
 
@@ -175,30 +228,21 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     renderFn(appRoot);
   };
 
+  // ── Advance time: the season clock panel ──
+  // Every entry point (bottom bar, mobile button, dashboard Next Race card, ⌘K)
+  // opens the same panel, which advances days through simulateNextDay.
+  const [sim, setSim] = useState<{ open: boolean; auto: AdvanceRequest | null }>({ open: false, auto: null });
+  const openSim = (auto: AdvanceRequest | null = null) => setSim({ open: true, auto });
+  useEffect(() => {
+    const on = (e: Event) => openSim((e as CustomEvent).detail?.autoStart ?? null);
+    window.addEventListener('f1p:advance-time', on);
+    return () => window.removeEventListener('f1p:advance-time', on);
+  }, []);
+
+  // ⌘K "Skip to race day": open the clock and run it to the weekend
   const handleSimulate = async () => {
     if (!canAdvance) return;
-
-    // Determine the race day for the current round so we know when to stop
-    const targetRaceDay = getRoundRaceDay(state.season.round);
-    const alreadyAtRaceDay = (state.season.currentDay || 1) >= targetRaceDay;
-
-    if (alreadyAtRaceDay) {
-      // Race window already open — just advance 1 day (normal behaviour when at race)
-      const result = simulateNextDay(state);
-      if (!result.advanced) return;
-    } else {
-      // Fast-forward: keep advancing days until we reach the race day
-      let advanced = false;
-      while ((state.season.currentDay || 1) < targetRaceDay) {
-        const result = simulateNextDay(state);
-        if (!result.advanced) break;
-        advanced = true;
-      }
-      if (!advanced) return;
-    }
-
-    await syncGame();
-    onSimulate?.();
+    openSim({ mode: 'race' });
   };
 
   // Lazy-import nav targets to avoid circular deps — screens import each other
@@ -222,6 +266,10 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
 
   const handleNav = async (id: string) => {
     if (id === activeScreen) return;
+    await renderScreen(id);
+  };
+
+  const renderScreen = async (id: string) => {
     if (id === 'fia') {
       const { renderFIADashboard } = await import('../fia/FIADashboard.tsx');
       renderFIADashboard(document.getElementById('app')!);
@@ -265,6 +313,17 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
     setIsDrawerOpen(false); // Close drawer on navigation
   };
 
+  const closeSim = async (changed: boolean) => {
+    setSim({ open: false, auto: null });
+    if (!changed) return;
+    if (onSimulate) onSimulate();
+    else await renderScreen(activeScreen);
+  };
+  const enterWeekend = () => { void renderScreen('weekend'); };
+  const seasonOver = state.season.round > totalRounds;
+  const advanceLabel = seasonOver ? 'Plan offseason' : canAdvance ? 'Advance time' : 'Race weekend';
+  const onAdvanceClick = () => (seasonOver ? renderScreen('weekend') : openSim());
+
   const handleLogout = async () => {
     try {
       await logoutUser();
@@ -279,7 +338,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
   const isRaceOrDashboard = activeScreen === 'dashboard' || activeScreen === 'weekend';
 
   return (
-    <div style={{fontFamily:HUB.fontSans, backgroundColor:HUB.bg, color:HUB.textPrimary, minHeight:'100vh'}}>
+    <div style={{fontFamily:HUB.fontSans, backgroundColor:HUB.bg, color:HUB.textPrimary, minHeight:'calc(100*var(--vh))'}}>
 
       {/* ── Mobile Drawer Overlay ── */}
       {isDrawerOpen && (
@@ -293,7 +352,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
       <aside 
         className={`desktop-sidebar mobile-drawer ${isDrawerOpen ? 'open' : ''}`}
         style={{
-          position:'fixed', left:0, top:0, height:'100vh', width:'256px', zIndex:101,
+          position:'fixed', left:0, top:0, height:'calc(100*var(--vh))', width:'256px', zIndex:101,
           backgroundColor:HUB.sidebar, borderRight:`1px solid ${HUB.border}`,
           display:'flex', flexDirection:'column', padding:'24px 0',
         }}
@@ -357,7 +416,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
                     position: 'relative',
                     background: 'transparent'
                   }}
-                  onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.color=HUB.textPrimary; (e.currentTarget as HTMLElement).style.background='rgba(237,237,237,0.04)'; }}}
+                  onMouseEnter={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.color=HUB.textPrimary; (e.currentTarget as HTMLElement).style.background='rgba(var(--ink),0.04)'; }}}
                   onMouseLeave={e => { if (!isActive) { (e.currentTarget as HTMLElement).style.color=HUB.textMuted; (e.currentTarget as HTMLElement).style.background='transparent'; }}}
                 >
                   {isActive && (
@@ -394,19 +453,19 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
             <LogOut size={16} strokeWidth={1.5}/> Log out
           </button>
           <motion.button 
-            onClick={handleSimulate} disabled={!canAdvance}
-            whileTap={{ scale: canAdvance ? 0.98 : 1 }}
+            onClick={() => { setIsDrawerOpen(false); void onAdvanceClick(); }}
+            whileTap={{ scale: 0.98 }}
             transition={microTransition}
             className={btnClass('primary', 'show-on-mobile')}
             style={btn('primary', 'md', { width: '100%', marginTop: '8px' })}
-          >Skip to race day <FastForward size={16} strokeWidth={1.5}/></motion.button>
+          >{advanceLabel} <FastForward size={16} strokeWidth={1.5}/></motion.button>
         </div>
       </aside>
 
       {/* ── Top Header ── */}
       <header className="mobile-header" style={{
         position:'fixed', top:0, left:'256px', right:0, height:'64px', zIndex:40,
-        background:'rgba(6,6,7,0.82)',
+        background:'rgba(var(--bg-rgb),0.82)',
         borderBottom:`1px solid ${HUB.border}`,
         display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 32px',
       }}>
@@ -428,6 +487,10 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
         </div>
         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
           <CommandPaletteTrigger />
+          <button onClick={toggleTheme} className={btnClass('ghost')} style={iconBtn('md')}
+            aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
+            {themeMode === 'dark' ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
+          </button>
           <button onClick={() => handleNav('standings')} className={btnClass('ghost')} aria-label="Standings" title="Standings" style={iconBtn('md')}>
             <Bell size={18} strokeWidth={1.5}/>
           </button>
@@ -443,13 +506,14 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
       {/* ── Main Slot ── */}
       <main style={{
         marginLeft:'256px', paddingTop:'96px', paddingBottom:'112px',
-        paddingLeft:'40px', paddingRight:'40px', minHeight:'100vh', boxSizing:'border-box',
+        paddingLeft:'40px', paddingRight:'40px', minHeight:'calc(100*var(--vh))', boxSizing:'border-box',
         position: 'relative', zIndex: 1 // needed for AnimatePresence absolute children if any, but we just use mode="wait"
       }}>
         <div style={{maxWidth:'1440px', margin:'0 auto', height: '100%'}}>
           <AnimatePresence mode="wait">
             <PageTransition id={activeScreen}>
-              {children}
+              {/* remount on theme change so every inline style repaints with the new palette */}
+              <React.Fragment key={themeMode}>{children}</React.Fragment>
             </PageTransition>
           </AnimatePresence>
         </div>
@@ -458,7 +522,7 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
       {/* ── Bottom Action Bar (Desktop) ── */}
       <div className="hide-on-mobile" style={{
         position:'fixed', bottom:0, left:'256px', right:0, height:'72px', zIndex:40,
-        background:'rgba(6,6,7,0.82)',
+        background:'rgba(var(--bg-rgb),0.82)',
         borderTop:`1px solid ${HUB.border}`, padding:'0 32px',
         display:'flex', alignItems:'center', justifyContent:'space-between',
       }}>
@@ -481,10 +545,12 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
               {Math.max(0, getRoundRaceDay(state.season.round) - (state.season.currentDay || 1))} days
             </p>
           </div>
-          <button onClick={handleSimulate} disabled={!canAdvance}
+          <button onClick={() => void onAdvanceClick()}
             className={btnClass('primary')}
             style={btn('primary', 'md')}
-          >Skip to race day <FastForward size={16} strokeWidth={1.5}/></button>
+            aria-haspopup="dialog"
+            title={seasonOver ? undefined : 'Open the season clock'}
+          >{advanceLabel} <FastForward size={16} strokeWidth={1.5}/></button>
         </div>
       </div>
 
@@ -555,6 +621,8 @@ export function HubLayout({ activeScreen, appRoot, children, onSimulate }: HubLa
 
       <CommandPalette activeScreen={activeScreen} appRoot={appRoot} navItems={navItems.filter(Boolean) as any}
         onNav={handleNav} onSkipToRaceDay={handleSimulate} onSimulate={onSimulate} onLogout={handleLogout} />
+
+      <SeasonSimulator open={sim.open} autoStart={sim.auto} onClose={closeSim} onEnterWeekend={enterWeekend} />
     </div>
   );
 }
@@ -566,7 +634,7 @@ function HubStage() {
   return (
     <div className="hub-stage" aria-hidden>
       <svg className="hub-stage-track" viewBox="-40 -40 580 580" preserveAspectRatio="xMidYMid meet">
-        <path d={d} fill="none" stroke="rgba(237,237,237,0.07)" strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        <path d={d} fill="none" style={{ stroke: 'rgba(var(--ink),0.08)' }} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       </svg>
     </div>
   );

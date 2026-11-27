@@ -1,5 +1,8 @@
-import { getTrackWetProbability } from "../utils/raceBalance.js";
-import { rollForFailures, applySessionWear, ensureEngineeringState } from "../utils/engineeringSystem.js";
+import { applySessionWear, ensureEngineeringState } from "../utils/engineeringSystem.js";
+import {
+  makeRng, newRaceSeed, getRaceRules, decideRaceWeather, rollNeutralisations, inRange,
+  rollStartIncidents, selectAIStrategy, rollRetirement, breaksCompoundRule, isClassified,
+} from "./raceEvents.js";
 import { strategies } from "../data/strategies.js";
 import { state } from "../state.js";
 import {
@@ -18,6 +21,8 @@ import {
   ERS_DELTA,
   DRY_COMPOUNDS,
   PIT_LOSS_BASE,
+  SC_PIT_FACTOR,
+  VSC_PIT_FACTOR,
 } from "./paceModel.js";
 
 export function compareCars(a, b, totalLaps) {
@@ -61,12 +66,26 @@ const ERS_USAGE = {
 };
 
 export class LiveRaceEngine {
-  constructor(teams, track, laps, qualifyingGrid, playerSelectedStrategies, weekendContext) {
+  /**
+   * @param options.seed  race seed: the same seed (and the same player inputs) replays the same race
+   */
+  constructor(teams, track, laps, qualifyingGrid, playerSelectedStrategies, weekendContext, options = {}) {
     this.track = track;
     this.totalLaps = laps;
-    this.isWet = Math.random() < getTrackWetProbability(track.name || track.circuit || "");
+    this.seed = options.seed ?? weekendContext?.raceSeed ?? newRaceSeed();
+    this.rng = makeRng(this.seed);
+    this.rules = getRaceRules(state);
+    // The weekend's weather (set at qualifying) wins; otherwise roll for it.
+    this.isWet = decideRaceWeather(track, weekendContext, this.rules, this.rng);
+    // Safety car / VSC windows by leader lap (shared rules with the quick sim)
+    const { scRange, vscRange } = rollNeutralisations(laps, this.rules, this.rng);
+    this.scRange = scRange;
+    this.vscRange = vscRange;
+    this.neutralisation = null; // null | "SC" | "VSC"
     this.weatherStr = this.isWet ? "Wet" : "Dry";
-    this.events = [];
+    this.events = [];    // { seq, time, lap, msg, kind?, driver?, other?, pos? }, newest first
+    this.eventSeq = 0;
+    this.fastestLap = null; // { driver, time, lap }
     this.comms = []; // { time, sender: "Engineer" | "Driver Name", msg, isPlayerTeam }
     this.ticks = 0;
     this.raceCompleted = false;
@@ -78,67 +97,21 @@ export class LiveRaceEngine {
 
     this.cars = this.initCars(teams, qualifyingGrid, playerSelectedStrategies, weekendContext);
     this.calculateFailures();
+    this.startIncidents = rollStartIncidents(this.cars.map((c) => ({ name: c.id, gridPos: c.gridPos })), this.rng);
     
-    this.addEvent("Lights out");
+    this.addEvent("Lights out", { kind: "start" });
     this.addComm("Engineer", "Lights out and away we go! Keep it clean into turn 1.", true);
   }
 
+  /** Pre-roll retirements: component wear for our cars, team reliability for the rest (see raceEvents.js). */
   calculateFailures() {
-    const isChaotic = Math.random() < 0.05;
-    const isExtreme = Math.random() < 0.01;
-    
-    const CATEGORIES = [
-      { type: "Engine", weight: 0.35 },
-      { type: "Gearbox", weight: 0.25 },
-      { type: "Hydraulics", weight: 0.20 },
-      { type: "Suspension", weight: 0.10 },
-      { type: "Electrical", weight: 0.10 }
-    ];
-
-    const GLOBAL_MULTIPLIER = 8.5380; // Auto-tuned for 2.5 avg DNFs per race
-
-    this.cars.forEach(car => {
-      // ── Player cars: use engineering component wear for failure probability ──
-      if (car.isPlayer) {
-        ensureEngineeringState(state);
-        const failures = rollForFailures(state, car.driver.name, isChaotic ? 2.0 : isExtreme ? 4.0 : 1.0);
-        if (failures.length > 0) {
-          const failLap = Math.max(1, Math.floor(Math.random() * this.totalLaps));
-          car.failureData = {
-            lap: failLap,
-            distance: failLap - 1 + Math.random(),
-            type: failures[0].type
-          };
-        }
-        return;
-      }
-
-      // ── AI cars: use legacy reliability-based model ──
-      let relFactor = 0.0;
-      if (car.reliability > 85) relFactor = 0.005;
-      else if (car.reliability >= 70) relFactor = 0.012;
-      else relFactor = 0.025;
-      
-      let chaosMult = 1.0;
-      if (isExtreme) chaosMult = 3.5;
-      else if (isChaotic) chaosMult = 2.0;
-
-      for (const cat of CATEGORIES) {
-        let prob = relFactor * cat.weight * GLOBAL_MULTIPLIER * chaosMult;
-        prob = Math.min(0.9, prob);
-
-        if (Math.random() < prob) {
-          const failLap = Math.max(1, Math.floor(Math.random() * this.totalLaps));
-          const failFraction = Math.random();
-          
-          car.failureData = {
-             lap: failLap,
-             distance: failLap - 1 + failFraction,
-             type: cat.type
-          };
-          break; // One critical failure per car max
-        }
-      }
+    ensureEngineeringState(state);
+    this.cars.forEach((car) => {
+      const failure = rollRetirement({
+        team: car.team, driver: car.driver, isPlayer: car.isPlayer, laps: this.totalLaps,
+        rules: this.rules, appState: state, rng: this.rng,
+      });
+      if (failure) car.failureData = { lap: failure.lap, distance: failure.distance, type: failure.type };
     });
   }
 
@@ -148,15 +121,20 @@ export class LiveRaceEngine {
     teams.forEach(team => {
       team.drivers.forEach(driver => {
         const gridPos = this.getGridPosition(qualifyingGrid, driver);
-        const isPlayer = !!playerSelectedStrategies && (playerSelectedStrategies[driver.name] !== undefined);
-        const profile = buildPaceProfile({ team, driver, track: this.track, isWet: this.isWet, weekendContext, appState: state });
+        // Ours if the team is flagged as the player's, or a strategy was picked for this driver
+        const isPlayer = Boolean(team.isPlayerTeam) || (!!playerSelectedStrategies && (playerSelectedStrategies[driver.name] !== undefined));
+        let profile = buildPaceProfile({ team, driver, track: this.track, isWet: this.isWet, weekendContext, appState: state });
+        if (!isPlayer && this.rules.aiAggression) {
+          // Season setting: aggressive AI races harder but makes more mistakes
+          profile = { ...profile, racecraft: profile.racecraft + this.rules.aiRacecraftDelta, mistakeChance: profile.mistakeChance * this.rules.aiMistakeMult };
+        }
 
         // Starting compound and stint plan from the chosen (or AI-picked) strategy
         const roundStrats = this.track.round ? (strategies[this.track.round] || []) : [];
         const pick = playerSelectedStrategies?.[driver.name];
         const strat = pick
           ? (roundStrats.find(st => st.id === pick)?.label ?? String(pick))
-          : (roundStrats[Math.floor(Math.random() * Math.min(2, roundStrats.length))]?.label ?? "M -> H");
+          : (selectAIStrategy(roundStrats, team, this.rng, this.rules)?.label ?? "M -> H");
         let plan = parseStrategyCompounds(strat).filter(c => DRY_COMPOUNDS.includes(c));
         if (plan.length === 0) plan = ["Medium", "Hard"];
         if (this.isWet) plan = ["Intermediate"];
@@ -234,9 +212,11 @@ export class LiveRaceEngine {
     return idx < 0 ? qualifyingGrid.length : idx;
   }
 
-  addEvent(msg) {
-    this.events.unshift({ time: this.elapsedTime, msg });
-    if (this.events.length > 100) this.events.pop();
+  /** Race feed entry. `meta` tags it for the race control screen (kind, driver, other, pos). */
+  addEvent(msg, meta = {}) {
+    const lap = this.cars?.length ? Math.max(1, Math.min(this.totalLaps, this.cars[0].lap || 1)) : 1;
+    this.events.unshift({ seq: ++this.eventSeq, time: this.elapsedTime, lap, msg, ...meta });
+    if (this.events.length > 400) this.events.pop();
   }
 
   addComm(sender, msg, isPlayerTeam) {
@@ -320,12 +300,12 @@ export class LiveRaceEngine {
       driver: car.driver.name,
       team: car.team.name,
       lap: car.pitLap ?? car.lap,
-      time: (2.0 + Math.random() * 0.9).toFixed(2),
+      time: (2.0 + this.rng() * 0.9).toFixed(2),
       oldPos: car.pitEntryPos,
       newPos: exitPos,
       strategy: `${from} → ${next}`,
     });
-    this.addEvent(`${car.driver.name} pits: ${from} → ${next}, rejoins P${exitPos}`);
+    this.addEvent(`${car.driver.name} pits: ${from} → ${next}, rejoins P${exitPos}`, { kind: "pit", driver: car.id, pos: exitPos, from, to: next });
   }
 
   aiLogic(car, dt, idx) {
@@ -333,7 +313,7 @@ export class LiveRaceEngine {
      if (car.retired || car.isPlayer) return;
 
      // ── Tyres: pit near the end of the tyre's useful life ──
-     if (!car.aiPitThreshold) car.aiPitThreshold = 0.82 + Math.random() * 0.18;
+     if (!car.aiPitThreshold) car.aiPitThreshold = clamp(0.82 + this.rng() * 0.18 + this.rules.aiPitShift, 0.7, 1.05);
      const lapsLeft = this.totalLaps - car.distance;
      const life = tyreLife(car.profile, car.tireCompound);
      const dryUsed = new Set(car.usedCompounds.filter(c => DRY_COMPOUNDS.includes(c)));
@@ -341,7 +321,9 @@ export class LiveRaceEngine {
      const canReachEnd = car.tyreAge + lapsLeft <= life * 1.1;
      const wornOut = car.tyreAge >= life * car.aiPitThreshold;
      const ruleDeadline = needsRule && lapsLeft < 12 && car.tyreAge > 6;
-     if (car.pitStopStatus === "None" && lapsLeft > 2 && ((wornOut && !(canReachEnd && !needsRule)) || ruleDeadline)) {
+     // A neutralisation makes a stop cheap: take it if one is due anyway
+     const neutralStop = this.neutralisation && lapsLeft > 5 && car.tyreAge >= 6 && (needsRule || car.tyreAge > life * 0.5);
+     if (car.pitStopStatus === "None" && lapsLeft > 2 && ((wornOut && !(canReachEnd && !needsRule)) || ruleDeadline || neutralStop)) {
        const planned = car.plan[car.planIdx + 1];
        const usable = planned && (!needsRule || !dryUsed.has(planned)) && tyreLife(car.profile, planned) * 1.15 >= lapsLeft;
        car.nextTire = usable ? planned : chooseNextCompound(car.profile, lapsLeft, car.usedCompounds, { lap: car.lap, totalLaps: this.totalLaps });
@@ -402,6 +384,7 @@ export class LiveRaceEngine {
     const leaderOldLap = this.cars.length > 0 ? this.cars[0].lap : 0;
 
     this.cars.sort((a, b) => compareCars(a, b, this.totalLaps));
+    this.updateNeutralisation();
 
     for (let i = 0; i < this.cars.length; i++) {
       let car = this.cars[i];
@@ -435,14 +418,21 @@ export class LiveRaceEngine {
       });
       car.basePace = lapTime;          // underlying pace: what decides an overtake
       lapTime += car.lapNoise;
-      if (car.lap <= 1) lapTime += 1.5; // standing start
+      if (car.lap <= 1) lapTime += 1.5 + (this.startIncidents.get(car.id) || 0); // standing start (+ any lap-1 incident)
       if (car.fuel <= 0) lapTime += 8;  // out of fuel: crawling home
       if (car.engineTemp > 120) lapTime += 2.5;
       else if (car.engineTemp > 115) lapTime += 0.6;
 
       // Dirty air / traffic: find the nearest running car ahead
       const ahead = this.carAhead(i);
-      if (ahead && ahead.pitStopStatus !== "Pitting") {
+      if (this.neutralisation === "SC") {
+        // Behind the safety car: slow pace, cars close up to ~0.6s and hold station
+        const scPace = this.track.baseTime * 1.35;
+        const gapToAhead = ahead ? (ahead.distance - car.distance) * scPace : 99;
+        lapTime = gapToAhead > 1.0 ? scPace * 0.9 : scPace;
+      } else if (this.neutralisation === "VSC") {
+        lapTime = Math.max(lapTime, car.basePace * 1.3);
+      } else if (ahead && ahead.pitStopStatus !== "Pitting") {
         const gapSec = (ahead.distance - car.distance) * lapTime;
         lapTime += dirtyAirPenalty(gapSec, this.overtakingDifficulty);
       }
@@ -457,7 +447,10 @@ export class LiveRaceEngine {
       // ── Overtaking: one roll per attempt, then hold position for a while ──
       // Cars on in/out laps are slow and out of the fight: they're passed without a battle
       const aheadInPitCycle = ahead && ahead.pitStopStatus !== "None";
-      if (ahead && !aheadInPitCycle && car.pitStopStatus !== "InLap" &&
+      if (this.neutralisation && ahead && !aheadInPitCycle && newDistance > ahead.distance - 0.002) {
+        // No overtaking under the safety car or VSC
+        newDistance = Math.min(newDistance, ahead.distance - 0.002);
+      } else if (ahead && !aheadInPitCycle && car.pitStopStatus !== "InLap" &&
           ahead.distance < this.totalLaps && newDistance > ahead.distance - 0.002) {
         const edge = (ahead.basePace ?? car.basePace) - car.basePace;
         if (this.elapsedTime < car.holdUntil || (edge <= 0 && car.lap > 1)) {
@@ -472,12 +465,12 @@ export class LiveRaceEngine {
             drs: car.lap > 2,
             tyreAgeDelta: ahead.tyreAge - car.tyreAge,
           });
-          if (Math.random() < p) {
+          if (this.rng() < p) {
             car.overtakes++;
             newDistance = Math.max(newDistance, ahead.distance + 0.0005); // move clear ahead
             ahead.holdUntil = this.elapsedTime + lapTime; // no instant switch-back
             const posNow = this.cars.indexOf(ahead) + 1;
-            this.addEvent(`LAP ${car.lap}: ${car.driver.name} overtakes ${ahead.driver.name} for P${posNow}`);
+            this.addEvent(`LAP ${car.lap}: ${car.driver.name} overtakes ${ahead.driver.name} for P${posNow}`, { kind: "overtake", driver: car.id, other: ahead.id, pos: posNow });
             if (car.isPlayer) this.addComm("Engineer", `Great move! That's P${posNow}.`, true);
             if (ahead.isPlayer) this.addComm("Engineer", `Lost the position to ${car.driver.name}. Regroup.`, true);
           } else {
@@ -497,18 +490,26 @@ export class LiveRaceEngine {
         car.lastLapTime = lapTimeDone;
         if (lapTimeDone < car.bestLapTime) car.bestLapTime = lapTimeDone;
         car.currentLapStartTime = crossTime;
+        // Fastest lap of the race (standing-start lap excluded)
+        if (car.lapTimes.length > 1 && (!this.fastestLap || lapTimeDone < this.fastestLap.time)) {
+          this.fastestLap = { driver: car.id, time: lapTimeDone, lap: car.lapTimes.length };
+          this.addEvent(`Fastest lap: ${car.driver.name}, ${lapTimeDone.toFixed(3)}s`, { kind: "fastest", driver: car.id, lapTime: lapTimeDone });
+        }
 
         // New lap: fresh noise sample and a chance of a mistake
-        car.lapNoise = clamp(gaussian() * car.profile.noiseSigma, -2.5 * car.profile.noiseSigma, 2.5 * car.profile.noiseSigma);
+        car.lapNoise = clamp(gaussian(this.rng) * car.profile.noiseSigma, -2.5 * car.profile.noiseSigma, 2.5 * car.profile.noiseSigma);
         const mistakeMult = car.driverMode === "Attack" ? 2 : car.driverMode === "Push" ? 1.4 : 1;
-        if (Math.random() < car.profile.mistakeChance * mistakeMult) {
-          car.lapNoise += 0.6 + Math.random() * 1.6;
+        if (!this.neutralisation && this.rng() < car.profile.mistakeChance * mistakeMult) {
+          car.lapNoise += 0.6 + this.rng() * 1.6;
           if (car.isPlayer) this.addComm(car.driver.name, "Sorry, locked up into the hairpin.", true);
         }
 
         if (car.pitStopStatus === "InLap") {
           car.pitStopStatus = "Pitting";
-          car.pitTimer = PIT_LOSS_BASE + Math.random() * 1.5;
+          // Stops are cheaper while the field is neutralised
+          const pitFactor = this.neutralisation === "SC" ? SC_PIT_FACTOR : this.neutralisation === "VSC" ? VSC_PIT_FACTOR : 1;
+          car.pitTimer = PIT_LOSS_BASE * pitFactor + this.rng() * 1.5;
+          if (this.neutralisation) car.neutralStop = true;
           car.pitEntryPos = this.cars.indexOf(car) + 1;
           car.pitLap = car.lapTimes.length;
           newDistance = Math.floor(newDistance) + 0.001;
@@ -525,6 +526,12 @@ export class LiveRaceEngine {
       if (car.distance >= this.totalLaps && oldDistance < this.totalLaps) {
          let fractionOver = (this.totalLaps - oldDistance) / (newDistance - oldDistance);
          car.totalTime += dt * fractionOver;
+         if (breaksCompoundRule(car.usedCompounds, this.isWet)) {
+           car.disqualified = true;
+           car.dnfReason = "Disqualified: did not use two dry compounds";
+           this.addEvent(`${car.driver.name} is disqualified: only one dry compound used`, { kind: "penalty", driver: car.id });
+           if (car.isPlayer) this.addComm("Engineer", "We never made the mandatory compound change. That's a disqualification.", true);
+         }
       } else if (car.distance < this.totalLaps) {
          car.totalTime += dt;
       }
@@ -535,12 +542,13 @@ export class LiveRaceEngine {
       car.tireWear = tyreWearPct(car.profile, car.tireCompound, car.tyreAge);
 
       car.fuel = Math.max(0, car.fuel - (FUEL_USAGE[car.fuelMode] || 1.0) * (105 / this.totalLaps) * dLaps);
-      car.ers += (ERS_USAGE[car.ersMode] || 0) * dLaps * 10;
+      // ERS_USAGE is battery spent per lap: deploy modes drain it, Harvest (negative) recharges it.
+      car.ers -= (ERS_USAGE[car.ersMode] || 0) * dLaps * 10;
       car.ers = Math.max(0, Math.min(100, car.ers));
 
       if (car.driverMode === "Push" || car.driverMode === "Attack") car.engineTemp += dt * 0.5;
       else if (car.driverMode === "Conserve") car.engineTemp -= dt * 1.0;
-      else car.engineTemp += (90 - car.engineTemp) * 0.01; // drift to 90
+      else car.engineTemp += (90 - car.engineTemp) * (1 - Math.exp(-0.6 * dt)); // drift to 90, independent of tick size
       car.engineTemp = Math.max(70, Math.min(130, car.engineTemp));
 
       // DNF Checks
@@ -548,7 +556,7 @@ export class LiveRaceEngine {
         car.retired = true;
         car.dnfReason = `${car.failureData.type} failure`;
         car.stints[car.stints.length - 1].endLap = car.lapTimes.length;
-        this.addEvent(`${car.driver.name} is OUT of the race with a ${car.failureData.type.toLowerCase()} failure.`);
+        this.addEvent(`${car.driver.name} is OUT of the race with a ${car.failureData.type.toLowerCase()} failure.`, { kind: "retire", driver: car.id, reason: car.dnfReason });
         if (car.isPlayer) {
            if (car.failureData.type === "Engine") this.addComm(car.driver.name, "I've lost the engine.", true);
            else if (car.failureData.type === "Gearbox") this.addComm(car.driver.name, "I've lost sync, gearbox is broken.", true);
@@ -570,7 +578,7 @@ export class LiveRaceEngine {
     if (!anyCarRacing) {
       this.raceCompleted = true;
       this.saveSnapshot(); // Final snapshot
-      this.addEvent("Chequered flag");
+      this.addEvent("Chequered flag", { kind: "finish", driver: this.cars[0]?.id });
       this.finalClassification = this.generateFinalClassification();
 
       // Apply component wear for player cars based on how they drove
@@ -585,7 +593,10 @@ export class LiveRaceEngine {
 
   generateFinalClassification() {
     // 1. Sort cars using compareCars to ensure they are in perfect final order
-    const sortedCars = [...this.cars].sort((a, b) => compareCars(a, b, this.totalLaps));
+    const sortedCars = [...this.cars].sort((a, b) => {
+      if (Boolean(a.disqualified) !== Boolean(b.disqualified)) return a.disqualified ? 1 : -1;
+      return compareCars(a, b, this.totalLaps);
+    });
 
     const classification = {
       raceId: `${this.track.round || 0}_${this.track.name || this.track.circuit || ""}`,
@@ -596,8 +607,11 @@ export class LiveRaceEngine {
         position: idx + 1,
         driver: c.driver,
         team: c.team,
-        time: c.retired ? 99999 : c.totalTime,
-        retired: c.retired,
+        time: c.retired ? 99999 : c.disqualified ? 199999 : c.totalTime,
+        retired: c.retired || Boolean(c.disqualified),
+        disqualified: Boolean(c.disqualified),
+        // Retired past 90% distance: still classified (and can score)
+        classified: !c.disqualified && (!c.retired || isClassified(c.lapTimes.length, this.totalLaps)),
         stops: c.stops,
         tireCompound: c.tireCompound,
         gridPos: c.gridPos,
@@ -634,6 +648,26 @@ export class LiveRaceEngine {
     }));
   }
 
+  /** Deploy / withdraw the safety car or VSC from the leader's lap. */
+  updateNeutralisation() {
+    const leader = this.cars.find((c) => !c.retired);
+    if (!leader) return;
+    const lap = leader.lap;
+    const next = inRange(this.scRange, lap) ? "SC" : inRange(this.vscRange, lap) ? "VSC" : null;
+    if (next === this.neutralisation) return;
+    if (next === "SC") {
+      this.addEvent(`LAP ${lap}: SAFETY CAR deployed`, { kind: "safety-car" });
+      this.addComm("Engineer", "Safety car, safety car. Stay above the delta. This is a cheap pit window.", true);
+    } else if (next === "VSC") {
+      this.addEvent(`LAP ${lap}: VIRTUAL SAFETY CAR`, { kind: "vsc" });
+      this.addComm("Engineer", "VSC, VSC. Hold the delta. Stops are cheaper right now.", true);
+    } else {
+      this.addEvent(`LAP ${lap}: ${this.neutralisation === "SC" ? "Safety car in this lap" : "VSC ending"}, green flag`, { kind: "green" });
+      this.addComm("Engineer", "Green flag, green flag. Back to racing.", true);
+    }
+    this.neutralisation = next;
+  }
+
   getReplayData() {
     return {
       totalLaps: this.totalLaps,
@@ -641,8 +675,9 @@ export class LiveRaceEngine {
       snapshots: this.snapshots,
       events: [...this.pitLog],
       feed: this.events,
-      scLaps: [],
-      vscLaps: [],
+      scLaps: this.scRange || [],
+      vscLaps: this.vscRange || [],
+      seed: this.seed,
     };
   }
 }

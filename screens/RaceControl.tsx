@@ -1,222 +1,216 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { HUB, btn, btnClass, iconBtn, pill } from '../components/HubLayout.tsx';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence } from 'framer-motion';
 import { LiveRaceEngine } from '../game/LiveRaceEngine.js';
-import { TrackMap } from '../components/ui/TrackMap.tsx';
-import { TimingTower } from '../components/ui/TimingTower.tsx';
-import { PlayerStrategyPanel } from '../components/ui/PlayerStrategyPanel.tsx';
-import { TelemetryCenter } from '../components/ui/TelemetryCenter.tsx';
-import { CommsPanel } from '../components/ui/CommsPanel.tsx';
-import { WeatherPanel } from '../components/ui/WeatherPanel.tsx';
-import { AnimatedTabs } from '../components/ui/animated-tabs.tsx';
-import { BattleTracker } from '../components/ui/BattleTracker.tsx';
-import { RaceEngineerPanel } from '../components/ui/RaceEngineerPanel.tsx';
-import { LiveEventFeed } from '../components/ui/LiveEventFeed.tsx';
 import { RaceEngineer } from '../game/RaceEngineer.js';
-import { Play, Pause, FastForward, SkipForward, ChevronRight } from 'lucide-react';
+import { state } from '../state.js';
+import { getCircuitIntel } from '../utils/weekendModel.js';
+import { getRoundWeather } from '../utils/driverProfileModel.js';
+import {
+  towerRows, findBattles, createHistory, recordHistory, describeEvent, teamColor,
+} from '../utils/raceControlModel.js';
+import { RaceHeader, TimingTower, EventFeed, BroadcastBanner, ControlBar, SPEEDS } from '../components/race/RaceParts.tsx';
+import { LiveCircuit } from '../components/race/LiveCircuit.tsx';
+import { PitWall } from '../components/race/PitWall.tsx';
+import { TelemetryPanel } from '../components/race/TelemetryPanel.tsx';
+import { BattleBoard } from '../components/race/BattleBoard.tsx';
+import '../components/race/race.css';
 
-export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrategies, selectedObjective, weekendContext, onRaceComplete }) {
-  // Engine instance Ref
-  const engineRef = useRef(null);
-  const strategyEngineRef = useRef(null);
-  
-  // React State for rendering
-  const [frame, setFrame] = useState(0);
-  const [speed, setSpeed] = useState(1);
+/*
+ * Live race control. The LiveRaceEngine is the single source of truth: this
+ * screen ticks it on requestAnimationFrame at the chosen speed (paused = no
+ * ticks), lets the AI race engineer read it, and re-renders the panels ten
+ * times a second. The map runs its own animation loop that reads the engine
+ * directly. Player commands go through engine.playerCommand, as before.
+ *
+ * The running race is kept in a module-level slot so a remount (theme switch)
+ * picks up the same race instead of restarting it.
+ */
+
+const RENDER_MS = 100;
+let live: null | { key: string; engine: any; engineer: any; history: any } = null;
+
+/** Round of a race that is running but not yet handed to the results screen. */
+export const liveRaceRound = () => (live && !live.engine.consumed ? live.engine.track?.round ?? null : null);
+
+const NOTABLE = (ev: any) => ['start', 'finish', 'retire', 'fastest'].includes(ev.kind)
+  || (ev.kind === 'overtake' && (ev.ours || ev.pos <= 10)) || (ev.kind === 'pit' && ev.ours);
+
+export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrategies, selectedObjective, weekendContext, onRaceComplete }: any) {
+  const raceKey = `${track?.round}:${laps}:${(qualifyingGrid || []).map((g: any) => g.driver?.name).join(',')}`;
+  const engineRef = useRef<any>(null);
+  const engineerRef = useRef<any>(null);
+  const historyRef = useRef<any>(createHistory());
+  const [, setFrame] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [rightTab, setRightTab] = useState('strategy');
-  
-  useEffect(() => {
-    engineRef.current = new LiveRaceEngine(teams, track, laps, qualifyingGrid, selectedStrategies, weekendContext);
-    strategyEngineRef.current = new RaceEngineer(engineRef.current, { objective: selectedObjective });
-    setFrame(f => f + 1);
-  }, [teams, track, laps, qualifyingGrid, selectedStrategies, selectedObjective, weekendContext]);
+  const [speed, setSpeed] = useState(1);
+  const [mode, setMode] = useState<'engineer' | 'broadcast'>('engineer');
+  const [teleId, setTeleId] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [towerCollapsed, setTowerCollapsed] = useState(false);
+  const [wallCollapsed, setWallCollapsed] = useState(false);
+  const pausedRef = useRef(paused); pausedRef.current = paused;
+  const speedRef = useRef(speed); speedRef.current = speed;
+  const passes = useRef<Map<string, number>>(new Map());
+  const lastSeq = useRef(0);
+  const banner = useRef<{ ev: any; until: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const rerender = useCallback(() => setFrame(f => f + 1), []);
 
-  useEffect(() => {
-    let animationFrameId;
-    let lastTime = performance.now();
+  // Create (or resume) the race
+  if (!engineRef.current) {
+    if (live && live.key === raceKey && !live.engine.consumed) {
+      engineRef.current = live.engine; engineerRef.current = live.engineer; historyRef.current = live.history;
+    } else {
+      const engine = new LiveRaceEngine(teams, track, laps, qualifyingGrid, selectedStrategies, weekendContext);
+      const engineer = new RaceEngineer(engine, { objective: selectedObjective });
+      live = { key: raceKey, engine, engineer, history: historyRef.current };
+      engineRef.current = engine; engineerRef.current = engineer;
+    }
+  }
 
-    const loop = (time) => {
-      if (!engineRef.current || engineRef.current.raceCompleted) {
-        if (engineRef.current?.raceCompleted) {
-          setFrame(f => f + 1);
-        }
-        return;
+  // Everything that has to happen after each engine step, including inside skips
+  const afterTick = useCallback(() => {
+    const e = engineRef.current;
+    engineerRef.current?.update();
+    recordHistory(historyRef.current, e);
+    // Stops planned for a later lap: call the car in at the start of that lap
+    e.cars.forEach((c: any) => {
+      const st = c.scheduledStop; if (!st) return;
+      if (c.retired || c.distance >= e.totalLaps) { c.scheduledStop = null; return; }
+      if (c.pitStopStatus === 'None' && c.lapTimes.length + 1 >= st.lap) { e.playerCommand(c.id, 'PIT', st.compound); c.scheduledStop = null; }
+    });
+    // Overtake highlights for the map
+    if (e.eventSeq !== lastSeq.current) {
+      const now = performance.now();
+      for (const ev of e.events) {
+        if ((ev.seq ?? 0) <= lastSeq.current) break;
+        if (ev.kind === 'overtake') passes.current.set(ev.driver, now + 1800);
       }
+      lastSeq.current = e.eventSeq;
+    }
+  }, []);
 
-      if (!paused) {
-        const deltaMs = time - lastTime;
-        const dt = Math.min(deltaMs, 100) / 1000; 
-        engineRef.current.tick(dt * speed);
-        strategyEngineRef.current?.update();
-        setFrame(f => f + 1);
-      }
-      
-      lastTime = time;
-      animationFrameId = requestAnimationFrame(loop);
+  // Main loop: tick the engine at the chosen speed; render panels at 10 fps
+  useEffect(() => {
+    let raf = 0; let last = performance.now(); let lastRender = 0;
+    const loop = (t: number) => {
+      raf = requestAnimationFrame(loop);
+      const e = engineRef.current; if (!e) return;
+      const dt = Math.min(t - last, 100) / 1000; last = t;
+      if (!pausedRef.current && !e.raceCompleted) { e.tick(dt * speedRef.current); afterTick(); }
+      if (t - lastRender >= RENDER_MS) { lastRender = t; setFrame(f => f + 1); }
     };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [afterTick]);
 
-    animationFrameId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [paused, speed]);
+  // Keyboard: space pauses, 1–5 pick the speed
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      const tag = (ev.target as HTMLElement)?.tagName;
+      if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tag) || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      if (ev.code === 'Space') { ev.preventDefault(); setPaused(p => !p); }
+      const n = Number(ev.key); if (n >= 1 && n <= SPEEDS.length) setSpeed(SPEEDS[n - 1]);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
-  const handleCommand = (driverId, command, value) => {
-    if (!engineRef.current) return;
-    // A manual call from the strategy panel takes the car off engineer auto
-    const car = engineRef.current.cars.find(c => c.id === driverId);
-    if (car?.autoEngineer) strategyEngineRef.current?.setAuto(driverId, false);
-    engineRef.current.playerCommand(driverId, command, value);
-    setFrame(f => f + 1);
+  useEffect(() => {
+    document.body.classList.add('rc-active');
+    return () => document.body.classList.remove('rc-active');
+  }, []);
+
+  const runUntil = (done: (e: any) => boolean, step: number) => {
+    const e = engineRef.current; if (!e || e.raceCompleted) return;
+    setBusy(true);
+    let guard = 0;
+    while (!e.raceCompleted && !done(e) && guard++ < 400000) { e.tick(step); afterTick(); }
+    setBusy(false);
+    rerender();
   };
+  const nextLap = () => { const target = (engineRef.current.cars[0]?.lap || 0) + 1; runUntil(e => e.cars[0].lap >= target, 0.1); };
+  const nextEvent = () => { const seq = engineRef.current.eventSeq; runUntil(e => e.eventSeq !== seq, 0.25); };
+  const toFlag = () => runUntil(() => false, 1.0);
 
-  const skipToNextLap = () => {
-    if (!engineRef.current) return;
-    const currentLap = engineRef.current.cars[0]?.lap || 0;
-    const targetLap = currentLap + 1;
-    while (!engineRef.current.raceCompleted && engineRef.current.cars[0].lap < targetLap) {
-      engineRef.current.tick(0.1);
-      strategyEngineRef.current?.update();
-    }
-    setFrame(f => f + 1);
+  const handleCommand = (driverId: string, command: string, value?: string) => {
+    const e = engineRef.current; if (!e) return;
+    const car = e.cars.find((c: any) => c.id === driverId);
+    if (car?.autoEngineer) engineerRef.current?.setAuto(driverId, false); // a manual call takes the car off auto
+    if (command === 'PIT' || command === 'CANCEL_PIT') car.scheduledStop = null;
+    e.playerCommand(driverId, command, value);
+    rerender();
   };
-
-  const skipToFinish = () => {
-    if (!engineRef.current) return;
-    while (!engineRef.current.raceCompleted) {
-      engineRef.current.tick(1.0);
-      strategyEngineRef.current?.update();
-    }
-    setFrame(f => f + 1);
+  const handleSchedule = (driverId: string, plan: { lap: number; compound: string } | null) => {
+    const e = engineRef.current; const car = e.cars.find((c: any) => c.id === driverId); if (!car) return;
+    if (plan && car.autoEngineer) engineerRef.current?.setAuto(driverId, false);
+    car.scheduledStop = plan;
+    if (plan) e.addComm('Engineer', `${car.driver.name.split(' ').pop()}, plan is to box on lap ${plan.lap} for ${plan.compound}s.`, true);
+    rerender();
   };
-
   const finishRace = () => {
-    if (engineRef.current && engineRef.current.raceCompleted) {
-      onRaceComplete(engineRef.current.finalClassification, engineRef.current.getReplayData());
-    }
+    const e = engineRef.current;
+    if (e?.raceCompleted) { e.consumed = true; live = null; onRaceComplete(e.finalClassification, e.getReplayData()); }
   };
-
-  if (!engineRef.current) return <div>Loading Race...</div>;
 
   const engine = engineRef.current;
-  const isFinished = engine.raceCompleted;
+  const engineer = engineerRef.current;
+  const playerTeam = state.team?.name;
+  const intel = useMemo(() => getCircuitIntel(track), [track]);
+  const weather = getRoundWeather(state, track?.round);
+  const rows = towerRows(engine, playerTeam);
+  const battles = findBattles(engine, rows, historyRef.current);
+  const playerIds = new Set<string>(engine.cars.filter((c: any) => c.isPlayer).map((c: any) => c.id));
+  const events = engine.events.map((ev: any) => describeEvent(ev, engine, playerIds));
+  const now = performance.now();
+  const recentPass = new Set<string>([...passes.current].filter(([, t]) => t > now).map(([id]) => id));
 
-  return (
-    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 100px)', overflow: 'hidden', backgroundColor: HUB.sidebar, borderRadius: '16px', border: `1px solid ${HUB.border}` }}>
-      
-      {/* ── Layer 0: The Track Canvas ── */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-        <TrackMap cars={engine.cars} trackName={track.name || track.circuit || ""} />
+  // Broadcast lower third: newest notable event, held five seconds
+  const newestNotable = events.find(NOTABLE);
+  if (newestNotable && (!banner.current || (newestNotable.seq ?? 0) > (banner.current.ev.seq ?? 0))) {
+    banner.current = { ev: { ...newestNotable, carColor: newestNotable.car ? teamColor(newestNotable.car.team.name, playerTeam) : null }, until: now + 5000 };
+  }
+  const bannerEv = banner.current && banner.current.until > now ? banner.current.ev : null;
+
+  const broadcast = mode === 'broadcast';
+  const showTele = teleId && rows.some(r => r.id === teleId);
+  const cls = ['rc-root', broadcast && 'is-broadcast', towerCollapsed && !broadcast && 'tower-collapsed', (wallCollapsed || broadcast) && 'wall-collapsed', showTele && 'has-tele'].filter(Boolean).join(' ');
+  const selectCar = (id: string) => { setTeleId(id); if (playerIds.has(id)) setFocusId(id); };
+
+  const ui = (
+    <div className={cls}>
+      <RaceHeader engine={engine} round={track} intel={intel} weather={weather} paused={paused} mode={mode} setMode={setMode} />
+      <div className="rc-body">
+        <TimingTower rows={rows} selectedId={teleId} onSelect={selectCar} broadcast={broadcast}
+          collapsed={towerCollapsed && !broadcast} onCollapse={() => setTowerCollapsed(c => !c)} />
+
+        <main className="rc-centre">
+          <EventFeed events={events} />
+          <div className="rc-stage">
+            <LiveCircuit engineRef={engineRef} round={track} intel={intel} rows={rows} selectedId={teleId} onSelect={selectCar}
+              battles={battles} lengthKm={intel?.lengthKm} broadcast={broadcast} recentPass={recentPass} />
+            <BattleBoard battles={battles} onFocus={(id: string) => setTeleId(t => t === id ? t : id)} selectedId={teleId} compact={!broadcast} />
+            {broadcast && <BroadcastBanner event={bannerEv} />}
+            <AnimatePresence>
+              {showTele && (
+                <TelemetryPanel key="tele" engine={engine} rows={rows} history={historyRef.current} id={teleId} onSelect={setTeleId}
+                  onClose={() => setTeleId(null)} lengthKm={intel?.lengthKm} />
+              )}
+            </AnimatePresence>
+          </div>
+        </main>
+
+        {!broadcast && (
+          <PitWall engine={engine} engineer={engineer} rows={rows} battles={battles} history={historyRef.current}
+            focusId={focusId} setFocusId={setFocusId} onCommand={handleCommand} onSchedule={handleSchedule}
+            collapsed={wallCollapsed} onCollapse={() => setWallCollapsed(c => !c)} onTelemetry={(id: string) => setTeleId(id)} />
+        )}
       </div>
-      
-      {/* ── Layer 1: HUD / Floating Overlays ── */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}>
-        
-        {/* Left Flank: F1 Timing Tower */}
-        <div style={{ position: 'absolute', left: '16px', top: '16px', bottom: '16px', width: '320px', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          
-          {/* Race Header Status */}
-          <div style={{ backgroundColor: 'rgba(17,17,19,0.88)', border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '16px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', lineHeight: '1.1' }}>
-                {track.name}
-              </h2>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <span style={{...pill(), fontSize: '11px', padding: '2px 6px'}}>{engine.weatherStr}</span>
-                {isFinished && <span style={{...pill(true), fontSize: '11px', padding: '2px 6px'}}>Finished</span>}
-              </div>
-            </div>
-            
-            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <div style={{ fontSize: '11px', color: HUB.textMuted, fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", marginBottom: '2px' }}>Lap</div>
-              <div style={{ fontSize: '24px', fontFamily: HUB.fontMono, fontWeight: 400, color: '#fff', lineHeight: '1' }}>
-                {Math.max(1, engine.cars[0]?.lap || 1)} <span style={{ fontSize: '14px', color: HUB.textFaint }}>/ {engine.totalLaps}</span>
-              </div>
-            </div>
-          </div>
-
-          <TimingTower cars={engine.cars} />
-        </div>
-
-        {/* Floating Battles Overlay (Pass-through clicks) */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          <BattleTracker cars={engine.cars} />
-        </div>
-
-        {/* Top Right: Live Event Feed (Toast Notifications) */}
-        <LiveEventFeed events={engine.events} />
-
-        {/* Right Flank: Operations Sidebar */}
-        <div style={{ position: 'absolute', right: '16px', top: '16px', bottom: '16px', width: '380px', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          
-          {/* Header */}
-          <div style={{ backgroundColor: 'rgba(17,17,19,0.88)', border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '12px', textAlign: 'center' }}>
-             <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontBold }}>Pit wall</h3>
-          </div>
-
-          {/* Scrolling Sections */}
-          <div style={{ flex: 1, backgroundColor: 'rgba(17,17,19,0.88)', border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-             
-             <section style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Race engineer</h4>
-               <RaceEngineerPanel engineer={strategyEngineRef.current} engine={engine} onChange={() => setFrame(f => f + 1)} />
-             </section>
-
-             <section>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Strategy</h4>
-               <PlayerStrategyPanel engine={engine} onCommand={handleCommand} />
-             </section>
-
-             <section>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Telemetry</h4>
-               <TelemetryCenter engine={engine} />
-             </section>
-
-             <section>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Radio</h4>
-               <CommsPanel engine={engine} />
-             </section>
-             
-          </div>
-        </div>
-
-        {/* Bottom Center: Pit Wall Console */}
-        <div style={{ 
-          position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', 
-          pointerEvents: 'auto', display: 'flex', gap: '8px', 
-          backgroundColor: 'rgba(17,17,19,0.88)', 
-          border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '6px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
-        }}>
-          {!isFinished ? (
-            <>
-              <button className={btnClass('ghost')} onClick={() => setPaused(!paused)} aria-label={paused ? 'Resume' : 'Pause'} title={paused ? 'Resume' : 'Pause'}
-                style={iconBtn('sm', paused ? { backgroundColor: HUB.raised, color: HUB.textPrimary } : { color: HUB.textPrimary })}>
-                {paused ? <Play size={16} strokeWidth={1.5} /> : <Pause size={16} strokeWidth={1.5} />}
-              </button>
-              <div style={{ width: '1px', backgroundColor: HUB.border, margin: '4px' }} />
-              <div role="radiogroup" aria-label="Simulation speed" style={{ display: 'flex', gap: '2px' }}>
-                {[1, 2, 4, 8, 16].map(s => (
-                  <button key={s} role="radio" aria-checked={speed === s} className={btnClass('ghost')} onClick={() => setSpeed(s)}
-                    style={btn('ghost', 'sm', { minWidth: '40px', padding: '0 8px', fontFamily: HUB.fontBold, fontVariantNumeric: 'tabular-nums', ...(speed === s ? { backgroundColor: HUB.raised, color: HUB.textPrimary, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' } : {}) })}>
-                    {s}×
-                  </button>
-                ))}
-              </div>
-              <div style={{ width: '1px', backgroundColor: HUB.border, margin: '4px' }} />
-              <button className={btnClass('ghost')} onClick={skipToNextLap} style={iconBtn('sm')} aria-label="Skip to next lap" title="Skip to next lap">
-                <SkipForward size={16} strokeWidth={1.5} />
-              </button>
-              <button className={btnClass('ghost')} onClick={skipToFinish} style={iconBtn('sm')} aria-label="Skip to finish" title="Skip to finish">
-                <FastForward size={16} strokeWidth={1.5} />
-              </button>
-            </>
-          ) : (
-            <button className={btnClass('primary')} onClick={finishRace} style={btn('primary', 'md')}>
-              Continue to results <ChevronRight size={16} strokeWidth={1.5} />
-            </button>
-          )}
-        </div>
-
-      </div>
+      <ControlBar engine={engine} paused={paused} setPaused={setPaused} speed={speed} setSpeed={setSpeed}
+        onNextLap={nextLap} onNextEvent={nextEvent} onFinish={toFlag} onContinue={finishRace} busy={busy} />
     </div>
   );
+
+  return createPortal(ui, document.body);
 }

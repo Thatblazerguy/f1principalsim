@@ -1,4 +1,5 @@
 import React, { useReducer, useRef, useState, useLayoutEffect } from 'react';
+import { getConstructorOrder } from "../utils/championshipModel.js";
 import { ChevronRight, CloudRain, Sun } from 'lucide-react';
 import { HUB, btn, btnClass } from '../components/HubLayout.tsx';
 import { getTrackPath } from '../data/realTrackLayouts.js';
@@ -52,8 +53,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
 
     const activeDrivers = getActiveDrivers(state.team).slice(0, 2);
     const teams = [state.team, ...(state.aiTeams || [])].filter(Boolean);
-    const sortedTeams = teams.map(t => ({ name: t.name, points: state.standings.teams?.[t.name] || 0 }))
-        .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+    const sortedTeams = getConstructorOrder(state).map(t => ({ name: t.name, points: t.points }));
     
     const myTeamIndex = sortedTeams.findIndex(t => t.name === state.team.name);
     const myTeamPosition = myTeamIndex + 1;
@@ -63,13 +63,8 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
         renderFn(appRoot);
     };
 
-    const handleSimulateDay = async () => {
-        if (!canAdvanceDay) return;
-        const result = simulateNextDay(state);
-        if (!result.advanced) { forceUpdate(); return; }
-        await syncGame();
-        forceUpdate();
-    };
+    // Opens the season clock (HubLayout) — the same advance-time flow as the bottom bar
+    const openSeasonClock = () => window.dispatchEvent(new CustomEvent('f1p:advance-time'));
 
     const handleEnterPitWall = () => navigate(isSeasonOver ? renderOffseason : renderWeekend);
 
@@ -160,9 +155,9 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                             )}
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 {!isSeasonOver && daysUntilRace > 0 && (
-                                    <button className={btnClass('secondary', 'full-width-btn')} onClick={handleSimulateDay} disabled={!canAdvanceDay}
-                                        style={btn('secondary', 'md')}>
-                                        Simulate 1 day
+                                    <button className={btnClass('secondary', 'full-width-btn')} onClick={openSeasonClock} disabled={!canAdvanceDay}
+                                        style={btn('secondary', 'md')} aria-haspopup="dialog">
+                                        Advance time
                                     </button>
                                 )}
                                 <button className={btnClass('primary', 'full-width-btn')} onClick={handleEnterPitWall} style={btn('primary', 'md')}>
@@ -179,7 +174,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
                 <div style={{ ...card, padding: '24px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
                     <h3 style={{ fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, margin: '0 0 16px' }}>Activity</h3>
                     {notifications.length === 0 ? (
-                        <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0, lineHeight: 1.5 }}>Nothing yet. Simulate a day to start the season clock.</p>
+                        <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0, lineHeight: 1.5 }}>Nothing yet. Advance time to start the season clock.</p>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             {notifications.map((n: any, idx: number) => (

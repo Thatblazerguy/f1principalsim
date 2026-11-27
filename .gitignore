@@ -1,5 +1,32 @@
+# Dependencies
 node_modules/
-.env
-.DS_Store
+
+# Build output
 dist/
 build/
+*.tsbuildinfo
+
+# Environment (copy .env.example to .env)
+.env
+.env.*
+!.env.example
+
+# Python (strategy_ml — run its scripts from inside strategy_ml/)
+__pycache__/
+*.pyc
+.venv/
+strategy_ml/data/
+fastf1_cache/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Local Claude Code settings
+.claude/settings.local.json

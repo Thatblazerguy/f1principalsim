@@ -44,7 +44,7 @@ export const PreRaceBriefingModal = ({
           transition={{ type: 'spring', bounce: 0.15, duration: 0.35 }}
           style={{
             ...glassCard({ padding: 0 }),
-            width: '100%', maxWidth: '780px', maxHeight: '92vh',
+            width: '100%', maxWidth: '780px', maxHeight: 'calc(92*var(--vh))',
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)'
           }}

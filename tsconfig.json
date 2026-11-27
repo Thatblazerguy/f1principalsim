@@ -4,22 +4,25 @@
     "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "allowJs": true,
+    "checkJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "strict": true,
+    "strict": false,
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
+    "types": ["vite/client"],
     "paths": {
       "@/*": ["./*"]
     }
   },
-  "include": ["src", "app.js", "screens", "components", "lib", "utils", "data", "state.js"],
+  "include": ["app.js", "state.js", "components", "screens", "fia", "game", "lib", "utils", "data"],
+  "exclude": ["node_modules", "dist", "**/*.test.js"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

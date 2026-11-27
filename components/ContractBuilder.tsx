@@ -11,6 +11,8 @@ import {
   computeBudgetImpact,
   computeMarketOfferOdds,
   computeReserveOfferOdds,
+  computeRenewalOdds,
+  getRenewalAsking,
   driverOverall,
 } from '../utils/contractOfferModel.js';
 
@@ -98,7 +100,7 @@ export function ContractBuilder({
   driver, mode, onSend, onClose, onDone, onTalk,
 }: {
   driver: any;
-  mode: 'market' | 'reserve';
+  mode: 'market' | 'reserve' | 'renew' | 'salary';
   onSend: (terms: ContractTerms) => Promise<OfferResult> | OfferResult;
   onClose: () => void;
   onDone?: (result: OfferResult) => void;
@@ -107,9 +109,11 @@ export function ContractBuilder({
   const s: any = state;
   const base = Number(driver.salary) || 1;
   const step = CONTRACT_LIMITS.salaryStep;
-  const minSalary = Math.ceil(base / step) * step;
-  const maxSalary = Math.max(minSalary + step * 4, Math.ceil((base * (1 + CONTRACT_LIMITS.maxRaise)) / step) * step);
-  const [salary, setSalary] = useState(minSalary);
+  const talks = mode === 'renew' || mode === 'salary';
+  const minSalary = talks ? Math.max(step, Math.floor((base * 0.6) / step) * step) : Math.ceil(base / step) * step;
+  const maxSalary = Math.max(Math.ceil(base / step) * step + step * 4, Math.ceil((base * (1 + CONTRACT_LIMITS.maxRaise)) / step) * step);
+  const asking = mode === 'renew' ? getRenewalAsking(driver) : base;
+  const [salary, setSalary] = useState(talks ? Math.min(maxSalary, Math.max(minSalary, asking)) : minSalary);
   const [seasons, setSeasons] = useState(Math.min(CONTRACT_LIMITS.maxSeasons, Math.max(CONTRACT_LIMITS.minSeasons, driver.contractYearsRemaining || 2)));
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<OfferResult | null>(null);
@@ -121,14 +125,18 @@ export function ContractBuilder({
 
   const terms = { salary, seasons };
   const odds = useMemo(
-    () => (mode === 'market' ? computeMarketOfferOdds(s, driver, terms) : computeReserveOfferOdds(driver, s.team, terms)),
+    () => (mode === 'market' ? computeMarketOfferOdds(s, driver, terms)
+      : talks ? computeRenewalOdds(s, driver, terms, mode)
+      : computeReserveOfferOdds(driver, s.team, terms)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, driver, salary, seasons],
   );
   // Market: the whole salary is new spend. Reserve: the driver is already paid, so only the change counts.
-  const impact = computeBudgetImpact(s, { salary, seasons, currentSalary: mode === 'reserve' ? base : 0 });
+  const impact = computeBudgetImpact(s, { salary, seasons, currentSalary: mode === 'market' ? 0 : base });
   const raiseMark = mode === 'reserve' && (odds as any).moneyMatters
     ? [{ at: Math.min(maxSalary, Math.ceil((base * (1 + MONEY_RAISE)) / step) * step), label: '+20% raise unlocks the money offer' }]
+    : mode === 'renew' ? [{ at: Math.min(maxSalary, Math.max(minSalary, asking)), label: `Asking $${asking}M` }]
+    : mode === 'salary' ? [{ at: base, label: `Current $${base}M` }]
     : [];
 
   const send = async () => {
@@ -151,10 +159,10 @@ export function ContractBuilder({
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <img src={getDriverHeadshotUrl(driver)} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${HUB.borderMid}` }} />
           <div>
-            <p className="ctb-kicker">{mode === 'market' ? 'Reserve contract offer' : 'Reserve role offer'}</p>
+            <p className="ctb-kicker">{mode === 'market' ? 'Reserve contract offer' : mode === 'renew' ? 'Contract renewal' : mode === 'salary' ? 'Salary negotiation' : 'Reserve role offer'}</p>
             <h3 className="ctb-title" id={titleId}>{driver.name}</h3>
             <span style={{ fontSize: 12, color: HUB.textMuted }}>
-              Age {driver.age ?? '–'} · {driverOverall(driver)} overall · {mode === 'market' ? 'asking' : 'currently on'} ${base}M a season
+              Age {driver.age ?? '–'} · {driverOverall(driver)} overall · {mode === 'market' ? 'asking' : 'currently on'} ${base}M a season{talks ? ` · ${driver.contractYearsRemaining ?? '–'} ${driver.contractYearsRemaining === 1 ? 'season' : 'seasons'} left · morale ${driver.morale ?? '–'}` : ''}
             </span>
           </div>
         </div>
@@ -197,12 +205,14 @@ export function ContractBuilder({
                 <p className="ctb-field-hint">
                   {mode === 'market'
                     ? 'Starts at the asking salary. The market path never takes less.'
+                    : mode === 'renew' ? `Starts at their $${asking}M asking salary. The mark shows it.`
+                    : mode === 'salary' ? 'The mark is their current salary. A raise is always accepted; a cut needs their agreement.'
                     : raiseMark.length
                       ? 'The amber mark is a 20% raise — the point where the money offer becomes available.'
                       : 'Starts at their current salary. At this resistance a raise does not change the odds.'}
                 </p>
               </div>
-              <div className="ctb-field">
+              {mode !== 'salary' && <div className="ctb-field">
                 <div className="ctb-field-head">
                   <label className="ctb-field-label" htmlFor={seasonsId}>Length</label>
                   <span className="ctb-field-value">{seasonsText(seasons)}</span>
@@ -219,12 +229,12 @@ export function ContractBuilder({
                   valueText={(v) => seasonsText(v)}
                   ticks={[seasonsText(CONTRACT_LIMITS.minSeasons), seasonsText(CONTRACT_LIMITS.maxSeasons)]}
                 />
-                <p className="ctb-field-hint">Sets the contract years shown on the driver. Length doesn't affect acceptance in the current rules.</p>
-              </div>
+                <p className="ctb-field-hint">{mode === 'renew' ? 'Replaces the seasons left on the deal. Drivers aged 34 or over prefer two seasons or fewer.' : "Sets the contract years shown on the driver. Length doesn't affect acceptance in the current rules."}</p>
+              </div>}
 
               <div className="ctb-budget" aria-live="polite">
                 <div className="ctb-stat">
-                  <span className="ctb-stat-label">{mode === 'market' ? 'Cost' : 'Extra cost'} this season ({impact.racesLeft} races left)</span>
+                  <span className="ctb-stat-label">{mode === 'market' ? 'Cost' : 'Change in cost'} this season ({impact.racesLeft} races left)</span>
                   <span className="ctb-stat-value"><Tweened value={impact.thisSeason} format={signedMoney} /></span>
                 </div>
                 <div className="ctb-stat">

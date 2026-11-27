@@ -58,7 +58,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="h-[100dvh] flex flex-col md:flex-row font-geist w-[100dvw]">
+    <div className="h-[calc(100*var(--vh))] flex flex-col md:flex-row font-geist w-[calc(100*var(--vw))]">
       <section className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="flex flex-col gap-6">

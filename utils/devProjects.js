@@ -511,6 +511,9 @@ export function ensureDevProjectsState(appState) {
       pitStopTime:     parseFloat((2.8 - (cp - 70) * 0.02).toFixed(2)),
       pitErrorRate:    parseFloat((4.0 - (cp - 70) * 0.05).toFixed(2)),
     };
+    // Race pace counts only the change from these starting specs (see getCarSpecs).
+    eng.carSpecsBaseline = { ...eng.carSpecs };
+    eng.baselineCarPerformance = cp;
   }
 }
 

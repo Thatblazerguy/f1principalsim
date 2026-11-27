@@ -260,12 +260,23 @@ export function processRaceFinance(appState, raceRecord, round) {
     });
   }
 
+  // Loans are paid back in instalments; interest alone is already in operatingCosts.
+  const loanRepayment = roundMoney(Math.min(
+    finance.loanBalance || 0,
+    finance.loanRepaymentPerRace || (finance.loanBalance || 0) / LOAN_TERM_RACES,
+  ));
+  finance.loanBalance = roundMoney((finance.loanBalance || 0) - loanRepayment);
+  if (finance.loanBalance <= 0) { finance.loanBalance = 0; finance.loanRepaymentPerRace = 0; }
+
   const income = roundMoney(baseSponsorIncome + prizeMoney + merchandiseSales + raceBonusCash + sponsorObjectiveCash);
-  const expenses = roundMoney(summary.operatingCosts + summary.driverSalaries + summary.staffSalaries + sponsorPenalty);
+  const expenses = roundMoney(summary.operatingCosts + summary.driverSalaries + summary.staffSalaries + sponsorPenalty + loanRepayment);
   const netProfit = roundMoney(income - expenses);
   appState.team.budget = roundMoney((appState.team.budget || 0) + netProfit);
 
-  finance.boardConfidence = clamp(finance.boardConfidence + (totalPoints > 0 ? 2 : -2) + (netProfit >= 0 ? 1 : -1), 0, 100);
+  // Running the team in the red erodes the board's trust race after race.
+  const insolvent = appState.team.budget < 0;
+  finance.racesInDebt = insolvent ? (finance.racesInDebt || 0) + 1 : 0;
+  finance.boardConfidence = clamp(finance.boardConfidence + (totalPoints > 0 ? 2 : -2) + (netProfit >= 0 ? 1 : -1) - (insolvent ? 4 + finance.racesInDebt : 0), 0, 100);
   finance.boardSatisfaction = clamp(finance.boardSatisfaction + (totalPoints > 0 ? 2 : -3), 0, 100);
   finance.sponsorHappiness = clamp(finance.sponsorHappiness + bonuses.filter((bonus) => bonus.complete).length * 2 - sponsorPenalty, 0, 100);
   finance.reputation = clamp(finance.reputation + (playerResults.some((result) => result.finishPos <= 3) ? 3 : totalPoints > 0 ? 1 : 0), 0, 100);
@@ -284,6 +295,7 @@ export function processRaceFinance(appState, raceRecord, round) {
     driverSalaries: summary.driverSalaries,
     facilityCosts: summary.facilityMaintenance,
     sponsorPenalty: roundMoney(sponsorPenalty),
+    loanRepayment,
     netProfit,
     runningSeasonBalance: appState.team.budget,
     bonuses,
@@ -382,16 +394,40 @@ export function setBudgetAllocation(appState, key, value) {
   return finance.budgetAllocation;
 }
 
+/** Emergency levers are a last resort: each can be pulled once per season. */
+export const MAX_LOAN_BALANCE = 84;
+export const MAX_MINORITY_STAKE = 49;
+const MINORITY_STAKE_STEP = 8;
+/** Races over which a loan is paid back (one season). */
+export const LOAN_TERM_RACES = 24;
+
+export function getEmergencyActionAvailability(appState, actionId) {
+  const finance = ensureFinanceState(appState);
+  const season = appState.season?.year || 1;
+  const usedThisSeason = finance.emergencyActions.some((action) => action.id === actionId && (action.season || 1) === season);
+  if (usedThisSeason) return { available: false, reason: "Already used this season" };
+  if (actionId === "loan" && (finance.loanBalance || 0) + 42 > MAX_LOAN_BALANCE) {
+    return { available: false, reason: "The bank won't extend more credit until the current loan is paid down" };
+  }
+  if (actionId === "minority_sale" && (finance.minorityOwnershipSold || 0) + MINORITY_STAKE_STEP > MAX_MINORITY_STAKE) {
+    return { available: false, reason: "The owners won't give up a controlling stake" };
+  }
+  return { available: true, reason: null };
+}
+
 export function applyEmergencyFinanceAction(appState, actionId) {
   const finance = ensureFinanceState(appState);
+  const availability = getEmergencyActionAvailability(appState, actionId);
+  if (!availability.available) return { ok: false, reason: availability.reason };
   const existing = finance.emergencyActions.filter((action) => action.id === actionId).length;
   if (actionId === "loan") {
     appState.team.budget = roundMoney((appState.team.budget || 0) + 35);
     finance.loanBalance = roundMoney((finance.loanBalance || 0) + 42);
+    finance.loanRepaymentPerRace = roundMoney(finance.loanBalance / LOAN_TERM_RACES);
     finance.boardSatisfaction = clamp(finance.boardSatisfaction - 5, 0, 100);
   } else if (actionId === "minority_sale") {
     appState.team.budget = roundMoney((appState.team.budget || 0) + 55);
-    finance.minorityOwnershipSold = clamp((finance.minorityOwnershipSold || 0) + 8, 0, 49);
+    finance.minorityOwnershipSold = clamp((finance.minorityOwnershipSold || 0) + MINORITY_STAKE_STEP, 0, MAX_MINORITY_STAKE);
     finance.boardConfidence = clamp(finance.boardConfidence - 8, 0, 100);
   } else if (actionId === "emergency_sponsor") {
     appState.team.budget = roundMoney((appState.team.budget || 0) + 18);
@@ -400,14 +436,19 @@ export function applyEmergencyFinanceAction(appState, actionId) {
     appState.team.budget = roundMoney((appState.team.budget || 0) + 12);
     finance.staff = finance.staff.map((staff, index) => index > 4 ? { ...staff, rating: clamp(staff.rating - 2, 50, 99), salary: roundMoney(staff.salary * 0.88) } : staff);
     finance.reputation = clamp(finance.reputation - 5, 0, 100);
+  } else {
+    return { ok: false, reason: "Unknown action" };
   }
   finance.emergencyActions.push({ id: actionId, round: appState.season?.round || 1, season: appState.season?.year || 1, count: existing + 1 });
+  return { ok: true, reason: null };
 }
 
 export function getFinanceAdvisorNotes(appState) {
   const finance = ensureFinanceState(appState);
   const summary = getTeamCommercialSummary(appState);
   const notes = [];
+  if ((appState.team?.budget || 0) < 0) notes.push(`The team is in debt (${finance.racesInDebt || 0} race${finance.racesInDebt === 1 ? "" : "s"} in a row). Board confidence falls every race until the books are back in the black.`);
+  if ((finance.loanBalance || 0) > 0) notes.push(`Loan outstanding: $${roundMoney(finance.loanBalance)}M, repaid at $${roundMoney(finance.loanRepaymentPerRace || finance.loanBalance / LOAN_TERM_RACES)}M per race.`);
   if ((appState.team?.budget || 0) < 20) notes.push("Cash reserve is thin. Consider delaying non-critical facility upgrades.");
   if (summary.driverMerch > 6) notes.push("Merchandising revenue is becoming a meaningful driver of cash flow.");
   if (finance.budgetAllocation.driverAcademy < 6) notes.push("Driver Academy funding is low, which will weaken long-term talent options.");

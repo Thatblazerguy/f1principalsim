@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
+import { constructorEntries } from "../utils/championshipModel.js";
 import { strategies } from "../data/strategies.js";
 import { getTrackStrategyProfile } from "../data/strategyProfiles.js";
 import { simulatePractice } from "../game/practice.js";
 import { simulateQualifying } from "../game/qualifying.js";
+import { newRaceSeed } from "../game/raceEvents.js";
 import { simulateRaceEvent } from "../game/raceSimulator.js";
-import { RaceControl } from "./RaceControl.tsx";
+import { RaceControl, liveRaceRound } from "./RaceControl.tsx";
 import { updateStandings } from "../game/standings.js";
-import { recordRaceHistory } from "../game/raceHistory.js";
+import { recordRaceHistory, recordSprintHistory, SPRINT_POINTS } from "../game/raceHistory.js";
 import { state } from "../state.js";
 import { ensureTeamState, gainTeamXP, gainTeamCarXP, getActiveDrivers } from "../utils/teamState.js";
 import { applyRoundCarDevelopmentAll } from "../utils/carDevelopment.js";
@@ -30,7 +32,7 @@ import { lockWeekendSetup } from "../game/setup/setupLab.js";
 import { SetupLab } from "../components/ui/SetupLab.tsx";
 import { StrategyBuilder } from "../components/ui/StrategyBuilder.tsx";
 import { ensureEngineeringState, getActiveComponent, COMPONENT_CATALOG, applyGridPenalties } from "../utils/engineeringSystem.js";
-import { RACE_OBJECTIVES, generateUnifiedRaceWeekend, evaluateObjective } from "../utils/raceObjectives.js";
+import { RACE_OBJECTIVES, generateUnifiedRaceWeekend, refreshRaceWeekendAfterQualifying, evaluateObjective } from "../utils/raceObjectives.js";
 export { RACE_OBJECTIVES };
 import { ObjectiveCardsList, FinishDistributionBar } from '../components/ui/ObjectiveCards.tsx';
 
@@ -40,11 +42,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SlideUp, PageTransition } from '../components/ui/motion.tsx';
 import { PreRaceBriefingModal } from "../components/ui/PreRaceBriefingModal.tsx";
 import { DetailedRaceReport } from "../components/ui/DetailedRaceReport.tsx";
+import { WeekendHeader, type WeekendView } from "../components/weekend/WeekendHeader.tsx";
+import { OverviewBoard } from "../components/weekend/OverviewBoard.tsx";
+import { SetupConsole } from "../components/weekend/SetupConsole.tsx";
+import { CircuitMap } from "../components/weekend/CircuitMap.tsx";
+import { CircuitStage } from "../components/drivers/CircuitStage.tsx";
+import { buildTrackGeometry, analyseTrack } from "../components/drivers/trackGeometry.ts";
+import { getTrackPath } from "../data/realTrackLayouts.js";
+import { usePrefersReducedMotion } from "../components/driverToolsMotion.ts";
+import { getSessionState, getCircuitIntel } from "../utils/weekendModel.js";
+import { getCircuitFacts } from "../utils/driverProfileModel.js";
+import { ensureSetupLab } from "../game/setup/setupLab.js";
+import "../components/weekend/weekend.css";
 
 function ensureWeekendProgress(round: number): any {
   if (!(state as any).weekendProgress || (state as any).weekendProgress.round !== round) {
     (state as any).weekendProgress = {
       round,
+      practiceComplete: false,
       qualifyingComplete: false,
       grid: null,
       raceComplete: false,
@@ -67,10 +82,9 @@ function updateBestFinishes(results: any[]) {
     const finishPos = idx + 1;
     const name = entry.driver.name;
 
+    if (entry.retired) return;
     const currentBest = s.bestFinishes[name];
     if (!currentBest || finishPos < currentBest) s.bestFinishes[name] = finishPos;
-
-    if (entry.team.name !== s.team?.name) return;
 
     if (finishPos === 1) s.driverWins[name] = (s.driverWins[name] || 0) + 1;
     if (finishPos <= 3) s.driverPodiums[name] = (s.driverPodiums[name] || 0) + 1;
@@ -113,26 +127,6 @@ const getTrackTypeString = (circuit: string) => {
   return "Permanent Circuit";
 };
 
-// Generates fake dynamic engineer comms
-const getEngineerNotes = (team: any, weekendProgress: any, isWet: boolean | null) => {
-  const notes = [
-    { time: '08:15', msg: "Garage setup completed successfully." },
-    { time: '09:00', msg: "Telemetry link established with factory." }
-  ];
-  if (weekendProgress?.qualifyingComplete) {
-    notes.push({ time: '14:30', msg: "Parc fermé conditions active. No further setup changes allowed." });
-  }
-  if (isWet === true) {
-    notes.push({ time: '15:00', msg: "Weather radar confirms incoming rain. Preparing wet tyre blankets." });
-  } else if (isWet === false) {
-    notes.push({ time: '15:00', msg: "Track declared dry. Risk of precipitation dropping." });
-  }
-  if (team.carPerformance > 85) {
-    notes.push({ time: '16:00', msg: "Simulations show high correlation with recent aero upgrades." });
-  }
-  return notes.reverse();
-};
-
 // RACE_OBJECTIVES is defined in utils/raceObjectives.js and re-exported above.
 
 export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
@@ -151,7 +145,8 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   const canAdvanceDay = canSimulateNextDay(s);
   const activeDrivers = getActiveDrivers(s.team!);
   const teams = [
-    { ...s.team!, drivers: activeDrivers },
+    // Flagged so the sim applies the player's engineering upgrades to this copy of the team.
+    { ...s.team!, drivers: activeDrivers, isPlayerTeam: true },
     ...s.aiTeams
   ];
   ensureFinanceState(s);
@@ -165,6 +160,11 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
   
   if (round && weekendProgress && !weekendProgress.weekendContext && raceWindowOpen) {
     weekendProgress.weekendContext = generateWeekendContext(teams, round, s.raceHistory || [], s);
+  }
+  // Seeds for the weekend's sessions: the same seed replays the same qualifying / race
+  if (weekendProgress && weekendProgress.qualiSeed == null) weekendProgress.qualiSeed = newRaceSeed();
+  if (weekendProgress?.weekendContext && weekendProgress.weekendContext.raceSeed == null) {
+    weekendProgress.weekendContext.raceSeed = newRaceSeed();
   }
 
   const raceNeedsQuali = Boolean(round && weekendProgress && !weekendProgress.qualifyingComplete);
@@ -183,15 +183,20 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
 
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(initialFlashMessage);
-  const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null, replayData?: any, objectiveId?: string } | null>(null);
+  const [resultsData, setResultsData] = useState<{ metric: string, res: any[], grid: any[] | null, replayData?: any, objectiveId?: string, track?: any } | null>(null);
   const [raceIsWet, setRaceIsWet] = useState<boolean | null>(
     weekendProgress?.isWet !== undefined ? weekendProgress.isWet : (raceWeekend?.weather.isWet ?? null)
   );
-  const [liveRaceMode, setLiveRaceMode] = useState(false);
+  // A race still running (e.g. after a theme switch remounts this screen) reopens in race control
+  const [liveRaceMode, setLiveRaceMode] = useState(() => !!round && !raceAlreadyRun && liveRaceRound() === round.round);
   const [showBriefingModal, setShowBriefingModal] = useState<'quick_sim' | 'race_control' | null>(null);
   const [briefingSelectedObjective, setBriefingSelectedObjective] = useState(
     weekendProgress?.selectedObjective || (raceWeekend?.recommendedObjective?.id) || RACE_OBJECTIVES[1].id
   );
+  const [view, setView] = useState<WeekendView>(() => (weekendProgress?.raceComplete ? 'results' : raceWindowOpen ? 'prep' : 'overview'));
+  const [practiceRun, setPracticeRun] = useState<boolean>(() => Boolean(weekendProgress?.practiceComplete));
+  const [selectedSector, setSelectedSector] = useState<number | null>(null);
+  const reduced = usePrefersReducedMotion();
 
   useEffect(() => {
     if (weekendProgress && weekendProgress.round === s.season.round && weekendProgress.raceComplete) {
@@ -220,7 +225,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     const completedText = tick.completedUpgrades.length
       ? ` Upgrade complete: ${tick.completedUpgrades.map((entry: any) => entry.part).join(", ")}.`
       : "";
-    const completedFacilities = processFacilityProjects(state);
+    const completedFacilities = tick.completedFacilities || [];
     const facilityText = completedFacilities.length
       ? ` Facility complete: ${completedFacilities.map((entry: any) => entry.name).join(", ")}.`
       : "";
@@ -232,12 +237,20 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
       return;
     }
+    // One practice session per weekend: re-running it would farm car XP.
+    if (weekendProgress?.practiceComplete || weekendProgress?.qualifyingComplete) {
+      setStatusMessage("Practice is over for this weekend.");
+      return;
+    }
     setLoading(true);
     setTimeout(() => {
       try {
         gainTeamCarXP(s.team!, 5);
         refreshPlayerSetupInContext(weekendProgress?.weekendContext, round, s);
         setResultsData({ metric: 'bestLap', res: simulatePractice(teams, round!, weekendProgress?.weekendContext), grid: null });
+        if (weekendProgress) weekendProgress.practiceComplete = true;
+        setPracticeRun(true);
+        setView('results');
         setStatusMessage(`Practice complete. Car XP increased to ${s.team!.carXP}/100.`);
         syncGame();
       } catch (error: any) {
@@ -252,6 +265,11 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       setStatusMessage(`Race weekend opens on ${raceDateLabel}. Simulate ${daysUntilRace} more day${daysUntilRace === 1 ? "" : "s"} first.`);
       return;
     }
+    // One qualifying session per weekend: re-rolling the grid until pole is an exploit.
+    if (weekendProgress?.qualifyingComplete) {
+      setStatusMessage("Qualifying is complete. The grid is set for this Grand Prix.");
+      return;
+    }
     setLoading(true);
     setTimeout(() => {
       try {
@@ -259,29 +277,65 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
         // Parc fermé: the setup sheet is final from qualifying onwards.
         refreshPlayerSetupInContext(weekendProgress?.weekendContext, round, s);
         lockWeekendSetup(s);
-        const { grid, isWet } = simulateQualifying(teams, round!, weekendProgress?.weekendContext);
+        const { grid, isWet } = simulateQualifying(teams, round!, weekendProgress?.weekendContext, { seed: weekendProgress?.qualiSeed });
         
         // Process penalties
         const finalGrid = applyGridPenalties(s, grid);
 
         setRaceIsWet(isWet);
         setResultsData({ metric: 'lap', res: finalGrid, grid: null });
+        setView('results');
         if (weekendProgress) {
           weekendProgress.qualifyingComplete = true;
           weekendProgress.grid = finalGrid.slice();
           weekendProgress.isWet = isWet;
+          // One weather for the whole weekend: the race runs in qualifying's conditions.
+          if (weekendProgress.weekendContext) weekendProgress.weekendContext.isWet = isWet;
         }
-        setStatusMessage(
-          weekendProgress?.raceComplete
-            ? `Qualifying session updated. This Grand Prix race is already complete — advance to the next round for a new race. Car XP is ${s.team!.carXP}/100.`
-            : `Qualifying complete. Car XP increased to ${s.team!.carXP}/100. Race is now unlocked.`
-        );
+        // Objectives re-forecast from the real grid and weather.
+        refreshRaceWeekendAfterQualifying(s, { grid: finalGrid, teams, weekendContext: weekendProgress?.weekendContext });
+        setStatusMessage(`Qualifying complete. Car XP increased to ${s.team!.carXP}/100. Race is now unlocked.`);
         syncGame();
       } catch (error: any) {
         setStatusMessage(`Qualifying failed to simulate. ${error.message}`);
       }
       setLoading(false);
     }, 1000);
+  };
+
+  // Sprint weekends (calendar flag + the season's sprint setting)
+  const sprintWeekend = Boolean(round?.sprint) && s.season.rules?.sprints !== false;
+  const sprintLaps = round ? Math.max(8, Math.round(round.laps / 3)) : 0;
+
+  const handleSprint = () => {
+    if (!weekendProgress?.qualifyingComplete) {
+      setStatusMessage("Qualifying sets the sprint grid. Run qualifying first.");
+      return;
+    }
+    if (weekendProgress.sprintComplete) {
+      setStatusMessage("The sprint has already been run this weekend.");
+      return;
+    }
+    setLoading(true);
+    setTimeout(async () => {
+      try {
+        const seed = ((weekendProgress.weekendContext?.raceSeed ?? 0) + 1) >>> 0;
+        const { finishers, replayData } = simulateRaceEvent(teams, round!, sprintLaps, weekendProgress.grid, {}, weekendProgress.weekendContext, 'points', { seed, sprint: true });
+        s.standings = updateStandings(finishers, s.standings, SPRINT_POINTS);
+        recordSprintHistory(round!.round, round!.name, round!.circuit, finishers, s, weekendProgress.grid, replayData.seed);
+        weekendProgress.sprintComplete = true;
+        const leader = finishers[0]?.time || 0;
+        setResultsData({ metric: 'gap', res: finishers.map((f: any) => ({ ...f, gap: f.retired ? NaN : f.time - leader })), grid: weekendProgress.grid });
+        setView('results');
+        const ours = finishers.map((f: any, i: number) => ({ f, pos: i + 1 })).filter(({ f }: any) => f.team.name === s.team!.name);
+        const pts = ours.reduce((a: number, { f, pos }: any) => a + (f.retired && !f.classified ? 0 : (SPRINT_POINTS[pos - 1] || 0)), 0);
+        setStatusMessage(`Sprint complete (${sprintLaps} laps). ${ours.map(({ f, pos }: any) => `${f.driver.name.split(' ').pop()} P${pos}`).join(', ')}: ${pts} point${pts === 1 ? '' : 's'}. The Grand Prix is next.`);
+        await syncGame();
+      } catch (error: any) {
+        setStatusMessage(`Sprint failed to simulate. ${error.message}`);
+      }
+      setLoading(false);
+    }, 800);
   };
 
   const openBriefingModal = (mode: 'quick_sim' | 'race_control') => {
@@ -295,6 +349,10 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     }
     if (!weekendProgress?.qualifyingComplete) {
       setStatusMessage("Qualifying must be completed before opening the pre-race briefing.");
+      return;
+    }
+    if (sprintWeekend && !weekendProgress.sprintComplete) {
+      setStatusMessage("It's a sprint weekend: run the sprint before the Grand Prix.");
       return;
     }
     setShowBriefingModal(mode);
@@ -333,7 +391,8 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           applyRoundCarDevelopmentAll(state);
           s.season.round += 1;
           
-          setResultsData({ metric: 'time', res: finishers, grid: weekendProgress?.grid || null, replayData, objectiveId });
+          setResultsData({ metric: 'time', res: finishers, grid: weekendProgress?.grid || null, replayData, objectiveId, track: round });
+          setView('results');
           
           const historyRecord = s.raceHistory[s.raceHistory.length - 1];
           const financeReport = processRaceFinance(state, historyRecord, round);
@@ -374,7 +433,8 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       applyRoundCarDevelopmentAll(state);
       s.season.round += 1;
       
-      setResultsData({ metric: 'time', res, grid: weekendProgress?.grid || null, replayData, objectiveId: objId });
+      setResultsData({ metric: 'time', res, grid: weekendProgress?.grid || null, replayData, objectiveId: objId, track: round });
+      setView('results');
       validateFinalClassification(finalClassification, standingsBefore, s.standings, historyRecord);
 
       setStatusMessage(`${round!.name} complete. Net finance result: ${financeReport.netProfit >= 0 ? "+" : ""}$${financeReport.netProfit}M. Car XP is now ${s.team!.carXP}/100. Day simulation is now unlocked.`);
@@ -387,12 +447,12 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
 
   const renderResults = () => {
     if (!resultsData) return null;
-    const { metric, res, grid, replayData, objectiveId } = resultsData;
-    const title = metric === "bestLap" ? "Practice Results" : metric === "lap" ? "Qualifying Results" : "Race Results";
+    const { metric, res, grid, replayData, objectiveId, track: resultTrack } = resultsData;
+    const title = metric === "bestLap" ? "Practice results" : metric === "lap" ? "Qualifying results" : metric === "gap" ? "Sprint results" : "Race results";
     const isRace = metric === "time";
 
     if (isRace) {
-      return <DetailedRaceReport results={res} grid={grid} objectiveId={objectiveId || 'points'} state={state} track={round} replayData={replayData} />;
+      return <DetailedRaceReport results={res} grid={grid} objectiveId={objectiveId || 'points'} state={state} track={resultTrack || round} replayData={replayData} />;
     }
 
     return (
@@ -401,7 +461,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
            initial={{ opacity: 0, scale: 0.98 }}
            animate={{ opacity: 1, scale: 1 }}
            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-           style={{ ...glassCard({ padding: '24px' }), marginTop: '24px' }}>
+           style={{ ...glassCard({ padding: '24px' }) }}>
            <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, margin: '0 0 16px', color: HUB.textPrimary }}>{title}</h3>
 
            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -480,334 +540,123 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     );
   }
 
-  // Calculate Data for the New Dashboard Layout
-  const reliability = s.team!.car?.reliability || 80;
-  const healthScore = Math.min(100, Math.max(0, reliability + (Math.random() * 10 - 5)));
-  
-  // Standings
-  const sortedTeams = Object.entries(s.standings.teams).sort((a: any, b: any) => b[1] - a[1]);
-  const teamPos = sortedTeams.findIndex(t => t[0] === s.team!.name) + 1;
-  const teamPts = s.standings.teams[s.team!.name] || 0;
-  
-  let gapAhead = 0, gapBehind = 0;
-  if (teamPos > 1) gapAhead = (sortedTeams[teamPos - 2][1] as number) - teamPts;
-  if (teamPos < sortedTeams.length) gapBehind = teamPts - (sortedTeams[teamPos][1] as number);
+  // Rival for the pre-race briefing (unchanged)
+  const sortedTeams = constructorEntries(s);
+  const rivals = sortedTeams.filter((t: any) => t[0] !== s.team!.name).map((t: any) => ({ name: t[0], points: t[1] })).slice(0, 3);
 
-  const sortedDrivers = Object.entries(s.standings.drivers).sort((a: any, b: any) => b[1] - a[1]);
-  const d1Pos = activeDrivers[0] ? sortedDrivers.findIndex(d => d[0] === activeDrivers[0].name) + 1 : '-';
-
-  // Rival Watch
-  const rivals = sortedTeams.filter((t: any) => t[0] !== s.team!.name).map((t: any) => {
-    const aiTeam = s.aiTeams.find((a: any) => a.name === t[0]);
-    return { name: t[0], points: t[1], carLevel: aiTeam?.carLevel || 1, perf: aiTeam?.carPerformance || 80 };
-  }).slice(0, 3); // top 3 rivals
-
-  const lastUpgrade = s.team!.upgradeHistory?.[s.team!.upgradeHistory.length - 1];
-  const pendingUpg = s.team!.pendingUpgrades?.[0];
-
-  const rainProb = Math.round(getTrackWetProbability(round.circuit) * 100);
+  const rainProb = Math.round(getTrackWetProbability(`${round.name || ""} ${round.circuit || ""}`) * 100);
   const raceBonusChallenges = generateRaceBonusChallenges(s, round);
+  const intel = getCircuitIntel(round);
+  const geo = buildTrackGeometry(getTrackPath(round.name));
+  const brakingCount = geo ? analyseTrack(geo as any, intel?.corners ?? null).braking.length : null;
+  const setupRuns = ensureSetupLab(s).weekend?.runs || [];
+  const session = getSessionState({ raceWindowOpen, daysUntilRace, weekendProgress, practiceRun, sprintWeekend });
+  const hasResults = Boolean(resultsData);
+  const activeView: WeekendView = view === 'results' && !hasResults ? 'overview' : view === 'prep' && raceAlreadyRun ? 'overview' : view;
+
+  const onNavigate = async (screen: string, tab?: string) => {
+    if (screen === 'prep') { setView('prep'); window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }); return; }
+    if (screen === 'engineering') { const m = await import('./engineering.tsx'); m.renderEngineering(root, tab); return; }
+    if (screen === 'academy') { const m = await import('./academy.tsx'); m.renderAcademy(root); return; }
+    if (screen === 'finance') { const m = await import('./finance.tsx'); m.renderFinance(root); return; }
+    if (screen === 'drivers') { const m = await import('./myDrivers.tsx'); m.renderMyDrivers(root); return; }
+  };
+
+  const setupChanged = (message?: string) => {
+    refreshPlayerSetupInContext(weekendProgress?.weekendContext, round, s);
+    if (message) {
+      setStatusMessage(message);
+      syncGame();
+    }
+  };
 
   return (
-    <div style={{ paddingBottom: '64px' }}>
-      
-      {/* Title Header */}
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          {pageTitle(round!.name)}
-          {pageSubtitle('Monitor track conditions, factory readiness, and rival developments before the race.')}
-        </div>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <div style={statCell()}>{statLabel('Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', color:HUB.textPrimary, fontWeight: 400, fontSize:'16px'}}>{round.round} / {totalRounds}</span></div>
-          <div style={statCell()}>{statLabel('Car level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', color:HUB.textPrimary, fontWeight: 400, fontSize:'16px'}}>Lv {s.team!.carLevel}</span></div>
-        </div>
-      </div>
+    <div className="wk-root">
+      {activeView === 'overview' && <CircuitStage facts={getCircuitFacts(round)} reduced={reduced} onOpen={() => onNavigate('prep')} />}
 
-      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '24px' }}>
-        
-        {/* Section 1: Weekend Overview (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} strokeWidth={1.5} color={HUB.textMuted} /> Weekend overview</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.circuit}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit type</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.circuitType}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Forecast</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>{raceWeekend?.weather.isWet ? <CloudRain size={16} strokeWidth={1.5} color={HUB.textMuted} /> : <Sun size={16} strokeWidth={1.5} color={HUB.textMuted} />}{raceWeekend?.weather.isWet ? 'Wet race' : 'Dry race'}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Rain probability</span><span style={{ fontSize: '12px', color: raceWeekend?.weather.rainProbability > 30 ? HUB.warning : HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.weather.rainProbability}%</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Track temp</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.weather.trackTemperature}°C</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Race status</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.raceStatus}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Countdown</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.countdown}</span></div>
-          </div>
-        </div>
+      <WeekendHeader
+        round={round} intel={intel} year={s.season.year || 1} totalRounds={totalRounds}
+        raceDateLabel={raceDateLabel} daysUntilRace={daysUntilRace} weather={raceWeekend?.weather}
+        session={session} view={activeView} setView={setView} hasResults={hasResults}
+        loading={loading} canAdvanceDay={canAdvanceDay}
+        onPractice={handlePractice} onQuali={handleQuali} onSprint={handleSprint}
+        onQuickSim={() => openBriefingModal('quick_sim')} onRaceControl={() => openBriefingModal('race_control')}
+        onAdvanceDay={advanceDay} statusMessage={statusMessage}
+      />
 
-        {/* Section 2: Power Unit Status (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldAlert size={16} strokeWidth={1.5} color={HUB.textMuted} /> Power unit status</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {(() => {
-              ensureEngineeringState(s);
-              const driver = s.team!.drivers[0];
-              if (!driver) return null;
-              
-              const keyComponents = ['ICE', 'TC', 'GB', 'ES'];
-              return keyComponents.map(comp => {
-                const active = getActiveComponent(s, driver.name, comp);
-                if (!active) return null;
-                const h = 100 - active.wear;
-                return (
-                  <div key={comp}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: HUB.textMuted, marginBottom: '4px' }}>
-                      <span>{COMPONENT_CATALOG[comp].name}</span>
-                      <span style={{ color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{h.toFixed(0)}%</span>
-                    </div>
-                    <div style={{ width: '100%', height: '4px', background: HUB.raised, borderRadius: '2px' }}>
-                      <div style={{ width: `${h}%`, height: '100%', background: h > 85 ? HUB.positive : h > 60 ? HUB.warning : HUB.negative, borderRadius: '2px' }} />
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-            <button onClick={() => import('./engineering.tsx').then(m => m.renderEngineering(root))} className={btnClass('secondary')} style={btn('secondary', 'md', { marginTop: '8px' })}>Manage engineering</button>
-          </div>
-        </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={activeView}
+          className="wk-viewwrap"
+          initial={reduced ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduced ? undefined : { opacity: 0, y: -4, transition: { duration: 0.12 } }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {activeView === 'overview' && (
+            <OverviewBoard
+              s={s} raceWeekend={raceWeekend} weekendProgress={weekendProgress} drivers={activeDrivers}
+              session={session} daysUntilRace={daysUntilRace} raceWindowOpen={raceWindowOpen}
+              selectedObjective={briefingSelectedObjective} onSelectObjective={setBriefingSelectedObjective}
+              intel={intel} trackProfile={trackProfile} insights={generateTrackInsights(round.circuit, raceWeekend?.weather.isWet ?? null, trackProfile)}
+              brakingCount={brakingCount} challenges={raceBonusChallenges} setupRuns={setupRuns} raceDay={raceDay}
+              onNavigate={onNavigate} reduced={reduced}
+            />
+          )}
 
-        {/* Section 3: Engineering Status (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Cpu size={16} strokeWidth={1.5} color={HUB.textMuted} /> Engineering status</h4>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
-              <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Latest upgrade</span>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{lastUpgrade?.part || 'None'}</span>
-                {lastUpgrade && <span style={{ fontSize: '12px', color: HUB.positive, fontWeight: 400, fontFamily: HUB.fontBold }}>+{lastUpgrade.expectedGain} OVR</span>}
-              </div>
-            </div>
-
-            <div style={{ padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
-              <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Manufacturing queue</span>
-              {pendingUpg ? (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{pendingUpg.part}</span>
-                    <span style={{ fontSize: '11px', color: HUB.textMuted }}>ETA round {Math.floor((Math.max(1, pendingUpg.readyDay) - 1) / 14) + 1}</span>
-                  </div>
-                  <div style={{ width: '100%', height: '4px', background: HUB.bg, borderRadius: '2px' }}>
-                    <div style={{ width: '60%', height: '100%', background: HUB.textFaint, borderRadius: '2px' }} />
-                  </div>
-                </div>
+          {activeView === 'prep' && (
+            <div className="wk-ws">
+              {raceWindowOpen ? (
+                <SetupConsole appState={s} track={round} drivers={activeDrivers} locked={Boolean(weekendProgress?.qualifyingComplete)} onSetupChanged={setupChanged} />
               ) : (
-                <span style={{ fontSize: '13px', color: HUB.textMuted }}>No active development projects</span>
+                <section className="wk-col wk-setup" aria-labelledby="wk-setup-title">
+                  <div className="wk-col-head"><h2 id="wk-setup-title" className="wk-panel-title"><span className="wk-code">01</span>Car setup</h2></div>
+                  <p className="wk-empty">The car reaches the circuit on {raceDateLabel}. Setup work and test runs open then, {daysUntilRace} day{daysUntilRace === 1 ? '' : 's'} from now. Strategy can be planned now.</p>
+                </section>
+              )}
+
+              <section className="wk-col wk-mapcol" aria-label="Circuit map">
+                <CircuitMap intel={intel} weather={raceWeekend?.weather} selectedSector={selectedSector} onSelectSector={setSelectedSector} reduced={reduced} />
+                <div className="wk-map-foot">
+                  <div><span>Length</span><strong>{intel?.lengthKm ? `${intel.lengthKm} km` : '–'}</strong></div>
+                  <div><span>Corners</span><strong>{intel?.corners ?? '–'}</strong></div>
+                  <div><span>Race distance</span><strong>{intel?.lengthKm && round.laps ? `${(intel.lengthKm * round.laps).toFixed(1)} km` : '–'}</strong></div>
+                  <div><span>Overtaking</span><strong>{intel?.overtaking != null ? `${intel.overtaking}/100` : '–'}</strong></div>
+                  <p className="wk-map-foot-note">Corner positions and braking zones are estimated from the layout's shape; the start line marks where the layout begins.</p>
+                </div>
+              </section>
+
+              {weekendProgress && activeDrivers.length > 0 ? (
+                <StrategyBuilder
+                  key={round.round}
+                  variant="workstation"
+                  appState={s}
+                  track={round}
+                  totalLaps={round.laps}
+                  playerTeam={teams[0]}
+                  drivers={activeDrivers}
+                  teams={teams}
+                  grid={weekendProgress.grid}
+                  weekendContext={weekendProgress.weekendContext}
+                  selectedStrategies={weekendProgress.selectedStrategies}
+                  rainProbability={rainProb}
+                  onLock={(labels: Record<string, string>) => {
+                    Object.assign(weekendProgress.selectedStrategies, labels);
+                    setStatusMessage(`Strategy locked: ${Object.entries(labels).map(([n, l]) => `${String(n).split(' ').pop()} ${String(l).replace(/\s*->\s*/g, '–').replace('(Custom: pit ', '(pit ')}`).join(' · ')}.`);
+                    syncGame();
+                  }}
+                />
+              ) : (
+                <section className="wk-col"><p className="wk-empty">Sign two race drivers to plan a strategy.</p></section>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* Section 4: Championship Snapshot (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Award size={16} strokeWidth={1.5} color={HUB.textMuted} /> Championship snapshot</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ background: HUB.raised, padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
-               <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Constructors</span>
-               <span style={{ fontSize: '24px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>P{raceWeekend?.standingsImpact.currentConstructorPosition}</span>
-            </div>
-            <div style={{ background: HUB.raised, padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
-               <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Lead driver</span>
-               <span style={{ fontSize: '24px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>P{d1Pos}</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${HUB.border}`, paddingTop: '12px' }}>
-            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Nearest rival</span>
-            <span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.standingsImpact.nearestRival}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to rival</span>
-            <span style={{ fontSize: '13px', color: raceWeekend?.standingsImpact.gapToRival > 0 ? HUB.negative : raceWeekend?.standingsImpact.gapToRival < 0 ? HUB.positive : HUB.textMuted, fontWeight: 400, fontFamily: HUB.fontMono }}>
-              {Math.abs(raceWeekend?.standingsImpact.gapToRival) > 0 ? `${raceWeekend?.standingsImpact.gapToRival > 0 ? '-' : '+'}${Math.abs(raceWeekend?.standingsImpact.gapToRival)} pts` : '—'}
-            </span>
-          </div>
-        </div>
-
-        {/* Section 5: AI Race Objectives (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h4 style={{ margin: 0, fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Flag size={16} strokeWidth={1.5} color={HUB.textMuted} /> Race objectives
-            </h4>
-            <span style={{ fontSize: '11px', color: HUB.textMuted }}>{raceWeekend?.tier.label}</span>
-          </div>
-          {raceWeekend?.finishDistribution && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
-              <FinishDistributionBar finishDist={raceWeekend.finishDistribution} compact={true} />
-            </div>
           )}
-          <ObjectiveCardsList
-            objectives={raceWeekend?.objectives || []}
-            recommendedObjective={raceWeekend?.recommendedObjective}
-            selectedObjectiveId={briefingSelectedObjective}
-            onSelect={setBriefingSelectedObjective}
-            compact={true}
-          />
-        </div>
 
-        {/* Section 6: Track Insights (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} strokeWidth={1.5} color={HUB.textMuted} /> Track insights</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {generateTrackInsights(round.circuit, raceWeekend?.weather.isWet ?? null, trackProfile).map((msg, i) => (
-               <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <ChevronRight size={16} strokeWidth={1.5} color={HUB.textFaint} style={{ marginTop: '1px', flexShrink: 0 }} />
-                  <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0, lineHeight: '1.4' }}>{msg}</p>
-               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Section 6: Rival Watch (Span 4) */}
-        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Timer size={16} strokeWidth={1.5} color={HUB.textMuted} /> Rival watch</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {rivals.map((rival, i) => (
-              <div key={rival.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
-                <div>
-                  <span style={{ fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, display: 'block' }}>{rival.name}</span>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>{rival.points} pts</span>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '11px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold, display: 'block' }}>Car Lv {rival.carLevel}</span>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', marginTop: '2px' }}>
-                    Pace: {rival.perf}
-                    {rival.perf > s.team!.carPerformance ? <ArrowUpRight size={12} strokeWidth={1.5} color={HUB.negative} /> : <ArrowDownRight size={12} strokeWidth={1.5} color={HUB.positive} />}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ ...glassCard(), marginBottom: '24px' }}>
-        <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={16} strokeWidth={1.5} color={HUB.textMuted} /> Race bonus challenges</h4>
-        <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-          {raceBonusChallenges.map((challenge) => (
-            <div key={challenge.id} style={{ padding: '16px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
-              <span style={{ fontSize: '11px', color: HUB.textMuted }}>Optional objective</span>
-              <h4 style={{ fontSize: '14px', color: HUB.textPrimary, margin: '6px 0 12px', fontFamily: HUB.fontBold }}>{challenge.label}</h4>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '11px', color: HUB.textMuted }}>
-                <span>Cash <strong style={{ color: HUB.positive }}>+${challenge.cash}M</strong></span>
-                <span>Board <strong style={{ color: HUB.textPrimary }}>+{challenge.boardConfidence}</strong></span>
-                <span>Rep <strong style={{ color: HUB.textPrimary }}>+{challenge.reputation}</strong></span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Section 7: Engineer Notes Feed */}
-      <div style={{ ...glassCard(), marginBottom: '32px' }}>
-         <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={16} strokeWidth={1.5} color={HUB.textMuted} /> Comms feed</h4>
-         <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
-           {getEngineerNotes(s.team, weekendProgress, raceIsWet).map((note, i) => (
-             <div key={i} style={{ minWidth: '250px', borderLeft: `1px solid ${HUB.borderMid}`, paddingLeft: '12px' }}>
-               <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono, display: 'block', marginBottom: '4px' }}>{note.time}</span>
-               <p style={{ fontSize: '13px', color: i === 0 ? HUB.textPrimary : HUB.textMuted, margin: 0 }}>{note.msg}</p>
-             </div>
-           ))}
-         </div>
-      </div>
-
-      {/* Advance Day Bar (if not open) */}
-      {!raceWindowOpen && (
-        <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div>
-            <p style={{ fontSize: '14px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold, margin: '0 0 4px' }}>Race weekend closed</p>
-            <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>Simulate {daysUntilRace} more day{daysUntilRace === 1 ? "" : "s"} until {raceDateLabel} to unlock track sessions.</p>
-          </div>
-          <button onClick={advanceDay} disabled={!canAdvanceDay || loading} className={btnClass('secondary')} style={btn('secondary', 'md')}>
-            Simulate 1 day
-          </button>
-        </div>
-      )}
-
-      {/* Setup Lab — car setup + learned track correlation */}
-      {raceWindowOpen && round && !raceAlreadyRun && (
-        <SetupLab
-          appState={s}
-          track={round}
-          drivers={activeDrivers}
-          locked={Boolean(weekendProgress?.qualifyingComplete)}
-          onSetupChanged={(message?: string) => {
-            refreshPlayerSetupInContext(weekendProgress?.weekendContext, round, s);
-            if (message) {
-              setStatusMessage(message);
-              syncGame();
-            }
-          }}
-        />
-      )}
-
-      {/* Strategy builder — writes weekendProgress.selectedStrategies, which quick sim and Race control read */}
-      {round && weekendProgress && !raceAlreadyRun && activeDrivers.length > 0 && (
-        <StrategyBuilder
-          key={round.round}
-          appState={s}
-          track={round}
-          totalLaps={round.laps}
-          playerTeam={teams[0]}
-          drivers={activeDrivers}
-          teams={teams}
-          grid={weekendProgress.grid}
-          weekendContext={weekendProgress.weekendContext}
-          selectedStrategies={weekendProgress.selectedStrategies}
-          rainProbability={rainProb}
-          onLock={(labels: Record<string, string>) => {
-            Object.assign(weekendProgress.selectedStrategies, labels);
-            setStatusMessage(`Strategy locked: ${Object.entries(labels).map(([n, l]) => `${String(n).split(' ').pop()} ${String(l).replace(/\s*->\s*/g, '–').replace('(Custom: pit ', '(pit ')}`).join(' · ')}.`);
-            syncGame();
-          }}
-        />
-      )}
-
-      {/* Bottom Actions Console */}
-      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
-        {(() => {
-          // Exactly one primary: the next session the player has to run.
-          const nextSession = !raceWindowOpen || weekendProgress?.raceComplete ? null : !weekendProgress?.qualifyingComplete ? 'qualifying' : 'race_control';
-          const sessionVariant = (id: string) => (nextSession === id ? 'primary' : 'secondary') as 'primary' | 'secondary';
-          const practiceDone = Boolean(weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete);
-          const qualiDone = Boolean(weekendProgress?.qualifyingComplete);
-          return (
-            <>
-              <button onClick={handlePractice} className={btnClass('secondary')} style={btn('secondary', 'md', { width: '100%' })}>
-                {practiceDone ? <CheckCircle size={16} strokeWidth={1.5} color={HUB.positive} /> : <Activity size={16} strokeWidth={1.5} />}
-                <span style={practiceDone ? { color: HUB.positive } : undefined}>Run practice</span>
-              </button>
-
-              <button onClick={handleQuali} className={btnClass(sessionVariant('qualifying'))} style={btn(sessionVariant('qualifying'), 'md', { width: '100%' })}>
-                {qualiDone ? <CheckCircle size={16} strokeWidth={1.5} color={HUB.positive} /> : <Timer size={16} strokeWidth={1.5} />}
-                <span style={qualiDone ? { color: HUB.positive } : undefined}>Run qualifying</span>
-              </button>
-
-              <button onClick={() => openBriefingModal('quick_sim')} className={btnClass('secondary')} style={btn('secondary', 'md', { width: '100%' })}>
-                <Zap size={16} strokeWidth={1.5} />
-                Quick sim
-              </button>
-
-              <button onClick={() => openBriefingModal('race_control')} className={btnClass(sessionVariant('race_control'))} style={btn(sessionVariant('race_control'), 'md', { width: '100%' })}>
-                <Flag size={16} strokeWidth={1.5} />
-                Race control
-              </button>
-            </>
-          );
-        })()}
-      </div>
-
-      {statusMessage && (
-        <div style={{ ...glassCard({ padding: '16px' }), marginTop: '24px' }}>
-          <p style={{ fontSize: '14px', color: HUB.textPrimary, margin: 0 }}>{statusMessage}</p>
-        </div>
-      )}
-
-      {resultsData && <div key={resultsData.metric}>{renderResults()}</div>}
+          {activeView === 'results' && resultsData && (
+            <div className="wk-results" key={resultsData.metric}>{renderResults()}</div>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Pre-Race Briefing Modal Overlay */}
         <PreRaceBriefingModal

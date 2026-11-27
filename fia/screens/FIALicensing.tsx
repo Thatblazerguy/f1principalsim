@@ -69,7 +69,7 @@ function FIALicensingScreen({ appRoot }) {
   });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100*var(--vh))', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
       {notification && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>
           {notification}

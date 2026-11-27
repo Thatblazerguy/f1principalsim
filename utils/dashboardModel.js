@@ -8,6 +8,7 @@
  *   - getCarSpecs / getTeamSeasonStats / getTeamForm (existing engines)
  * Nothing here mutates state.
  */
+import { buildChampionship, getConstructorOrder } from "./championshipModel.js";
 import { getCarSpecs } from "./simTeam.js";
 import { getTeamSeasonStats, getTeamForm } from "../game/raceHistory.js";
 
@@ -34,6 +35,7 @@ export function getSeasonRaces(state) {
  */
 export function getChampionshipSeries(state, rivals = 4) {
   const races = getSeasonRaces(state);
+  const champ = buildChampionship(state);
   const allNames = [state.team, ...(state.aiTeams || [])].filter(Boolean).map((t) => t.name);
   const running = Object.fromEntries(allNames.map((n) => [n, 0]));
 
@@ -42,15 +44,17 @@ export function getChampionshipSeries(state, rivals = 4) {
     const snap = race.standingsAfter?.teams;
     const totals = {};
     for (const n of allNames) totals[n] = snap && snap[n] != null ? snap[n] : running[n] || 0;
-    let leader = allNames[0];
-    for (const n of allNames) if (totals[n] > totals[leader]) leader = n;
+    // Leader after this round, with count-back on equal points.
+    const snap2 = champ.progression.teams[champ.progression.rounds.findIndex((p) => p.round === race.round)] || {};
+    let leader = Object.keys(snap2).find((n) => snap2[n].pos === 1) || allNames[0];
+    if (!(leader in totals)) leader = allNames[0];
     return { round: race.round, name: race.name, totals, leader, leaderPoints: totals[leader] || 0 };
   });
 
-  const current = state.standings?.teams || {};
+  const order = new Map(getConstructorOrder(state).map((t) => [t.name, t.pos]));
   const others = allNames
     .filter((n) => n !== state.team?.name)
-    .sort((a, b) => (current[b] || 0) - (current[a] || 0) || a.localeCompare(b))
+    .sort((a, b) => (order.get(a) ?? 99) - (order.get(b) ?? 99))
     .slice(0, rivals);
   const names = [state.team?.name, ...others].filter(Boolean);
   const series = names.map((name) => ({
@@ -89,9 +93,7 @@ export function getTeamProfile(state, team, raceDrivers) {
   const season = state.season?.year || 1;
   const history = (state.raceHistory || []).filter((r) => (r.season ?? 1) === season);
   const all = [state.team, ...(state.aiTeams || [])].filter(Boolean);
-  const table = all
-    .map((t) => ({ name: t.name, points: state.standings?.teams?.[t.name] || 0 }))
-    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  const table = getConstructorOrder(state);
   const stats = getTeamSeasonStats(team.name, history, season);
   const specs = getCarSpecs(team);
   const drivers = (raceDrivers || team.drivers || []).slice(0, 2).filter(Boolean);

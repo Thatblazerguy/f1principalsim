@@ -1,3 +1,8 @@
+import { processMarketDay } from "../game/transferMarket.js";
+import { processScoutingDay } from "../game/scouting.js";
+import { processAcademyDay } from "../game/academyEngine.js";
+import { processFacilityProjects } from "./financeSystem.js";
+
 const BASE_SEASON_YEAR = 2026;
 const BASE_SEASON_START_MONTH = 2; // March (0-indexed)
 const BASE_SEASON_START_DAY = 1;
@@ -158,31 +163,43 @@ export function canSimulateNextDay(state) {
 export function simulateNextDay(state) {
   ensureSeasonTimeline(state);
   const totalRounds = state.season.totalRounds || 24;
-  if (state.season.round > totalRounds) return { advanced: false, reason: "season_complete", completedUpgrades: [] };
+  if (state.season.round > totalRounds) return { advanced: false, reason: "season_complete", completedUpgrades: [], completedFacilities: [] };
 
   if (!canSimulateNextDay(state)) {
-    return { advanced: false, reason: "race_weekend_open", completedUpgrades: [] };
+    return { advanced: false, reason: "race_weekend_open", completedUpgrades: [], completedFacilities: [] };
   }
 
   state.season.currentDay += 1;
   const completedUpgrades = processCompletedUpgrades(state);
   const daysUntilRace = getDaysUntilRound(state.season.round, state.season.currentDay);
 
-  // Process scouting if academy system is loaded
+  // Academy scouting runs inside the same tick (synchronously) so a multi-day
+  // fast-forward processes every day in order, exactly like single-day steps.
   if (state.academy && state.academy.scouts) {
-    import('../game/scouting.js').then(({ processScoutingDay }) => {
-       processScoutingDay(state);
-    }).catch(err => console.error("Failed to process scouting day", err));
+    try { processScoutingDay(state); } catch (err) { console.error("Failed to process scouting day", err); }
   }
+  // Academy: development, scouting staff, junior championships, payroll and the prospect market
+  if (state.academy) {
+    try { processAcademyDay(state); } catch (err) { console.error("Academy day failed", err); }
+  }
+
+  // Factory facility builds finish on their ready day, whichever screen advanced time.
+  let completedFacilities = [];
+  try { completedFacilities = processFacilityProjects(state); } catch (err) { console.error("Facility projects failed", err); }
+  completedFacilities.forEach(f => addTimelineNotification(state, `${f.name} upgrade complete (Lv ${f.level}).`));
 
   if (daysUntilRace === 0 && state.season.round <= totalRounds) {
     addTimelineNotification(state, `Race weekend is now live: Round ${state.season.round}.`);
   }
 
+  // Driver market: scouting progress, interest changes, AI pre-contracts and seat filling
+  try { processMarketDay(state); } catch (err) { console.error("Driver market day failed", err); }
+
   return {
     advanced: true,
     reason: "ok",
     completedUpgrades,
+    completedFacilities,
     daysUntilRace,
   };
 }

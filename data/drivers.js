@@ -57,27 +57,61 @@ function resolveCanonicalDriverKey(name = "") {
   return DRIVER_NAME_ALIASES.get(normalized) ?? normalized;
 }
 
-function buildInitialsAvatar(name = "Driver") {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0]?.toUpperCase() || "")
-    .join("") || "DR";
+// Verified official headshots (formula1.com media). Drivers without one fall back to a helmet figure.
+const F1_MEDIA_HEADSHOT = (path) => `https://media.formula1.com/content/dam/fom-website/drivers/${path}.png.transform/2col/image.png`;
+const STATIC_HEADSHOTS = {
+  "Alex Albon": "A/ALEALB01_Alexander_Albon/alealb01",
+  "Andrea Kimi Antonelli": "A/ANDANT01_Andrea%20Kimi_Antonelli/andant01",
+  "Antonio Giovinazzi": "A/ANTGIO01_Antonio_Giovinazzi/antgio01",
+  "Carlos Sainz": "C/CARSAI01_Carlos_Sainz/carsai01",
+  "Charles Leclerc": "C/CHALEC01_Charles_Leclerc/chalec01",
+  "Daniel Ricciardo": "D/DANRIC01_Daniel_Ricciardo/danric01",
+  "Esteban Ocon": "E/ESTOCO01_Esteban_Ocon/estoco01",
+  "Felipe Drugovich": "F/FELDRU01_Felipe_Drugovich/feldru01",
+  "Fernando Alonso": "F/FERALO01_Fernando_Alonso/feralo01",
+  "Franco Colapinto": "F/FRACOL01_Franco_Colapinto/fracol01",
+  "Gabriel Bortoleto": "G/GABBOR01_Gabriel_Bortoleto/gabbor01",
+  "George Russell": "G/GEORUS01_George_Russell/georus01",
+  "Isack Hadjar": "I/ISAHAD01_Isack_Hadjar/isahad01",
+  "Jack Doohan": "J/JACDOO01_Jack_Doohan/jacdoo01",
+  "Kevin Magnussen": "K/KEVMAG01_Kevin_Magnussen/kevmag01",
+  "Lance Stroll": "L/LANSTR01_Lance_Stroll/lanstr01",
+  "Lando Norris": "L/LANNOR01_Lando_Norris/lannor01",
+  "Lewis Hamilton": "L/LEWHAM01_Lewis_Hamilton/lewham01",
+  "Liam Lawson": "L/LIALAW01_Liam_Lawson/lialaw01",
+  "Logan Sargeant": "L/LOGSAR01_Logan_Sargeant/logsar01",
+  "Max Verstappen": "M/MAXVER01_Max_Verstappen/maxver01",
+  "Mick Schumacher": "M/MICSCH02_Mick_Schumacher/micsch02",
+  "Nico Hulkenberg": "N/NICHUL01_Nico_Hulkenberg/nichul01",
+  "Nyck de Vries": "N/NYCDEV01_Nyck_De%20Vries/nycdev01",
+  "Oliver Bearman": "O/OLIBEA01_Oliver_Bearman/olibea01",
+  "Oscar Piastri": "O/OSCPIA01_Oscar_Piastri/oscpia01",
+  "Pierre Gasly": "P/PIEGAS01_Pierre_Gasly/piegas01",
+  "Sergio Perez": "S/SERPER01_Sergio_Perez/serper01",
+  "Valtteri Bottas": "V/VALBOT01_Valtteri_Bottas/valbot01",
+  "Yuki Tsunoda": "Y/YUKTSU01_Yuki_Tsunoda/yuktsu01",
+  "Zhou Guanyu": "G/GUAZHO01_Guanyu_Zhou/guazho01",
+};
 
+// Driver silhouette in a race helmet, used wherever a driver has no photo.
+export function buildHelmetAvatar(accent = "#e10600") {
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="grad" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#e10600"/>
-      <stop offset="100%" stop-color="#5e0d0d"/>
-    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2a2f"/><stop offset="1" stop-color="#141416"/></linearGradient>
+    <linearGradient id="shell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f2f4"/><stop offset="1" stop-color="#9a9aa2"/></linearGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3f4a"/><stop offset="1" stop-color="#0b0c0f"/></linearGradient>
   </defs>
-  <rect width="128" height="128" rx="20" fill="url(#grad)"/>
-  <text x="50%" y="54%" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="44" font-weight="700">${initials}</text>
+  <rect width="128" height="128" fill="url(#bg)"/>
+  <path d="M10 128 C14 104 36 94 64 94 C92 94 114 104 118 128 Z" fill="#3b3b42"/>
+  <path d="M46 96 L82 96 L78 106 L50 106 Z" fill="${accent}" opacity="0.9"/>
+  <path d="M28 64 C28 36 46 20 67 20 C90 20 104 37 104 60 L104 76 C104 85 98 90 89 90 L44 90 C35 90 28 84 28 75 Z" fill="url(#shell)"/>
+  <path d="M36 40 C44 27 56 21 68 21 C82 21 94 28 100 40 Z" fill="${accent}"/>
+  <path d="M52 52 C52 47 56 45 61 45 L103 45 L104 64 L60 64 C55 64 52 61 52 57 Z" fill="url(#visor)"/>
+  <path d="M58 49 L96 49" stroke="#ffffff" stroke-opacity="0.25" stroke-width="2" stroke-linecap="round"/>
+  <path d="M30 78 L104 78" stroke="#000" stroke-opacity="0.12" stroke-width="2"/>
 </svg>
   `.trim();
-
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
@@ -232,7 +266,7 @@ export const drivers = [
 
 export function getDriverHeadshotUrl(nameOrDriver) {
   const name = typeof nameOrDriver === "string" ? nameOrDriver : nameOrDriver?.name;
-  if (!name) return buildInitialsAvatar("Driver");
+  if (!name) return buildHelmetAvatar();
 
   const canonical = resolveCanonicalDriverKey(name);
   const localDriver = typeof nameOrDriver === "object"
@@ -240,7 +274,8 @@ export function getDriverHeadshotUrl(nameOrDriver) {
     : drivers.find(entry => resolveCanonicalDriverKey(entry.name) === canonical);
   const profile = driverProfileByName.get(canonical);
 
-  return localDriver?.headshotUrl || profile?.headshot_url || buildInitialsAvatar(name);
+  const known = STATIC_HEADSHOTS[name] || Object.entries(STATIC_HEADSHOTS).find(([n]) => resolveCanonicalDriverKey(n) === canonical)?.[1];
+  return localDriver?.headshotUrl || profile?.headshot_url || (known ? F1_MEDIA_HEADSHOT(known) : buildHelmetAvatar());
 }
 
 export function getDriverNumber(nameOrDriver) {

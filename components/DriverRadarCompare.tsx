@@ -281,8 +281,8 @@ function Radar({ left, right, leftAccent, rightAccent }: { left: Entry | null; r
 
 // ─── Facts table ──────────────────────────────────────────────────────────
 function Facts({ left, right }: { left: Entry | null; right: Entry | null }) {
-  const a = getComparisonFacts(left?.driver);
-  const b = getComparisonFacts(right?.driver);
+  const a: any = getComparisonFacts(left?.driver);
+  const b: any = getComparisonFacts(right?.driver);
   const fmt = (v: any, kind: string) => {
     if (v === null || v === undefined) return '–';
     if (kind === 'money') return `$${Number(v).toFixed(1).replace(/\.0$/, '')}M`;
@@ -290,38 +290,53 @@ function Facts({ left, right }: { left: Entry | null; right: Entry | null }) {
     if (kind === 'seasons') return `${v} ${v === 1 ? 'season' : 'seasons'}`;
     return String(v);
   };
-  const rows: [string, string, string][] = [
-    ['Overall (6-attribute average)', 'overall', 'num'],
-    ['Potential ceiling', 'potential', 'num'],
-    ['Age', 'age', 'num'],
-    ['Salary per season', 'salary', 'money'],
-    ['Contract remaining', 'contract', 'seasons'],
-    ['Market value', 'market', 'num'],
-    ['Merchandise per race', 'merch', 'merch'],
-    ['Popularity', 'popularity', 'num'],
+  // better: which end wins the row. null = shown side by side, no winner.
+  const rows: { label: string; key: string; kind: string; better: 'high' | 'low' | null; scale?: number }[] = [
+    { label: 'Overall', key: 'overall', kind: 'num', better: 'high', scale: 100 },
+    { label: 'Potential ceiling', key: 'potential', kind: 'num', better: 'high', scale: 100 },
+    { label: 'Qualifying', key: 'quali', kind: 'num', better: 'high', scale: 100 },
+    { label: 'Race pace', key: 'pace', kind: 'num', better: 'high', scale: 100 },
+    { label: 'Consistency', key: 'consistency', kind: 'num', better: 'high', scale: 100 },
+    { label: 'Morale', key: 'morale', kind: 'num', better: 'high', scale: 100 },
+    { label: 'Salary per season', key: 'salary', kind: 'money', better: 'low' },
+    { label: 'Age', key: 'age', kind: 'num', better: null },
+    { label: 'Contract remaining', key: 'contract', kind: 'seasons', better: null },
+    { label: 'Market value', key: 'market', kind: 'num', better: 'high', scale: 100 },
+    { label: 'Merchandise per race', key: 'merch', kind: 'merch', better: 'high' },
   ];
   return (
     <div className="drc-facts">
-      <table className="drc-facts-table">
-        <caption style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Side-by-side contract and commercial facts</caption>
-        <thead>
-          <tr>
-            <td className="drc-l" style={{ color: HUB.textMuted, fontSize: 12, fontFamily: HUB.fontRegular }}>{left?.driver.name || '–'}</td>
-            <th scope="col" style={{ width: '38%' }}></th>
-            <td className="drc-r" style={{ color: HUB.textMuted, fontSize: 12, fontFamily: HUB.fontRegular }}>{right?.driver.name || '–'}</td>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([label, key, kind]) => (
-            <tr key={key}>
-              <td className="drc-l">{fmt(a?.[key as keyof typeof a], kind)}</td>
-              <th scope="row">{label}</th>
-              <td className="drc-r">{fmt(b?.[key as keyof typeof b], kind)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="drc-facts-note">Merchandise and popularity come from the finance model (getDriverCommercialValue). Merchandise is earned each race weekend; salary is charged at 1/24 per race.</p>
+      <div className="drc-bars" role="table" aria-label="Side-by-side ratings, contract and commercial facts">
+        <div className="drc-bars-head" role="row">
+          <span role="columnheader" className="drc-l">{left?.driver.name || '–'}</span>
+          <span role="columnheader" aria-hidden="true" />
+          <span role="columnheader" className="drc-r">{right?.driver.name || '–'}</span>
+        </div>
+        {rows.map((r) => {
+          const va = a?.[r.key]; const vb = b?.[r.key];
+          const na = Number(va); const nb = Number(vb);
+          const both = va != null && vb != null;
+          let win = 0;
+          if (both && r.better && na !== nb) win = (r.better === 'high' ? na > nb : na < nb) ? 1 : 2;
+          const max = r.scale || Math.max(na || 0, nb || 0, 1);
+          const wa = va == null ? 0 : Math.max(2, Math.min(100, (na / max) * 100));
+          const wb = vb == null ? 0 : Math.max(2, Math.min(100, (nb / max) * 100));
+          const what = r.better === 'low' ? 'cheaper' : 'stronger';
+          return (
+            <div key={r.key} className="drc-bar-row" role="row"
+              aria-label={`${r.label}: ${left?.driver.name} ${fmt(va, r.kind)}, ${right?.driver.name} ${fmt(vb, r.kind)}${win ? `, ${win === 1 ? left?.driver.name : right?.driver.name} ${what}` : ''}`}>
+              <span className={`drc-bar-val drc-l ${win === 1 ? 'is-win' : ''}`} role="cell">{fmt(va, r.kind)}</span>
+              <span className="drc-bar-mid" role="cell">
+                <span className="drc-bar-track drc-bar-left"><span className={win === 1 ? 'is-win' : ''} style={{ width: `${wa}%` }} /></span>
+                <span className="drc-bar-label">{r.label}</span>
+                <span className="drc-bar-track"><span className={win === 2 ? 'is-win' : ''} style={{ width: `${wb}%` }} /></span>
+              </span>
+              <span className={`drc-bar-val drc-r ${win === 2 ? 'is-win' : ''}`} role="cell">{fmt(vb, r.kind)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="drc-facts-note">The brighter bar wins the row; for salary that is the cheaper driver. Age and contract length are shown without a winner. Merchandise comes from the finance model and is earned each race weekend; salary is charged at 1/24 per race.</p>
     </div>
   );
 }

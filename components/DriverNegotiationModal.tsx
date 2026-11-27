@@ -48,8 +48,8 @@ export const DriverNegotiationModal = ({
         style={{
           ...glassCard({ padding: 0 }),
           width: '800px',
-          maxWidth: '90vw',
-          maxHeight: '90vh',
+          maxWidth: 'calc(90*var(--vw))',
+          maxHeight: 'calc(90*var(--vh))',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',

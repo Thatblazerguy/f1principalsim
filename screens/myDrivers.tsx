@@ -13,7 +13,11 @@ import { RadarChart } from '../components/driverComparison.tsx';
 import { DriverNegotiationModal } from '../components/DriverNegotiationModal.tsx';
 import { ContractBuilder } from '../components/ContractBuilder.tsx';
 import { DriverRadarCompare } from '../components/DriverRadarCompare.tsx';
-import { runReserveOffer } from '../utils/contractOfferModel.js';
+import { runReserveOffer, runRenewalOffer, areContractTalksClosed } from '../utils/contractOfferModel.js';
+import { getDriverSeasonSummary, getDriverChampionshipPosition, getTeamChampionshipPosition, getCurrentRound, getCircuitFacts, getRoundWeather } from '../utils/driverProfileModel.js';
+import { DriverLineup, WeekendPanel, DriverHero, DriverStats, ContractPanel, ConfirmDialog, ContractDetails, type ConfirmSpec } from '../components/drivers/DriverDeck.tsx';
+import { CircuitStage, CircuitExpanded } from '../components/drivers/CircuitStage.tsx';
+import { usePrefersReducedMotion } from '../components/driverToolsMotion.ts';
 import { getDriverSeasonPace, formatLapTime, formatDelta } from '../utils/racePace.js';
 import {
   Chart as ChartJS,
@@ -329,11 +333,17 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
   const [negotiatingDriver, setNegotiatingDriver] = useState<any>(null);
   const [contractDriver, setContractDriver] = useState<any>(null);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [confirmSpec, setConfirmSpec] = useState<ConfirmSpec>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [circuitOpen, setCircuitOpen] = useState(false);
+  const [talkMode, setTalkMode] = useState<'renew' | 'salary' | null>(null);
+  const [, bump] = useState(0);
+  const reduced = usePrefersReducedMotion();
 
   // --- Handlers ---
   const handleAction = async (action: string, driverName: string) => {
     if (action === 'release') {
-      if(confirm(`Release ${driverName}? This cannot be undone.`)) {
+      {
         if ((state as any).team.reserveDriver?.name === driverName) {
           (state as any).team.reserveDriver = null;
           setSelectedTab(0);
@@ -444,6 +454,19 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
     };
   };
 
+  const sendRenewal = async (driver: any, terms: { salary: number; seasons: number }, kind: 'renew' | 'salary') => {
+    const result = runRenewalOffer(state as any, driver, terms, kind);
+    await syncGame();
+    setFlashMessage(result.headline);
+    bump(x => x + 1);
+    return result;
+  };
+
+  const openGarage = async () => {
+    const { renderEngineering } = await import('./engineering.tsx');
+    renderEngineering(root);
+  };
+
   // --- Data aggregation ---
   const allDrivers = [
     ...(state as any).team.drivers,
@@ -483,6 +506,11 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
       </div>
     );
   }
+
+  const roundInfo = getCurrentRound(state as any);
+  const circuitFacts = getCircuitFacts(roundInfo.round);
+  const isReserve = (state as any).team.reserveDriver?.name === currentDriver.name;
+  const surname = currentDriver.name.split(' ').pop();
 
   // Derived metrics
   const carRank = getTeamCarRank((state as any).team.name);
@@ -543,126 +571,78 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
   } : null;
 
   return (
-    <div style={{ paddingBottom: '80px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ paddingBottom: '80px', width: '100%' }}>
       
-      {/* --- HEADER --- */}
-      <div className="mobile-stack" style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="dm-head">
         <div>
           {pageTitle('My drivers')}
-          {pageSubtitle('Season form, contracts and how each driver compares to the car.')}
-        </div>
-        <div style={{ display: 'flex', gap: '4px', background: HUB.sidebar, padding: '4px', borderRadius: '10px', border: `1px solid ${HUB.border}`, position: 'relative' }}>
-          {allDrivers.map((d, idx) => {
-            const isActive = selectedTab === idx;
-            return (
-              <button 
-                key={d.name} 
-                onClick={() => setSelectedTab(idx)} 
-                style={{
-                  position: 'relative',
-                  background: 'transparent',
-                  color: isActive ? HUB.textPrimary : HUB.textMuted,
-                  border: 'none',
-                  height: '28px',
-                  padding: '0 16px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontFamily: HUB.fontBold,
-                  fontSize: '13px',
-                  outline: 'none',
-                  zIndex: 1,
-                  transition: `color 150ms ${HUB.ease}`
-                }}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="active-driver-tab"
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: HUB.raised,
-                      border: `1px solid ${HUB.borderMid}`,
-                      borderRadius: '8px',
-                      zIndex: -1
-                    }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 380,
-                      damping: 30
-                    }}
-                  />
-                )}
-                {d.name.split(' ').pop()} {d.driverRole === 'reserve' ? '(reserve)' : ''}
-              </button>
-            );
-          })}
+          {pageSubtitle('Your lineup, how each driver is performing and where their contracts stand')}
         </div>
       </div>
 
-      {flashMessage && (
-        <div style={{ padding: '12px 16px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', color: HUB.textPrimary, fontSize: '13px', marginBottom: '24px' }}>
-          {flashMessage}
-        </div>
-      )}
+      {flashMessage && <div className="dm-flash" role="status">{flashMessage}</div>}
 
+      <CircuitStage facts={circuitFacts} reduced={reduced} onOpen={() => setCircuitOpen(true)} />
+
+      <div className="dm-root">
+        <div className="dm-left">
+          <DriverLineup drivers={allDrivers} selected={selectedTab} onSelect={setSelectedTab} />
+          <WeekendPanel facts={circuitFacts} roundNo={roundInfo.roundNo} total={roundInfo.total} completed={roundInfo.completed}
+            weather={getRoundWeather(state as any, roundInfo.roundNo)} team={(state as any).team}
+            teamPos={getTeamChampionshipPosition(state as any, (state as any).team.name)}
+            activeProjects={((state as any).engineering?.projects || []).filter((p: any) => p.status === 'active').length}
+            onOpenCircuit={() => setCircuitOpen(true)} onGarage={openGarage} />
+        </div>
+
+        <DriverHero driver={currentDriver} team={(state as any).team} champPos={getDriverChampionshipPosition(state as any, currentDriver.name)} reduced={reduced} />
+
+        <div className="dm-right">
+          <DriverStats driver={currentDriver} teammate={teammate}
+            summary={getDriverSeasonSummary(state as any, currentDriver.name)}
+            mateSummary={teammate ? getDriverSeasonSummary(state as any, teammate.name) : null} />
+          <ContractPanel
+            driver={currentDriver}
+            isReserve={isReserve}
+            reserveTaken={!!(state as any).team.reserveDriver}
+            talksClosed={areContractTalksClosed(state as any, currentDriver)}
+            onRenew={() => setTalkMode('renew')}
+            onSalary={() => setTalkMode('salary')}
+            onDetails={() => setDetailsOpen(true)}
+            onCompare={() => setCompareOpen(true)}
+            onRelease={() => setConfirmSpec({
+              title: `Release ${currentDriver.name}?`,
+              body: `${currentDriver.name} leaves the team straight away and their $${currentDriver.salary ?? 0}M salary stops. This can't be undone.`,
+              confirm: 'Release driver', danger: true,
+              run: () => handleAction('release', currentDriver.name),
+            })}
+            onDemote={() => setConfirmSpec({
+              title: `Move ${surname} to reserve?`,
+              body: `${currentDriver.name} gives up their race seat and becomes your reserve driver on the same salary. You'll need to fill the empty seat before the next race.`,
+              confirm: 'Demote to reserve',
+              run: () => handleAction('demote', currentDriver.name),
+            })}
+            onPromote={() => (state as any).team.drivers.length < 2
+              ? setConfirmSpec({
+                  title: `Promote ${surname} to a race seat?`,
+                  body: `${currentDriver.name} takes the empty race seat.`,
+                  confirm: 'Promote',
+                  run: () => handleAction('promote', currentDriver.name),
+                })
+              : handleAction('promote', currentDriver.name)}
+          />
+        </div>
+      </div>
+
+      <div className="dm-below">
+      <h3 className="dm-below-title">Detailed analysis</h3>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentDriver.name}
-          initial={{ opacity: 0, y: 10 }}
+          initial={reduced ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.22, ease: [0.32, 0.94, 0.6, 1] }}
+          exit={reduced ? undefined : { opacity: 0, y: -10 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* --- SECTION 1: DRIVER OVERVIEW --- */}
-          <div className="mobile-stack" style={{ ...glassCard({ padding: 0 }), marginBottom: '24px', display: 'flex', overflow: 'hidden' }}>
-        <div style={{ flex: '0 0 240px', background: HUB.bg, borderRight: `1px solid ${HUB.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
-           <img src={getDriverHeadshotUrl(currentDriver)} alt={currentDriver.name} style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: `1px solid ${HUB.borderMid}`, marginBottom: '16px' }} loading="lazy" />
-           <h2 style={{ fontSize: '24px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontBold, margin: '0 0 4px', textAlign: 'center' }}>{currentDriver.name}</h2>
-           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-             <span style={{ fontSize: '18px', color: HUB.accentInk, fontFamily: HUB.fontMono, fontWeight: 400 }}>#{getDriverNumber(currentDriver)}</span>
-             <span style={pill(false)}>{currentDriver.category}</span>
-           </div>
-        </div>
-
-        <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '24px' }}>
-             <div>
-               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Age</span>
-               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.age || 25}</span>
-             </div>
-             <div>
-               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Salary</span>
-               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>${currentDriver.salary || 0}M</span>
-             </div>
-             <div>
-               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Contract</span>
-               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.contractYearsRemaining ?? currentDriver.contractDuration ?? 1} yrs</span>
-             </div>
-             <div>
-               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Morale</span>
-               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.morale || 90}%</span>
-                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (currentDriver.morale || 90) > 70 ? HUB.positive : HUB.negative }}></div>
-               </div>
-             </div>
-             <div>
-               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Potential</span>
-               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.potentialCeiling || 90}</span>
-             </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '16px', marginTop: '32px', borderTop: `1px solid ${HUB.border}`, paddingTop: '24px' }}>
-            <button onClick={() => handleAction('release', currentDriver.name)} className={btnClass('danger')} style={btn('danger', 'md')}>Release contract</button>
-            {(state as any).team.reserveDriver?.name !== currentDriver.name ? (
-              <button onClick={() => handleAction('demote', currentDriver.name)} disabled={!!(state as any).team.reserveDriver} className={btnClass('secondary')} style={btn('secondary', 'md')}>Demote to reserve</button>
-            ) : (
-              <button onClick={() => handleAction('promote', currentDriver.name)} className={btnClass('primary')} style={btn('primary', 'md')}>Promote to race seat</button>
-            )}
-            <button onClick={() => setCompareOpen(true)} className={btnClass('secondary')} style={btn('secondary', 'md')}>Compare</button>
-          </div>
-        </div>
-      </div>
-
       {stats ? (
         <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px' }}>
           
@@ -737,33 +717,6 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
           <ResponsiveAccordionSection title="Grid and finish by round" gridColumn="span 12">
             <div style={{ height: '300px' }}>
               {chartData ? <Line data={chartData} options={chartOptions} /> : <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.textMuted}}>No race data yet</div>}
-            </div>
-          </ResponsiveAccordionSection>
-
-          {/* --- SECTION 4 & 9: ATTRIBUTES --- */}
-          <ResponsiveAccordionSection title="Attributes" gridColumn="span 4">
-            <div style={{ marginBottom: '24px' }}>
-              <RadarChart pace={currentDriver.pace} quali={currentDriver.quali} racecraft={currentDriver.racecraft} consistency={currentDriver.consistency} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-               {[
-                 { label: 'Race pace', val: currentDriver.pace },
-                 { label: 'Qualifying', val: currentDriver.quali },
-                 { label: 'Racecraft', val: currentDriver.racecraft },
-                 { label: 'Consistency', val: currentDriver.consistency },
-                 { label: 'Tyre management', val: Math.round((currentDriver.pace + currentDriver.consistency) / 2) },
-                 { label: 'Pressure handling', val: Math.round((currentDriver.quali + currentDriver.racecraft) / 2) }
-               ].map(attr => (
-                 <div key={attr.label}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                     <span style={{ fontSize: '12px', color: HUB.textMuted }}>{attr.label}</span>
-                     <span style={{ fontSize: '12px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{attr.val.toFixed(1)}</span>
-                   </div>
-                   <div style={{ height: '4px', background: HUB.raised, borderRadius: '2px', overflow: 'hidden' }}>
-                     <div style={{ height: '100%', width: `${(attr.val / 100) * 100}%`, background: 'rgba(237,237,237,0.5)' }}></div>
-                   </div>
-                 </div>
-               ))}
             </div>
           </ResponsiveAccordionSection>
 
@@ -876,6 +829,19 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
       )}
         </motion.div>
       </AnimatePresence>
+      </div>
+
+      <CircuitExpanded open={circuitOpen} facts={circuitFacts} reduced={reduced} onClose={() => setCircuitOpen(false)} />
+      <ConfirmDialog spec={confirmSpec} onClose={() => setConfirmSpec(null)} />
+      <ContractDetails driver={detailsOpen ? currentDriver : null} open={detailsOpen} onClose={() => setDetailsOpen(false)} appState={state} />
+      {talkMode && (
+        <ContractBuilder
+          driver={currentDriver}
+          mode={talkMode}
+          onSend={(terms) => sendRenewal(currentDriver, terms, talkMode)}
+          onClose={() => setTalkMode(null)}
+        />
+      )}
 
       {/* Promotion Modal */}
       {promotionModalOpen && (state as any).team.reserveDriver && (

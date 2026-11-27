@@ -15,6 +15,14 @@
  *
  * It talks on the radio (engine.comms) when something changes, offers calls the
  * player can apply with one click, and can run a car on its own ("auto").
+ *
+ * Pit timing has two brains:
+ *   - the planner (evaluatePit): stint-time arithmetic, no traffic or rivals
+ *   - the strategy model (game/strategy/strategyModel.js): a neural network
+ *     trained on Monte Carlo race rollouts that predicts our finishing position
+ *     for each pit option, so it sees track position, traffic and rivals' stops
+ * With strategyBrain "model" (the default) the model makes the auto pit calls
+ * whenever it applies (dry race, not mid-stop); otherwise the planner does.
  */
 
 import { state } from "../state.js";
@@ -26,6 +34,7 @@ import {
   DRY_COMPOUNDS,
   PIT_LOSS_BASE,
 } from "./paceModel.js";
+import { adviseLiveCar } from "./strategy/strategyModel.js";
 
 const LEGACY_TARGETS = { win: 1, podium: 3, points: 10, conservative: 12, gamble: 5 };
 const FUEL_USAGE = { Rich: 1.2, Standard: 1.0, Lean: 0.8 };
@@ -35,8 +44,9 @@ const fmtGap = (g) => (g >= 99 ? "–" : `${g.toFixed(1)}s`);
 const radio = (call) => (["cover", "threat"].includes(call.id) ? call.title : call.title.charAt(0).toLowerCase() + call.title.slice(1));
 
 export class RaceEngineer {
-  constructor(engine, { objective = "points", targetPosition = null, autoByDefault = true } = {}) {
+  constructor(engine, { objective = "points", targetPosition = null, autoByDefault = true, strategyBrain = "model" } = {}) {
     this.engine = engine;
+    this.strategyBrain = strategyBrain;
     this.objective = objective;
     this.targetPosition = targetPosition
       ?? state?.weekendProgress?.selectedObjectiveData?.targetPosition
@@ -167,13 +177,21 @@ export class RaceEngineer {
     const pitPlan = m.pitEval;
     const rejoin = this.rejoinEstimate(car, position);
 
+    // Strategy model: re-scored once per lap (or after a stop / tyre change)
+    const mlKey = `${Math.floor(car.distance)}:${car.tireCompound}:${car.stops}`;
+    if (m.mlKey !== mlKey) {
+      m.mlKey = mlKey;
+      try { m.ml = adviseLiveCar(e, car.id); } catch (_) { m.ml = null; }
+    }
+    const strategyModel = car.pitStopStatus === "None" || car.pitStopStatus === "OutLap" ? m.ml : null;
+
     const projected = this.projectFinish(car);
     const target = this.targetPosition;
     const status = projected <= target ? "On target" : projected <= target + 2 ? "At risk" : "Off target";
 
     const calls = this.buildCalls(car, {
       ahead, behind, gapAhead, gapBehind, aheadTrend, behindTrend,
-      life, lapsLeft, lapsToCliff, lossVsNew, fuelMargin, pitPlan, rejoin, position,
+      life, lapsLeft, lapsToCliff, lossVsNew, fuelMargin, pitPlan, rejoin, position, strategyModel,
     });
 
     return {
@@ -198,6 +216,7 @@ export class RaceEngineer {
       ers: car.ers,
       engineTemp: car.engineTemp,
       pitPlan,
+      strategyModel,
       rejoin,
       calls,
       auto: !!car.autoEngineer,
@@ -314,7 +333,7 @@ export class RaceEngineer {
 
   buildCalls(car, ctx) {
     const calls = [];
-    const { ahead, behind, gapAhead, gapBehind, behindTrend, lapsLeft, lapsToCliff, fuelMargin, pitPlan, rejoin } = ctx;
+    const { ahead, behind, gapAhead, gapBehind, behindTrend, lapsLeft, lapsToCliff, fuelMargin, pitPlan, rejoin, strategyModel } = ctx;
     const inPitCycle = car.pitStopStatus !== "None" && car.pitStopStatus !== "OutLap";
 
     // Strategy
@@ -347,6 +366,16 @@ export class RaceEngineer {
           detail: lapsToCliff < lapsLeft ? `Tyres go past their best with ${Math.ceil(lapsLeft - lapsToCliff)} laps left, manage them.` : `Tyres will make it with ${Math.floor(lapsToCliff - lapsLeft)} laps in hand.`,
         });
       }
+    }
+
+    // Safety car / VSC: a stop costs roughly half, take it if one is due anyway
+    const scCall = !inPitCycle ? this.neutralStopCall(car, ctx) : null;
+    if (scCall) calls.push(scCall);
+
+    // Strategy model: speak up when it disagrees with the planner by a real margin
+    if (!scCall && !inPitCycle && strategyModel) {
+      const modelCall = this.modelCall(car, strategyModel, pitPlan, lapsLeft);
+      if (modelCall) calls.push(modelCall);
     }
 
     // Driving mode
@@ -505,11 +534,63 @@ export class RaceEngineer {
 
   // ─── Autopilot ─────────────────────────────────────────────────────────────
 
+  /** Compound we'd fit if we stopped now (same rule as the planner). */
+  nextCompoundFor(car, lapsLeft) {
+    return chooseNextCompound(car.profile, lapsLeft, car.usedCompounds, { lap: Math.max(1, car.lap), totalLaps: this.engine.totalLaps });
+  }
+
+  neutralStopCall(car, { lapsLeft, life }) {
+    const e = this.engine;
+    if (!e.neutralisation || lapsLeft <= 5 || car.tyreAge < 6) return null;
+    const mustStop = !e.isWet && new Set(car.usedCompounds.filter((c) => DRY_COMPOUNDS.includes(c))).size < 2;
+    if (!mustStop && car.tyreAge < life * 0.4) return null;
+    const compound = this.nextCompoundFor(car, Math.ceil(lapsLeft));
+    return {
+      id: "sc-box", priority: 1, kind: "strategy",
+      title: `${e.neutralisation === "SC" ? "Safety car" : "VSC"}: box now for ${compound}`,
+      detail: `A stop costs about ${e.neutralisation === "SC" ? "half" : "two thirds"} of the usual time while the field is neutralised.`,
+      command: { type: "PIT", value: compound }, actionLabel: "Box now",
+    };
+  }
+
+  modelCall(car, sm, pitPlan, lapsLeft) {
+    const MARGIN = 0.3; // places
+    const best = sm.best;
+    const planned = sm.plannerPick;
+    const fmtPos = (p) => `P${p.toFixed(1)}`;
+    if (best.id === "box_0" && pitPlan?.action !== "box" && sm.gainVsPlanner >= MARGIN) {
+      const compound = this.nextCompoundFor(car, Math.ceil(lapsLeft));
+      return {
+        id: "model-box", priority: 1, kind: "strategy",
+        title: `Strategy model: box now for ${compound}`,
+        detail: `Projects ${fmtPos(best.expectedPos)} vs ${planned ? fmtPos(planned.expectedPos) : "worse"} on the planner's timing. Track position beats the tyre maths here.`,
+        command: { type: "PIT", value: compound }, actionLabel: "Box now",
+      };
+    }
+    if (pitPlan?.action === "box" && best.id !== "box_0" && sm.gainVsPlanner >= MARGIN) {
+      return {
+        id: "model-hold", priority: 2, kind: "strategy",
+        title: `Strategy model: ${best.label.charAt(0).toLowerCase()}${best.label.slice(1)}`,
+        detail: `Projects ${fmtPos(best.expectedPos)} vs ${planned ? fmtPos(planned.expectedPos) : "worse"} if we box now: we'd rejoin in traffic.`,
+        command: null,
+      };
+    }
+    return null;
+  }
+
   autopilot(car, b) {
     if (car.pitStopStatus !== "None") return;
+    const scBox = b.calls.find((c) => c.id === "sc-box");
+    if (scBox) { this.apply(car.id, scBox); return; }
+    const modelRunsPits = this.strategyBrain === "model" && b.strategyModel && !this.engine.neutralisation;
+    if (modelRunsPits && b.strategyModel.best.id === "box_0") {
+      const lapsLeft = Math.max(0, this.engine.totalLaps - car.distance);
+      this.apply(car.id, { command: { type: "PIT", value: this.nextCompoundFor(car, Math.ceil(lapsLeft)) } });
+      return;
+    }
     for (const call of b.calls) {
       if (!call.command || call.command.type === "CANCEL_PIT") continue;
-      if (call.command.type === "PIT" && !["box", "undercut", "cover"].includes(call.id)) continue;
+      if (call.command.type === "PIT" && (modelRunsPits || !["box", "undercut", "cover"].includes(call.id))) continue;
       const already =
         (call.command.type === "MODE" && car.driverMode === call.command.value) ||
         (call.command.type === "ERS" && car.ersMode === call.command.value) ||

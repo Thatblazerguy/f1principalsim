@@ -192,7 +192,7 @@ export function applySessionWear(appState, driverName, trackIntensity, driverAgg
  * Calculate instantaneous failure risk for the active components.
  * Returns an array of components that failed.
  */
-export function rollForFailures(appState, driverName, sessionStress) {
+export function rollForFailures(appState, driverName, sessionStress, rng = Math.random) {
   const pool = ensureEngineeringState(appState).driverPools[driverName];
   if (!pool) return [];
 
@@ -213,7 +213,7 @@ export function rollForFailures(appState, driverName, sessionStress) {
     failureRisk *= sessionStress;
 
     // Roll d1000
-    const roll = Math.random() * 1000;
+    const roll = rng() * 1000;
     // failureRisk is a % out of 100, so we multiply by 10 to compare with d1000
     if (roll < failureRisk * 10) {
       active.failures++;

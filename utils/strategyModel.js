@@ -325,6 +325,62 @@ export function finishingRange(field, driverName, planTotal, profile, totalLaps)
   return { best: Math.min(best, likely), likely, worst: Math.max(worst, likely), sigma, fieldSize: field.length };
 }
 
+// ─── Strategy comparison ─────────────────────────────────────────────────────
+
+const PRESETS = {
+  oneStop: [["Medium", "Hard"], ["Soft", "Hard"], ["Hard", "Medium"], ["Soft", "Medium"]],
+  twoStop: [["Soft", "Medium", "Hard"], ["Medium", "Hard", "Medium"], ["Soft", "Hard", "Medium"], ["Medium", "Medium", "Hard"], ["Soft", "Hard", "Hard"]],
+  aggressive: [["Soft", "Medium", "Soft"], ["Soft", "Soft", "Medium"]],
+  conservative: [["Hard", "Medium"]],
+};
+
+/** Risk from the plan's own projection: past a tyre cliff = High; peak wear ≥ 85% or three stops = Medium. */
+export function planRisk(profile, plan, totalLaps, proj) {
+  const issues = planIssues(profile, plan, totalLaps).filter((i) => !i.blocking);
+  const peak = Math.max(0, ...proj.laps.map((l) => l.wear));
+  if (issues.length) return { level: "High", peak, reason: issues[0].text };
+  if (peak >= 85 || plan.pitLaps.length >= 3) return { level: "Medium", peak, reason: peak >= 85 ? `Tyres reach ${Math.round(peak)}% wear` : "Three stops add traffic exposure" };
+  return { level: "Low", peak, reason: "Every stint ends before the tyre cliff" };
+}
+
+/**
+ * Recommended, best one-stop, best two-stop, an aggressive soft-heavy plan and a
+ * conservative hard-first one-stop, each projected with the pace model and
+ * placed in the field. Stints use the sim's own split (enginePitLaps).
+ */
+export function compareStrategies({ profile, field, driverName, totalLaps, rec }) {
+  const evalPlan = (compounds) => {
+    const plan = { compounds, pitLaps: enginePitLaps(profile, compounds, totalLaps) };
+    const proj = projectPlan(profile, plan, totalLaps);
+    return { plan, proj };
+  };
+  const best = (list) => list.map(evalPlan).filter((x) => !planIssues(profile, x.plan, totalLaps).some((i) => i.blocking)).sort((a, b) => a.proj.total - b.proj.total)[0];
+  const recEval = { plan: { compounds: rec.compounds, pitLaps: rec.pitLaps }, proj: projectPlan(profile, rec, totalLaps) };
+  const rows = [
+    { id: "rec", label: "Recommended", note: rec.source || "", ...recEval },
+    { id: "one", label: "One-stop", ...best(PRESETS.oneStop) },
+    { id: "two", label: "Two-stop", ...best(PRESETS.twoStop) },
+    { id: "agg", label: "Aggressive", ...best(PRESETS.aggressive) },
+    { id: "con", label: "Conservative", ...best(PRESETS.conservative) },
+  ].filter((r) => r.plan);
+  return rows.map((r) => {
+    const range = finishingRange(field, driverName, r.proj.total, profile, totalLaps);
+    const risk = planRisk(profile, r.plan, totalLaps, r.proj);
+    return {
+      ...r,
+      total: r.proj.total,
+      delta: r.proj.total - recEval.proj.total,
+      finish: range.likely,
+      stops: r.plan.pitLaps.length,
+      pitLoss: r.plan.pitLaps.length * (PIT_LOSS + PIT_LOSS_EXTRA),
+      peakWear: risk.peak,
+      risk: risk.level,
+      riskReason: risk.reason,
+      same: r.id !== "rec" && samePlan(r.plan, recEval.plan),
+    };
+  });
+}
+
 export function overtakingDifficulty(track) {
   return getOvertakingDifficulty(track);
 }

@@ -42,6 +42,9 @@ export function normalizeTeamSpecs(team) {
  *   ovr ≥ 82  →  1.20×
  *   ovr  < 82 →  1.35×  (backmarkers catch up fastest)
  */
+/** Same ceiling the off-season uses (game/seasonRollover.js AI_OVR_CAP). */
+const IN_SEASON_OVR_CAP = 97;
+
 export function applyRoundCarDevelopment(team) {
   normalizeTeamSpecs(team);
 
@@ -64,12 +67,13 @@ export function applyRoundCarDevelopment(team) {
   team.specs.chassis     = clampStat(team.specs.chassis     + (budget * wC) / sum);
   // Reliability develops more slowly (harder to improve near the cap)
   team.specs.reliability = clampStat(team.specs.reliability + (budget * wR * 0.85) / sum);
-  team.specs.ovr         = clampStat(team.specs.ovr         + (budget * wO * 0.80) / sum);
 
-  // Overall car performance bump (drives lap-time calcs in simTeam.js)
-  const perfBump =
-    (budget * 0.30) / sum + (Math.random() - 0.5) * 0.04;
-  team.carPerformance = clampStat(team.carPerformance + perfBump);
+  // Overall rating: one bump for both carPerformance (race pace) and specs.ovr
+  // (weekend form) so they never drift apart, capped like the off-season (97).
+  const ovrBump = (budget * (0.30 + wO * 0.80)) / sum + (Math.random() - 0.5) * 0.04;
+  const nextOvr = Math.min(IN_SEASON_OVR_CAP, Math.max(team.carPerformance ?? currentOvr, (team.carPerformance ?? currentOvr) + ovrBump));
+  team.carPerformance = parseFloat(nextOvr.toFixed(2));
+  team.specs.ovr = team.carPerformance;
 }
 
 export function applyRoundCarDevelopmentAll(state) {

@@ -110,7 +110,7 @@ function FIAContractsScreen({ appRoot }) {
   const totalFees = Object.values(contracts).reduce((sum: number, c: any) => sum + (c.status === 'active' ? c.hostingFee : 0), 0);
 
   return (
-    <div style={{ minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px' }}>
+    <div style={{ minHeight: 'calc(100*var(--vh))', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px' }}>
       {notification && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>
           {notification}

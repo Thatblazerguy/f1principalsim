@@ -172,13 +172,13 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100*var(--vh))', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
       {/* Sidebar */}
       <aside style={{
         width: 240, flexShrink: 0, background: FIA.sidebar,
         borderRight: `1px solid ${HUB.border}`,
         display: 'flex', flexDirection: 'column', padding: '28px 0', position: 'fixed',
-        left: 0, top: 0, height: '100vh', zIndex: 50
+        left: 0, top: 0, height: 'calc(100*var(--vh))', zIndex: 50
       }}>
         {/* Logo */}
         <div style={{ padding: '0 24px', marginBottom: 32 }}>
@@ -242,7 +242,7 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
       </aside>
 
       {/* Main Content */}
-      <main style={{ marginLeft: 240, flex: 1, padding: '40px 48px', overflowY: 'auto', minHeight: '100vh' }}>
+      <main style={{ marginLeft: 240, flex: 1, padding: '40px 48px', overflowY: 'auto', minHeight: 'calc(100*var(--vh))' }}>
         <div style={{ position: 'relative', maxWidth: 1200 }}>
           {/* Header */}
           <div style={{ marginBottom: 40 }}>

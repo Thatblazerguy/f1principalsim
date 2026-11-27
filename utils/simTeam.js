@@ -42,32 +42,69 @@ function getTeamBonusFactors(appState) {
   };
 }
 
+/** Seeding multipliers used by ensureDevProjectsState, plus the mean of its 0–5 random term. */
+const SEED_MULTIPLIERS = {
+  cornering: 0.95, downforce: 0.93, mechanicalGrip: 0.90, tyreWear: 0.92, balance: 0.94,
+  topSpeed: 0.96, acceleration: 0.91, fuelEfficiency: 0.89, reliability: 0.93,
+};
+const SEED_RANDOM_MEAN = 2.5;
+
+/** Expected starting carSpecs for a car of rating `cp` (for saves made before baselines were stored). */
+function estimateSeedSpecs(cp) {
+  return Object.fromEntries(Object.entries(SEED_MULTIPLIERS).map(([k, m]) => [k, cp * m + SEED_RANDOM_MEAN]));
+}
+
+/** Engineering ratings derived from carSpecs plus facility/staff bonuses. Unrounded. */
+function deriveEngineeringRatings(cs, bonuses) {
+  const aero = ((cs.cornering + cs.downforce) / 2) + bonuses.aero;
+  const chassis = ((cs.mechanicalGrip + cs.balance + cs.tyreWear) / 3) + bonuses.chassis;
+  const reliability = cs.reliability + bonuses.reliability;
+  const topSpeed = cs.topSpeed + bonuses.powerUnit;
+  const acceleration = cs.acceleration + bonuses.powerUnit;
+  const fuelEfficiency = cs.fuelEfficiency + bonuses.powerUnit * 0.5;
+  const ovr = (aero + chassis + reliability + topSpeed + acceleration + fuelEfficiency) / 6;
+  return { aero, chassis, reliability, topSpeed, acceleration, fuelEfficiency, ovr };
+}
+
+const clampSpec = (v) => Math.min(99, Math.max(40, v));
+
+/**
+ * The player's team. Nothing in the game sets an `isPlayerTeam` flag, so match
+ * by identity (the race engines receive the same `state.team` object). Name
+ * matching is avoided because a player can name their team after an AI team.
+ */
+export const isPlayerTeam = (team) => Boolean(team && (team.isPlayerTeam || (state.team && team === state.team)));
+
 export function getCarSpecs(team) {
-  // Check if this is the player team and we have engineering.carSpecs
-  if (team.isPlayerTeam && state.engineering?.carSpecs) {
-    const cs = state.engineering.carSpecs;
+  // Player team: engineering work is applied as a *delta* on top of the same
+  // team ratings the AI uses. Before, the player's car was rated from its raw
+  // carSpecs, which are seeded ~7% below carPerformance, so taking over a team
+  // made its car 3–4 OVR slower than the AI version. The OVR is also no longer
+  // rounded, so small upgrades show up in lap time instead of vanishing.
+  if (isPlayerTeam(team) && state.engineering?.carSpecs) {
+    const eng = state.engineering;
+    const cp = team.carPerformance ?? SPEC_BASE;
     const bonuses = getTeamBonusFactors(state);
-    
-    // Derive aero, chassis, reliability from carSpecs and apply bonus factors
-    const aero = ((cs.cornering + cs.downforce) / 2) + bonuses.aero;
-    const chassis = ((cs.mechanicalGrip + cs.balance + cs.tyreWear) / 3) + bonuses.chassis;
-    const reliability = cs.reliability + bonuses.reliability;
-    const topSpeed = cs.topSpeed + bonuses.powerUnit;
-    const acceleration = cs.acceleration + bonuses.powerUnit;
-    const fuelEfficiency = cs.fuelEfficiency + bonuses.powerUnit * 0.5;
-    
-    // Calculate overall performance based on carSpecs
-    const ovr = Math.round(
-      (aero + chassis + reliability + topSpeed + acceleration + fuelEfficiency) / 6
-    );
+    if (!eng.bonusBaseline) eng.bonusBaseline = { ...bonuses };
+    const baselineSpecs = eng.carSpecsBaseline || estimateSeedSpecs(eng.baselineCarPerformance ?? cp);
+
+    const now = deriveEngineeringRatings(eng.carSpecs, bonuses);
+    const base = deriveEngineeringRatings({ ...eng.carSpecs, ...baselineSpecs }, eng.bonusBaseline);
+    const delta = (key) => now[key] - base[key];
+
+    const anchor = {
+      aero: team.specs?.aero ?? cp,
+      chassis: team.specs?.chassis ?? cp,
+      reliability: team.specs?.reliability ?? cp,
+    };
     return {
-      aero: Math.min(99, Math.max(40, aero)),
-      chassis: Math.min(99, Math.max(40, chassis)),
-      reliability: Math.min(99, Math.max(40, reliability)),
-      topSpeed: Math.min(99, Math.max(40, topSpeed)),
-      acceleration: Math.min(99, Math.max(40, acceleration)),
-      fuelEfficiency: Math.min(99, Math.max(40, fuelEfficiency)),
-      ovr: Math.min(99, Math.max(40, ovr)),
+      aero: clampSpec(anchor.aero + delta("aero")),
+      chassis: clampSpec(anchor.chassis + delta("chassis")),
+      reliability: clampSpec(anchor.reliability + delta("reliability")),
+      topSpeed: clampSpec(cp + delta("topSpeed")),
+      acceleration: clampSpec(cp + delta("acceleration")),
+      fuelEfficiency: clampSpec(cp + delta("fuelEfficiency")),
+      ovr: clampSpec(cp + delta("ovr")),
     };
   }
 
@@ -130,7 +167,7 @@ export function getTeamLapCredit(team, session, driverName) {
   }
 
   // Apply Power Unit component performance modifier (player team only)
-  if (team.isPlayerTeam && driverName) {
+  if (isPlayerTeam(team) && driverName) {
     const puModifier = getDriverPuPerformance(state, driverName);
     // puModifier is 0.4-1.0, convert to a lap credit bonus/penalty
     const puBonus = (puModifier - 0.7) * 0.05; // -0.015 to +0.015 seconds

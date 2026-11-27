@@ -1,22 +1,55 @@
 @font-face {
   font-family: 'Formula1-Wide';
-  src: url('./Formula1-Wide_web_0.ttf') format('truetype');
+  src: url('./assets/fonts/Formula1-Wide_web_0.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Formula1-Bold';
-  src: url('./Formula1-Bold_web_0.ttf') format('truetype');
+  src: url('./assets/fonts/Formula1-Bold_web_0.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Formula1-Regular';
-  src: url('./Formula1-Regular_web_0.ttf') format('truetype');
+  src: url('./assets/fonts/Formula1-Regular_web_0.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+}
+
+/*
+ * Site scale. The whole site renders at 80% on laptops and desktops, like
+ * browser zoom at 80%. Phones stay at 100% so small text stays readable.
+ * Viewport units don't follow zoom, so every vh/vw in the code goes through
+ * --vh / --vw, which grow by 1 / 0.8 to keep full-screen layouts full-screen.
+ */
+:root { --app-zoom: 1; --vh: 1vh; --vw: 1vw; }
+
+/* THEME:BEGIN — colour tokens for dark and light. --ink and the *-rgb tokens are
+   bare channels for rgba(var(--ink), alpha). Components keep their accent red
+   and semantic tints; everything neutral comes from here. */
+:root, html[data-theme="dark"] {
+  color-scheme: dark;
+  --hub-bg: #060607; --hub-well: #09090a; --hub-surf: #0d0d0f; --hub-raise: #151518;
+  --ink: 237, 237, 237; --surf-rgb: 17, 17, 19; --bg-rgb: 6, 6, 7;
+  --hub-t1: #ededed; --hub-t2: #a1a1a6; --hub-t3: #85858b;
+  --hub-red-ink: #ff4d47; --hub-pos: #4cc38a; --hub-neg: #e5484d; --hub-warn: #d9a43a;
+  --hub-shadow: 0 1px 0 rgba(0, 0, 0, 0);
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --hub-bg: #f3f3f1; --hub-well: #ebebe8; --hub-surf: #ffffff; --hub-raise: #f1f1ef;
+  --ink: 22, 22, 26; --surf-rgb: 255, 255, 255; --bg-rgb: 243, 243, 241;
+  --hub-t1: #141416; --hub-t2: #4d4d53; --hub-t3: #66666c;
+  --hub-red-ink: #c20500; --hub-pos: #17804f; --hub-neg: #c4323a; --hub-warn: #8f6210;
+  --hub-shadow: 0 1px 2px rgba(22, 22, 26, 0.06);
+}
+/* THEME:END */
+@media (min-width: 1024px) {
+  :root { --app-zoom: 0.8; --vh: 1.25vh; --vw: 1.25vw; }
+  html { zoom: 0.8; }
 }
 
 /* Strategy Cards Styles - Manual Fallback for Tailwind */
@@ -25,17 +58,17 @@
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   padding: 16px;
   border-radius: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(var(--ink), 0.1);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(var(--ink), 0.05);
   margin-bottom: 12px;
 }
 
 #strategy-tabs-root .strategy-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(var(--ink), 0.1);
+  border-color: rgba(var(--ink), 0.2);
 }
 
 #strategy-tabs-root .strategy-card.selected {
@@ -117,11 +150,11 @@
   --f1-red-soft: #ff3b30;
   --f1-orange: #ec4e02;
   --f1-black: #0f0f10;
-  --f1-surface: #19191b;
-  --f1-surface-2: #232325;
-  --f1-border: rgba(237,237,237,0.08);
-  --f1-text: #ededed;
-  --f1-muted: #a1a1a6;
+  --f1-surface: var(--hub-raise);
+  --f1-surface-2: var(--hub-raise);
+  --f1-border: rgba(var(--ink), 0.08);
+  --f1-text: var(--hub-t1);
+  --f1-muted: var(--hub-t2);
 }
 
 * {
@@ -130,16 +163,16 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: calc(100*var(--vh));
   font-family: 'Formula1-Regular', sans-serif;
-  color: #ededed;
+  color: var(--hub-t1);
   overflow-x: hidden;
-  background: #060607;
+  background: var(--hub-bg);
   -webkit-font-smoothing: antialiased;
 }
 
-:root { color-scheme: dark; accent-color: #ededed; }
-input[type="range"], input[type="checkbox"], input[type="radio"] { accent-color: #ededed; }
+:root { color-scheme: dark; accent-color: var(--hub-t1); }
+input[type="range"], input[type="checkbox"], input[type="radio"] { accent-color: var(--hub-t1); }
 /* ── Button system: liquid glass (pairs with btn()/btnClass() in HubLayout.tsx) ──
    Same treatment as <LiquidButton> in components/ui/liquid-glass-button.tsx:
    an inset light ring (::before) over an SVG refraction of what sits behind (::after, #hub-glass in index.html). */
@@ -147,9 +180,9 @@ input[type="range"], input[type="checkbox"], input[type="radio"] { accent-color:
 .hub-btn-primary::before, .hub-btn-secondary::before, .hub-btn-danger::before {
   content: ''; position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none;
   box-shadow: 0 0 8px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.08),
-    inset 3px 3px 0.5px -3.5px rgba(255,255,255,0.09), inset -3px -3px 0.5px -3.5px rgba(255,255,255,0.85),
+    inset 3px 3px 0.5px -3.5px rgba(var(--ink), 0.09), inset -3px -3px 0.5px -3.5px rgba(255,255,255,0.85),
     inset 1px 1px 1px -0.5px rgba(255,255,255,0.6), inset -1px -1px 1px -0.5px rgba(255,255,255,0.6),
-    inset 0 0 6px 6px rgba(255,255,255,0.12), inset 0 0 2px 2px rgba(255,255,255,0.06), 0 0 12px rgba(0,0,0,0.15);
+    inset 0 0 6px 6px rgba(var(--ink), 0.12), inset 0 0 2px 2px rgba(var(--ink), 0.06), 0 0 12px rgba(0,0,0,0.15);
   transition: box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .hub-btn-primary::after, .hub-btn-secondary::after, .hub-btn-danger::after {
@@ -160,15 +193,15 @@ input[type="range"], input[type="checkbox"], input[type="radio"] { accent-color:
 .hub-btn-secondary::before, .hub-btn-danger::before {
   box-shadow: 0 2px 6px rgba(0,0,0,0.08),
     inset -3px -3px 0.5px -3.5px rgba(255,255,255,0.6), inset 1px 1px 1px -0.5px rgba(255,255,255,0.45),
-    inset -1px -1px 1px -0.5px rgba(255,255,255,0.45), inset 0 0 6px 6px rgba(255,255,255,0.07), inset 0 0 2px 2px rgba(255,255,255,0.04);
+    inset -1px -1px 1px -0.5px rgba(255,255,255,0.45), inset 0 0 6px 6px rgba(var(--ink), 0.07), inset 0 0 2px 2px rgba(var(--ink), 0.04);
 }
 .hub-btn-primary:hover:not(:disabled), .hub-btn-secondary:hover:not(:disabled), .hub-btn-danger:hover:not(:disabled) { transform: scale(1.05); }
 .hub-btn:active:not(:disabled) { transform: scale(0.98); transition-duration: 120ms; }
 .hub-btn:disabled, .hub-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed !important; }
-.hub-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(237,237,237,0.35) !important; }
+.hub-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--ink), 0.35) !important; }
 .hub-btn-primary:hover:not(:disabled) { background-color: rgba(240,20,14,0.9) !important; }
-.hub-btn-secondary:hover:not(:disabled) { background-color: rgba(237,237,237,0.07) !important; }
-.hub-btn-ghost:hover:not(:disabled) { background-color: rgba(237,237,237,0.06) !important; color: #ededed !important; }
+.hub-btn-secondary:hover:not(:disabled) { background-color: rgba(var(--ink), 0.07) !important; }
+.hub-btn-ghost:hover:not(:disabled) { background-color: rgba(var(--ink), 0.06) !important; color: var(--hub-t1) !important; }
 .hub-btn-danger:hover:not(:disabled) { background-color: rgba(229,72,77,0.14) !important; }
 .hub-btn > * { position: relative; z-index: 1; }
 .hub-btn svg { flex-shrink: 0; }
@@ -179,10 +212,10 @@ input[type="range"], input[type="checkbox"], input[type="radio"] { accent-color:
 /* ── App stage + headline motion (landing design language inside the app) ── */
 .hub-stage { position: fixed; inset: 0; left: 256px; z-index: 0; pointer-events: none; overflow: hidden;
   background:
-    radial-gradient(70% 55% at 55% -10%, rgba(237,237,237,0.06), transparent 70%),
+    radial-gradient(70% 55% at 55% -10%, rgba(var(--ink), 0.06), transparent 70%),
     radial-gradient(120% 90% at 60% 45%, transparent 55%, rgba(0,0,0,0.6) 100%); }
-.hub-stage-track { position: absolute; right: -8vw; top: 8vh; width: 70vw; height: 90vh; transform: rotate(-8deg); }
-@media (max-width: 900px) { .hub-stage { left: 0; } .hub-stage-track { width: 120vw; right: -40vw; } }
+.hub-stage-track { position: absolute; right: -8vw; top: calc(8*var(--vh)); width: calc(70*var(--vw)); height: calc(90*var(--vh)); transform: rotate(-8deg); }
+@media (max-width: 900px) { .hub-stage { left: 0; } .hub-stage-track { width: calc(120*var(--vw)); right: -40vw; } }
 .hub-title .hub-w { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.06em; }
 .hub-title .hub-w > span { display: inline-block; animation: hubRise 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes hubRise { from { transform: translateY(110%); } to { transform: none; } }
@@ -202,12 +235,12 @@ input[type="range"], input[type="checkbox"], input[type="radio"] { accent-color:
 .dash-secondary { transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), border-color 150ms; }
 .dash-secondary:hover:not(:disabled) { background-color: #2c2c2f !important; }
 .dash-link { transition: color 150ms; }
-.dash-link:hover { color: #ededed !important; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid rgba(237,237,237,0.6); outline-offset: 2px; }
+.dash-link:hover { color: var(--hub-t1) !important; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid rgba(var(--ink), 0.6); outline-offset: 2px; }
 
 #app {
   width: 100%;
-  min-height: 100vh;
+  min-height: calc(100*var(--vh));
 }
 
 .hub-nav {
@@ -223,8 +256,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   margin: 0 auto 18px;
   padding: 14px 24px;
   border-radius: 22px;
-  background: #19191b;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--hub-raise);
+  border: 1px solid rgba(var(--ink), 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -244,7 +277,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-family: 'Formula1-Wide', sans-serif;
   font-weight: 400;
   color: white;
-  background: #19191b;
+  background: var(--hub-raise);
 }
 
 .hub-nav-kicker {
@@ -252,7 +285,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 0.72rem;
   letter-spacing: 0;
   
-  color: rgba(245, 245, 245, 0.55);
+  color: rgba(var(--ink), 0.55);
 }
 
 .hub-nav-brand strong {
@@ -290,10 +323,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   min-height: 32px;
   margin: 0;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(var(--ink), 0.08);
+  background: rgba(var(--ink), 0.03);
   padding: 0 12px;
-  color: #a1a1a6;
+  color: var(--hub-t2);
   font-size: 13px;
   font-weight: 400;
   
@@ -305,7 +338,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .hub-slide-tab-active {
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(var(--ink), 0.14);
 }
 
 .hub-slide-cursor {
@@ -380,9 +413,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   min-width: 200px;
   padding: 6px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: #19191b;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(var(--ink), 0.1);
+  background: var(--hub-raise);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(var(--ink), 0.04);
 }
 
 .hub-dropdown-item {
@@ -406,7 +439,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .hub-dropdown-item-active {
-  background: #232325;
+  background: var(--hub-raise);
   color: white;
 }
 
@@ -429,7 +462,7 @@ p {
 }
 
 .glass {
-  background: #19191b;
+  background: var(--hub-raise);
   border: 1px solid var(--f1-border);
   border-radius: 14px;
   padding: 20px;
@@ -438,10 +471,10 @@ p {
 
 @layer base {
 button {
-  background: #232325;
-  border: 1px solid rgba(237,237,237,0.08);
+  background: var(--hub-raise);
+  border: 1px solid rgba(var(--ink), 0.08);
   padding: 10px 14px;
-  color: #ededed;
+  color: var(--hub-t1);
   font-family: inherit;
   font-weight: 400;
   border-radius: 8px;
@@ -467,7 +500,7 @@ input:not([type="checkbox"]), select {
 
 .landing {
   max-width: 540px;
-  margin: 7vh auto 0;
+  margin: calc(7*var(--vh)) auto 0;
   text-align: center;
 }
 
@@ -494,7 +527,7 @@ input:not([type="checkbox"]), select {
   height: 64px;
   border-radius: 14px;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(var(--ink), 0.14);
 }
 
 .setup-eyebrow {
@@ -502,19 +535,19 @@ input:not([type="checkbox"]), select {
   letter-spacing: 0;
   font-size: 0.75rem;
   margin: 0 0 6px;
-  color: rgba(245, 245, 245, 0.56);
+  color: rgba(var(--ink), 0.56);
 }
 
 .setup-subtitle {
   margin: 0;
-  color: rgba(245, 245, 245, 0.7);
+  color: rgba(var(--ink), 0.7);
   line-height: 1.6;
 }
 
 .setup-fields label {
   display: block;
   font-size: 0.9rem;
-  color: rgba(245, 245, 245, 0.7);
+  color: rgba(var(--ink), 0.7);
   margin: 10px 0 4px;
 }
 
@@ -533,24 +566,24 @@ input:not([type="checkbox"]), select {
   padding: 7px 12px;
   border-radius: 999px;
   font-size: 0.82rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(245, 245, 245, 0.78);
+  border: 1px solid rgba(var(--ink), 0.14);
+  background: rgba(var(--ink), 0.06);
+  color: rgba(var(--ink), 0.78);
 }
 
 .setup-driver-list {
   max-height: 300px;
   margin-top: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ink), 0.08);
   border-radius: 16px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(var(--ink), 0.02);
 }
 
 .setup-driver-item {
   gap: 10px;
   align-items: flex-start;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(var(--ink), 0.08);
   padding: 10px 4px;
 }
 
@@ -576,7 +609,7 @@ input:not([type="checkbox"]), select {
 }
 
 .setup-auth-shell {
-  min-height: calc(100vh - 72px);
+  min-height: calc(calc(100*var(--vh)) - 72px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -596,9 +629,9 @@ input:not([type="checkbox"]), select {
   position: relative;
   overflow: hidden;
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(var(--ink), 0.09);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)),
+    linear-gradient(180deg, rgba(var(--ink), 0.035), rgba(var(--ink), 0.01)),
     rgba(11, 4, 4, 0.86);
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
 }
@@ -627,7 +660,7 @@ input:not([type="checkbox"]), select {
 
 .setup-copy-block h1 {
   margin-bottom: 10px;
-  font-size: clamp(2.2rem, 4vw, 3.5rem);
+  font-size: clamp(2.2rem, calc(4*var(--vw)), 3.5rem);
   line-height: 1.05;
   letter-spacing: 0;
 }
@@ -642,8 +675,8 @@ input:not([type="checkbox"]), select {
   align-items: center;
   min-height: 58px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(var(--ink), 0.08);
+  background: rgba(var(--ink), 0.045);
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
@@ -686,9 +719,9 @@ input:not([type="checkbox"]), select {
   margin: 0;
   padding: 16px;
   border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ink), 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(var(--ink), 0.05), rgba(var(--ink), 0.02)),
     rgba(20, 8, 8, 0.78);
   text-align: left;
   box-shadow: none;
@@ -702,7 +735,7 @@ input:not([type="checkbox"]), select {
   border-color: rgba(255, 104, 104, 0.55);
   background:
     radial-gradient(circle at top right, rgba(225, 6, 0, 0.18), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(var(--ink), 0.07), rgba(var(--ink), 0.02)),
     rgba(32, 10, 10, 0.9);
 }
 
@@ -721,11 +754,11 @@ input:not([type="checkbox"]), select {
   font-size: 0.74rem;
   letter-spacing: 0;
   
-  color: rgba(245, 245, 245, 0.56);
+  color: rgba(var(--ink), 0.56);
 }
 
 .setup-origin-tagline {
-  color: rgba(245, 245, 245, 0.72);
+  color: rgba(var(--ink), 0.72);
   line-height: 1.45;
 }
 
@@ -733,8 +766,8 @@ input:not([type="checkbox"]), select {
   margin-top: auto;
   padding: 7px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(var(--ink), 0.06);
+  border: 1px solid rgba(var(--ink), 0.12);
   color: #fff;
   font-weight: 400;
 }
@@ -761,8 +794,8 @@ input:not([type="checkbox"]), select {
 .setup-origin-stat {
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(var(--ink), 0.045);
+  border: 1px solid rgba(var(--ink), 0.08);
 }
 
 .setup-origin-stat span,
@@ -771,7 +804,7 @@ input:not([type="checkbox"]), select {
 }
 
 .setup-origin-stat span {
-  color: rgba(245, 245, 245, 0.58);
+  color: rgba(var(--ink), 0.58);
   font-size: 0.82rem;
 }
 
@@ -786,7 +819,7 @@ input:not([type="checkbox"]), select {
   max-height: 360px;
   padding: 10px 14px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(var(--ink), 0.025);
 }
 
 .setup-driver-item {
@@ -808,7 +841,7 @@ input:not([type="checkbox"]), select {
 
 .setup-driver-meta span {
   margin-top: 4px;
-  color: rgba(245, 245, 245, 0.66);
+  color: rgba(var(--ink), 0.66);
   line-height: 1.45;
 }
 
@@ -828,7 +861,7 @@ input:not([type="checkbox"]), select {
 .setup-helper-copy {
   margin: 0;
   font-size: 0.9rem;
-  color: rgba(245, 245, 245, 0.58);
+  color: rgba(var(--ink), 0.58);
 }
 
 .setup-error {
@@ -886,7 +919,7 @@ input:not([type="checkbox"]), select {
   border-radius: inherit;
   background:
     linear-gradient(180deg, rgba(20, 6, 6, 0.06), rgba(5, 1, 1, 0.55)),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 28%);
+    radial-gradient(circle at top left, rgba(var(--ink), 0.12), transparent 28%);
 }
 
 .setup-testimonials {
@@ -905,7 +938,7 @@ input:not([type="checkbox"]), select {
   gap: 14px;
   padding: 18px;
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(var(--ink), 0.12);
   background: rgba(17, 12, 12, 0.58);
 }
 
@@ -932,18 +965,18 @@ input:not([type="checkbox"]), select {
 .setup-testimonial-card span {
   margin-top: 2px;
   font-size: 0.9rem;
-  color: rgba(245, 245, 245, 0.62);
+  color: rgba(var(--ink), 0.62);
 }
 
 .setup-testimonial-card p {
   margin: 8px 0 0;
   font-size: 0.94rem;
   line-height: 1.55;
-  color: rgba(245, 245, 245, 0.8);
+  color: rgba(var(--ink), 0.8);
 }
 
 .setup-driver-meta span {
-  color: rgba(245, 245, 245, 0.6);
+  color: rgba(var(--ink), 0.6);
   font-size: 0.9rem;
 }
 
@@ -968,7 +1001,7 @@ input:not([type="checkbox"]), select {
 
 .landing-shell {
   position: relative;
-  min-height: calc(100vh - 48px);
+  min-height: calc(calc(100*var(--vh)) - 48px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -987,8 +1020,8 @@ input:not([type="checkbox"]), select {
   inset: 0;
   opacity: 0.22;
   background:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 100%),
-    radial-gradient(circle at 80% 40%, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 100%);
+    radial-gradient(circle at 20% 20%, rgba(var(--ink), 0.08) 0 1px, transparent 1px 100%),
+    radial-gradient(circle at 80% 40%, rgba(var(--ink), 0.06) 0 1px, transparent 1px 100%);
   background-size: 28px 28px, 36px 36px;
 }
 
@@ -997,8 +1030,8 @@ input:not([type="checkbox"]), select {
   inset: 8% 0 0;
   opacity: 0.2;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    linear-gradient(rgba(var(--ink), 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ink), 0.08) 1px, transparent 1px);
   background-size: 80px 80px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.9) 28%, rgba(0, 0, 0, 0.2));
 }
@@ -1040,8 +1073,8 @@ input:not([type="checkbox"]), select {
   align-items: center;
   text-align: center;
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.01) 40%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+    radial-gradient(circle at top, rgba(var(--ink), 0.08), rgba(var(--ink), 0.01) 40%),
+    linear-gradient(160deg, rgba(var(--ink), 0.045), rgba(var(--ink), 0.015));
 }
 
 .landing-panel::before {
@@ -1093,13 +1126,13 @@ input:not([type="checkbox"]), select {
   
   letter-spacing: 0;
   font-size: 0.8rem;
-  color: rgba(245, 245, 245, 0.68);
+  color: rgba(var(--ink), 0.68);
 }
 
 .landing-copy h1 {
   margin-bottom: 24px;
   font-family: 'Formula1-Wide', sans-serif;
-  font-size: clamp(3.25rem, 8vw, 6.4rem);
+  font-size: clamp(3.25rem, calc(8*var(--vw)), 6.4rem);
   line-height: 0.98;
   letter-spacing: 0;
   text-transform: none;
@@ -1108,9 +1141,9 @@ input:not([type="checkbox"]), select {
 .landing-description {
   max-width: 680px;
   margin: 0 auto;
-  font-size: clamp(1rem, 2.6vw, 1.22rem);
+  font-size: clamp(1rem, calc(2.6*var(--vw)), 1.22rem);
   line-height: 1.8;
-  color: rgba(245, 245, 245, 0.76);
+  color: rgba(var(--ink), 0.76);
 }
 
 .landing-actions {
@@ -1146,7 +1179,7 @@ input:not([type="checkbox"]), select {
 
 .landing-note {
   margin-top: 14px;
-  color: rgba(245, 245, 245, 0.6);
+  color: rgba(var(--ink), 0.6);
   font-size: 0.95rem;
 }
 
@@ -1161,23 +1194,23 @@ input:not([type="checkbox"]), select {
 
 .landing-stat-card {
   padding: 20px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ink), 0.08);
   border-radius: 24px;
   background: rgba(10, 10, 10, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(var(--ink), 0.04);
 }
 
 .landing-stat-value {
   display: block;
   margin-bottom: 8px;
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-size: clamp(1.8rem, calc(4*var(--vw)), 2.5rem);
   font-weight: 400;
   color: white;
 }
 
 .landing-stat-label {
   display: block;
-  color: rgba(245, 245, 245, 0.64);
+  color: rgba(var(--ink), 0.64);
   font-size: 0.95rem;
 }
 
@@ -1211,9 +1244,9 @@ input:not([type="checkbox"]), select {
   isolation: isolate;
   min-height: 300px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 34px rgba(0, 0, 0, 0.34);
+  background: rgba(var(--ink), 0.04);
+  border: 1px solid rgba(var(--ink), 0.1);
+  box-shadow: inset 0 1px 0 rgba(var(--ink), 0.05), 0 18px 34px rgba(0, 0, 0, 0.34);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1341,11 +1374,11 @@ input:not([type="checkbox"]), select {
   
   letter-spacing: 0;
   font-size: 0.78rem;
-  color: rgba(245, 245, 245, 0.6);
+  color: rgba(var(--ink), 0.6);
 }
 
 .dashboard-header h2 {
-  font-size: clamp(2rem, 4.5vw, 3.2rem);
+  font-size: clamp(2rem, calc(4.5*var(--vw)), 3.2rem);
   margin-bottom: 10px;
 }
 
@@ -1353,7 +1386,7 @@ input:not([type="checkbox"]), select {
   max-width: 620px;
   font-size: 1rem;
   line-height: 1.7;
-  color: rgba(245, 245, 245, 0.72);
+  color: rgba(var(--ink), 0.72);
 }
 
 .dashboard-overview {
@@ -1366,14 +1399,14 @@ input:not([type="checkbox"]), select {
   min-width: 140px;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(var(--ink), 0.08);
+  background: rgba(var(--ink), 0.03);
 }
 
 .dashboard-overview-label {
   display: block;
   margin-bottom: 6px;
-  color: rgba(245, 245, 245, 0.58);
+  color: rgba(var(--ink), 0.58);
   font-size: 0.84rem;
 }
 
@@ -1398,7 +1431,7 @@ input:not([type="checkbox"]), select {
   overflow: hidden;
   transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(var(--ink), 0.05);
 }
 
 .menu-card-group:hover {
@@ -1442,7 +1475,7 @@ input:not([type="checkbox"]), select {
   height: 0;
   border-radius: 18px;
   opacity: 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--ink), 0.08);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
 }
 
@@ -1479,19 +1512,19 @@ input:not([type="checkbox"]), select {
   min-height: 100%;
   padding: 24px 28px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--ink), 0.06);
   transition: background-color 0.5s ease, border-color 0.5s ease, color 0.5s ease, opacity 0.5s ease, transform 0.5s ease;
 }
 
 .menu-card-group:hover .menu-card-content {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--ink), 0.08);
 }
 
 .menu-card-kicker {
   
   letter-spacing: 0;
   font-size: 0.76rem;
-  color: rgba(245, 245, 245, 0.62);
+  color: rgba(var(--ink), 0.62);
 }
 
 .menu-card-content h3 {
@@ -1501,7 +1534,7 @@ input:not([type="checkbox"]), select {
 
 .menu-card-content p {
   line-height: 1.7;
-  color: rgba(245, 245, 245, 0.74);
+  color: rgba(var(--ink), 0.74);
 }
 
 .menu-card-actions {
@@ -1529,7 +1562,7 @@ input:not([type="checkbox"]), select {
   height: 42px;
   border-radius: 12px;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(var(--ink), 0.16);
   background: rgba(0, 0, 0, 0.28);
   flex-shrink: 0;
 }
@@ -1565,7 +1598,7 @@ input:not([type="checkbox"]), select {
   gap: 14px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ink), 0.08);
   background: rgba(0, 0, 0, 0.2);
 }
 
@@ -1574,7 +1607,7 @@ input:not([type="checkbox"]), select {
   background:
     linear-gradient(100deg, rgba(46, 204, 113, 0.16) 0%, rgba(0, 0, 0, 0.22) 55%),
     rgba(0, 0, 0, 0.2);
-  box-shadow: 0 0 20px rgba(46, 204, 113, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 20px rgba(46, 204, 113, 0.08), inset 0 1px 0 rgba(var(--ink), 0.06);
 }
 
 .driver-summary-identity {
@@ -1592,7 +1625,7 @@ input:not([type="checkbox"]), select {
   height: 48px;
   padding: 0 10px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(var(--ink), 0.09);
   font-family: 'Formula1-Bold', sans-serif;
   font-weight: 400;
   color: white;
@@ -1607,7 +1640,7 @@ input:not([type="checkbox"]), select {
 .driver-summary-meta,
 .driver-summary-chip span,
 .driver-summary-empty {
-  color: rgba(245, 245, 245, 0.58);
+  color: rgba(var(--ink), 0.58);
   font-size: 0.88rem;
 }
 
@@ -1622,7 +1655,7 @@ input:not([type="checkbox"]), select {
   min-width: 62px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--ink), 0.08);
   text-align: center;
 }
 
@@ -1642,7 +1675,7 @@ input:not([type="checkbox"]), select {
   letter-spacing: 0;
   
   color: rgba(255, 255, 255, 0.82);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--ink), 0.08);
 }
 
 .dashboard-content-panel {
@@ -1671,7 +1704,7 @@ input:not([type="checkbox"]), select {
   border-radius: 22px;
   background:
     radial-gradient(circle at top right, rgba(225, 6, 0, 0.24), transparent 38%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    linear-gradient(160deg, rgba(var(--ink), 0.04), rgba(var(--ink), 0.015));
 }
 
 .market-grid,
@@ -1744,7 +1777,7 @@ input:not([type="checkbox"]), select {
 .sponsor-slot-blurb {
   margin: 0;
   font-size: 0.88rem;
-  color: rgba(245, 245, 245, 0.62);
+  color: rgba(var(--ink), 0.62);
   line-height: 1.45;
 }
 
@@ -1773,12 +1806,12 @@ input:not([type="checkbox"]), select {
 .calendar-card,
 .standings-card {
   padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ink), 0.08);
   border-radius: 20px;
   background:
     radial-gradient(circle at top right, rgba(225, 6, 0, 0.18), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    linear-gradient(180deg, rgba(var(--ink), 0.045), rgba(var(--ink), 0.02));
+  box-shadow: inset 0 1px 0 rgba(var(--ink), 0.04);
 }
 
 .market-driver-card-top,
@@ -1793,7 +1826,7 @@ input:not([type="checkbox"]), select {
 
 .detail-card-meta {
   margin: 4px 0 0;
-  color: rgba(245, 245, 245, 0.6);
+  color: rgba(var(--ink), 0.6);
 }
 
 .detail-card-badges {
@@ -1811,7 +1844,7 @@ input:not([type="checkbox"]), select {
   border-radius: 999px;
   background: rgba(225, 6, 0, 0.18);
   color: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ink), 0.08);
   font-size: 0.8rem;
 }
 
@@ -1838,7 +1871,7 @@ input:not([type="checkbox"]), select {
 }
 
 .active-driver-slot span {
-  color: rgba(245, 245, 245, 0.62);
+  color: rgba(var(--ink), 0.62);
   font-size: 0.78rem;
   letter-spacing: 0;
   
@@ -1848,14 +1881,14 @@ input:not([type="checkbox"]), select {
   margin: 0;
   background: rgba(0, 0, 0, 0.22);
   border-radius: 14px;
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(var(--ink), 0.08);
 }
 
 .active-driver-preview {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: rgba(245, 245, 245, 0.82);
+  color: rgba(var(--ink), 0.82);
   font-size: 0.9rem;
 }
 
@@ -1871,12 +1904,12 @@ input:not([type="checkbox"]), select {
   padding: 12px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(var(--ink), 0.06);
 }
 
 .driver-detail-stat span {
   display: block;
-  color: rgba(245, 245, 245, 0.55);
+  color: rgba(var(--ink), 0.55);
   font-size: 0.78rem;
   margin-bottom: 4px;
   
@@ -1916,7 +1949,7 @@ input:not([type="checkbox"]), select {
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(var(--ink), 0.06);
 }
 
 .team-lineup-row--yours {
@@ -2007,8 +2040,8 @@ input:not([type="checkbox"]), select {
   align-items: center;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(var(--ink), 0.08);
+  border: 1px solid rgba(var(--ink), 0.12);
   color: rgba(255, 255, 255, 0.86);
   font-size: 0.78rem;
 }
@@ -2028,7 +2061,7 @@ input:not([type="checkbox"]), select {
   width: 230px;
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ink), 0.08);
   background: rgba(0, 0, 0, 0.22);
 }
 
@@ -2059,7 +2092,7 @@ input:not([type="checkbox"]), select {
   display: inline-flex;
   gap: 4px;
   align-items: center;
-  color: rgba(245, 245, 245, 0.62);
+  color: rgba(var(--ink), 0.62);
   font-size: 0.72rem;
 }
 
@@ -2070,7 +2103,7 @@ input:not([type="checkbox"]), select {
 
 .dashboard-race-card p {
   margin: 6px 0 0;
-  color: rgba(245, 245, 245, 0.7);
+  color: rgba(var(--ink), 0.7);
   font-size: 0.86rem;
 }
 
@@ -2102,7 +2135,7 @@ input:not([type="checkbox"]), select {
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(var(--ink), 0.06);
 }
 
 .standings-columns {
@@ -2135,7 +2168,7 @@ input:not([type="checkbox"]), select {
 
 .standings-table-head {
   padding: 0 18px 4px;
-  color: rgba(245, 245, 245, 0.54);
+  color: rgba(var(--ink), 0.54);
   font-size: 0.7rem;
   letter-spacing: 0;
   
@@ -2143,20 +2176,20 @@ input:not([type="checkbox"]), select {
 
 .standings-table-row {
   padding: 16px 18px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(var(--ink), 0.055), rgba(var(--ink), 0.02));
+  border: 1px solid rgba(var(--ink), 0.08);
   border-radius: 18px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(var(--ink), 0.03);
 }
 
 .standings-table-row--yours {
   border-color: rgba(46, 204, 113, 0.4);
   background:
-    linear-gradient(105deg, rgba(46, 204, 113, 0.14) 0%, rgba(255, 255, 255, 0.04) 45%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
+    linear-gradient(105deg, rgba(46, 204, 113, 0.14) 0%, rgba(var(--ink), 0.04) 45%),
+    linear-gradient(135deg, rgba(var(--ink), 0.055), rgba(var(--ink), 0.02));
   box-shadow:
     0 0 18px rgba(46, 204, 113, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    inset 0 1px 0 rgba(var(--ink), 0.04);
 }
 
 .standings-you-pill {
@@ -2177,9 +2210,9 @@ input:not([type="checkbox"]), select {
   border-color: rgba(46, 204, 113, 0.28);
   box-shadow:
     0 0 24px rgba(46, 204, 113, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 rgba(var(--ink), 0.06);
   background:
-    linear-gradient(145deg, rgba(46, 204, 113, 0.1) 0%, rgba(255, 255, 255, 0.03) 42%, transparent 65%),
+    linear-gradient(145deg, rgba(46, 204, 113, 0.1) 0%, rgba(var(--ink), 0.03) 42%, transparent 65%),
     var(--f1-surface, #111);
 }
 
@@ -2191,7 +2224,7 @@ input:not([type="checkbox"]), select {
   min-width: 62px;
   padding: 9px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--ink), 0.06);
   color: white;
   font-weight: 400;
 }
@@ -2203,7 +2236,7 @@ input:not([type="checkbox"]), select {
 }
 
 .standings-table-meta {
-  color: rgba(245, 245, 245, 0.6);
+  color: rgba(var(--ink), 0.6);
   font-size: 0.95rem;
 }
 
@@ -2212,8 +2245,8 @@ input:not([type="checkbox"]), select {
   min-width: 72px;
   padding: 11px 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(var(--ink), 0.055);
+  border: 1px solid rgba(var(--ink), 0.07);
   color: white;
   font-size: 1.05rem;
   font-weight: 400;
@@ -2238,13 +2271,13 @@ input:not([type="checkbox"]), select {
 }
 
 .weekend-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--ink), 0.1);
   border-radius: 18px;
   padding: 16px;
   margin-bottom: 14px;
   background:
     radial-gradient(circle at 90% 0%, rgba(236, 78, 2, 0.2), transparent 45%),
-    rgba(255, 255, 255, 0.03);
+    rgba(var(--ink), 0.03);
 }
 
 .weekend-head h3 {
@@ -2256,12 +2289,12 @@ input:not([type="checkbox"]), select {
   
   letter-spacing: 0;
   font-size: 0.72rem;
-  color: rgba(245, 245, 245, 0.58);
+  color: rgba(var(--ink), 0.58);
 }
 
 .weekend-meta {
   margin: 0;
-  color: rgba(245, 245, 245, 0.68);
+  color: rgba(var(--ink), 0.68);
 }
 
 .weekend-gate-hint {
@@ -2290,7 +2323,7 @@ input:not([type="checkbox"]), select {
   align-self: center;
   min-height: 48px;
   font-weight: 400;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(var(--ink), 0.14);
   background: linear-gradient(90deg, #1a6b3c, #2ecc71);
 }
 
@@ -2300,14 +2333,14 @@ input:not([type="checkbox"]), select {
   filter: grayscale(0.35);
   background: var(--f1-surface-2, #2a2a2a);
   border-color: var(--f1-border);
-  color: rgba(245, 245, 245, 0.45);
+  color: rgba(var(--ink), 0.45);
 }
 
 .weekend-continue-hint {
   margin: 0;
   text-align: center;
   font-size: 0.82rem;
-  color: rgba(245, 245, 245, 0.55);
+  color: rgba(var(--ink), 0.55);
 }
 
 .weekend-actions {
@@ -2365,7 +2398,7 @@ input:not([type="checkbox"]), select {
 
 .strategy-select {
   background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--ink), 0.1);
   color: #fff;
   padding: 0.8rem 1rem;
   border-radius: 8px;
@@ -2401,7 +2434,7 @@ input:not([type="checkbox"]), select {
   border-radius: 18px;
   background:
     radial-gradient(circle at right, rgba(225, 6, 0, 0.16), transparent 32%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    linear-gradient(160deg, rgba(var(--ink), 0.04), rgba(var(--ink), 0.015));
 }
 
 .weekend-results-panel {
@@ -2425,7 +2458,7 @@ input:not([type="checkbox"]), select {
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(var(--ink), 0.06);
 }
 
 .result-list {
@@ -2457,7 +2490,7 @@ input:not([type="checkbox"]), select {
     var(--f1-surface);
   box-shadow:
     0 0 0 1px rgba(46, 204, 113, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 rgba(var(--ink), 0.06);
 }
 
 .result-row-you-pill {
@@ -2490,7 +2523,7 @@ input:not([type="checkbox"]), select {
 
 .result-row-team,
 .result-row-time {
-  color: rgba(245, 245, 245, 0.68);
+  color: rgba(var(--ink), 0.68);
 }
 
 .result-row-meta {
@@ -2512,7 +2545,7 @@ input:not([type="checkbox"]), select {
 .result-row-quali-ref {
   font-size: 0.78rem;
   font-weight: 400;
-  color: rgba(245, 245, 245, 0.5);
+  color: rgba(var(--ink), 0.5);
   letter-spacing: 0;
 }
 
@@ -2531,14 +2564,14 @@ input:not([type="checkbox"]), select {
 }
 
 .result-row-delta--same {
-  color: rgba(245, 245, 245, 0.55);
+  color: rgba(var(--ink), 0.55);
 }
 
 .race-delta-summary {
   margin: 8px 0 0;
   font-size: 0.88rem;
   line-height: 1.45;
-  color: rgba(245, 245, 245, 0.72);
+  color: rgba(var(--ink), 0.72);
 }
 
 .race-delta-summary-gain {
@@ -2552,7 +2585,7 @@ input:not([type="checkbox"]), select {
 }
 
 .race-delta-summary-same {
-  color: rgba(245, 245, 245, 0.55);
+  color: rgba(var(--ink), 0.55);
 }
 
 .result-row-time {
@@ -2604,7 +2637,7 @@ input:not([type="checkbox"]), select {
 .spinner {
   width: 72px;
   height: 72px;
-  border: 5px solid rgba(255, 255, 255, 0.16);
+  border: 5px solid rgba(var(--ink), 0.16);
   border-top: 5px solid var(--f1-red);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
@@ -2659,7 +2692,7 @@ input:not([type="checkbox"]), select {
   }
 
   .landing-shell {
-    min-height: calc(100vh - 32px);
+    min-height: calc(calc(100*var(--vh)) - 32px);
     padding: 14px 0;
   }
 
@@ -2789,7 +2822,7 @@ input:not([type="checkbox"]), select {
   }
 
   .dashboard-race-card {
-    width: min(82vw, 230px);
+    width: min(calc(82*var(--vw)), 230px);
   }
 
   .dashboard-day-controls {
@@ -2860,8 +2893,8 @@ input:not([type="checkbox"]), select {
     display: flex !important;
   }
   
-  /* Reset layout constraints */
-  #app main {
+  /* Reset layout constraints (the hub shell mounts outside #app) */
+  #app main, #hub-layout-root main {
     margin-left: 0 !important;
     padding-top: 64px !important;
     padding-bottom: 72px !important;
@@ -2920,7 +2953,7 @@ input:not([type="checkbox"]), select {
     max-width: 320px;
     background: #0f0f10;
     z-index: 101;
-    border-right: 1px solid rgba(255,255,255,0.05);
+    border-right: 1px solid rgba(var(--ink), 0.05);
     transform: translateX(-100%);
     transition: transform 0.3s ease-in-out;
   }
@@ -2960,7 +2993,7 @@ input:not([type="checkbox"]), select {
     align-items: center;
     padding: 16px 0;
     cursor: pointer;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(var(--ink), 0.05);
   }
 }
 
@@ -2969,8 +3002,8 @@ input:not([type="checkbox"]), select {
 @media (max-width: 767px) {
   .mobile-fullscreen-modal {
     max-width: 100% !important;
-    max-height: 100vh !important;
-    height: 100vh !important;
+    max-height: calc(100*var(--vh)) !important;
+    height: calc(100*var(--vh)) !important;
     border-radius: 0 !important;
   }
 }
@@ -2986,7 +3019,7 @@ input:not([type="checkbox"]), select {
 @media (max-width: 767px) {
   .section-header-mobile {
     display: flex !important;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(var(--ink), 0.05);
   }
   .section-header-desktop {
     display: none !important;
@@ -3014,7 +3047,7 @@ html.lenis, html.lenis body { height: auto; }
 .lx-cut { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
 .lx main { position: relative; z-index: 2; }
 .lx-section { position: relative; }
-.lx-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 64px 96px; box-sizing: border-box; }
+.lx-sticky { position: sticky; top: 0; height: calc(100*var(--vh)); overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 64px 96px; box-sizing: border-box; }
 .lx-hero { justify-content: flex-end; padding-bottom: 112px; }
 
 /* nav */
@@ -3026,13 +3059,13 @@ html.lenis, html.lenis body { height: auto; }
 
 /* copy */
 .lx-copy { max-width: 620px; position: relative; }
-.lx-legacy { justify-content: flex-start; padding-top: 16vh; }
+.lx-legacy { justify-content: flex-start; padding-top: calc(16*var(--vh)); }
 .lx-copy-center { margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; max-width: 760px; }
 .lx-kicker { font-size: 14px; color: #85858b; margin: 0 0 20px; }
 .lx-h1, .lx-h2 { font-family: 'Formula1-Wide', sans-serif; font-weight: 400; text-transform: uppercase; color: #ededed; margin: 0 0 24px; }
-.lx-h1 { font-size: clamp(36px, 4.6vw, 68px); line-height: 1.04; letter-spacing: -0.01em; }
-.lx-h2 { font-size: clamp(28px, 3.3vw, 48px); line-height: 1.08; }
-.lx-h2-xl { font-size: clamp(36px, 5vw, 76px); line-height: 1.02; }
+.lx-h1 { font-size: clamp(36px, calc(4.6*var(--vw)), 68px); line-height: 1.04; letter-spacing: -0.01em; }
+.lx-h2 { font-size: clamp(28px, calc(3.3*var(--vw)), 48px); line-height: 1.08; }
+.lx-h2-xl { font-size: clamp(36px, calc(5*var(--vw)), 76px); line-height: 1.02; }
 .lx-sub { font-size: 18px; line-height: 1.55; color: #a1a1a6; max-width: 34rem; margin: 0 0 32px; }
 .lx-copy-center .lx-sub { margin-left: auto; margin-right: auto; }
 .lx-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -3090,7 +3123,7 @@ html.lenis, html.lenis body { height: auto; }
 .lx-track-tag { font-size: 11px; color: #a1a1a6; padding: 2px 6px; border-radius: 4px; background: rgba(15,15,16,0.8); border: 1px solid rgba(237,237,237,0.1); white-space: nowrap; }
 
 /* race */
-.lx-race-copy { position: absolute; inset: 0; display: flex; align-items: flex-start; padding-top: 14vh; justify-content: center; text-align: center; pointer-events: none; opacity: 0; transform: scale(1.04); transition: opacity 500ms cubic-bezier(0.22,1,0.36,1), transform 900ms cubic-bezier(0.22,1,0.36,1); }
+.lx-race-copy { position: absolute; inset: 0; display: flex; align-items: flex-start; padding-top: calc(14*var(--vh)); justify-content: center; text-align: center; pointer-events: none; opacity: 0; transform: scale(1.04); transition: opacity 500ms cubic-bezier(0.22,1,0.36,1), transform 900ms cubic-bezier(0.22,1,0.36,1); }
 .lx-race-copy.is-in { opacity: 1; transform: none; }
 
 /* footer */
@@ -3098,7 +3131,7 @@ html.lenis, html.lenis body { height: auto; }
 
 /* boot */
 .lx-boot { position: fixed; inset: 0; z-index: 100; background: #060607; display: flex; align-items: center; justify-content: center; }
-.lx-boot-inner { width: min(360px, calc(100vw - 48px)); display: flex; flex-direction: column; gap: 24px; }
+.lx-boot-inner { width: min(360px, calc(calc(100*var(--vw)) - 48px)); display: flex; flex-direction: column; gap: 24px; }
 .lx-boot-mark { font-family: 'Formula1-Wide', sans-serif; font-style: italic; font-size: 28px; color: #ededed; }
 .lx-boot-mark span { color: #E10600; }
 .lx-boot-lights { display: flex; gap: 12px; }
@@ -3114,7 +3147,7 @@ html.lenis, html.lenis body { height: auto; }
 /* no-WebGL fallback */
 .lx.no-webgl .lx-stage { background: #0f0f10; }
 .lx.no-webgl .lx-section { height: auto !important; }
-.lx.no-webgl .lx-sticky { position: relative; height: auto; min-height: 80vh; padding-top: 120px; }
+.lx.no-webgl .lx-sticky { position: relative; height: auto; min-height: calc(80*var(--vh)); padding-top: 120px; }
 .lx.no-webgl .lx-parts, .lx.no-webgl .lx-race-copy { display: none; }
 .lx-static-visual { margin-top: 48px; max-width: 640px; }
 

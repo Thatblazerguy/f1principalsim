@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { constructorEntries } from "../utils/championshipModel.js";
 import { state } from "../state.js";
 import { drivers, getDriverHeadshotUrl } from "../data/drivers.js";
 import { renderDashboard } from "./dashboard.tsx";
@@ -6,6 +7,7 @@ import { getTeamRoster, getActiveDrivers, setTeamActiveDrivers, ensureTeamState 
 import { rotateSponsorOffers } from "../utils/sponsorDeals.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getRoundRaceDay } from "../utils/seasonTimeline.js";
+import { runSeasonEnd, applySeasonRollover, processEndOfSeasonFinancials } from "../game/seasonRollover.js";
 import { mountLayout, HUB, glassCard, statCell, btn, btnClass, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
 import { ShieldCheck, TrendingUp, Users, DollarSign, Activity, AlertCircle, ChevronRight, Target, CheckCircle, Zap, Star } from "lucide-react";
 import { motion } from 'framer-motion';
@@ -122,55 +124,11 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, rules: 
   
   rotateSponsorOffers(s);
 
-  const driverStandings = Object.entries(s.standings.drivers || {})
-    .sort(([, a]: any, [, b]: any) => b - a);
-  
-  const totalDrivers = driverStandings.length;
-  const allTeams = [s.team!, ...(s.aiTeams || [])];
-  
-  allTeams.forEach(t => {
-    const atrMultiplier = t.atrMultiplier ?? 1.0;
-    if (t !== s.team) {
-      const aiGrowth = (3 + Math.random() * 3) * atrMultiplier;
-      t.carPerformance = parseFloat((t.carPerformance + aiGrowth).toFixed(1));
-      const parts = ["aero", "engine", "chassis", "reliability"];
-      parts.forEach(p => {
-        if (t.car && t.car[p]) {
-          const partGrowth = Math.floor(Math.random() * 2) + (atrMultiplier > 1.05 ? 1 : 0);
-          t.car[p] += partGrowth;
-        }
-      });
-    }
-
-    const teamDrivers = [...t.drivers, ...(t.reserveDriver ? [t.reserveDriver] : [])];
-    teamDrivers.forEach((d: any) => {
-      if (typeof d.age === "number") d.age += 1;
-
-      const rankIndex = driverStandings.findIndex(([name]) => name === d.name);
-      let ratingChange = 0;
-
-      if (rankIndex !== -1) {
-        const percentile = (totalDrivers - rankIndex) / totalDrivers;
-        if (percentile > 0.8) ratingChange = 1 + Math.random(); 
-        else if (percentile > 0.5) ratingChange = 0.5 + Math.random() * 0.5; 
-        else if (percentile < 0.2) ratingChange = -1 - Math.random(); 
-        else ratingChange = Math.random() * 0.5 - 0.25; 
-      } else {
-        ratingChange = -0.5 + Math.random() * 0.5;
-      }
-
-      const stats = ["pace", "quali", "racecraft", "tyre", "wet", "consistency"];
-      stats.forEach(st => {
-        if (typeof d[st] === "number") {
-          d[st] = parseFloat(Math.min(99, Math.max(40, d[st] + ratingChange)).toFixed(1));
-        }
-      });
-      
-      if (typeof d.market === "number") {
-        d.market = parseFloat(Math.min(99, Math.max(10, d.market + ratingChange * 2)).toFixed(1));
-      }
-    });
-  });
+  // Development and progression for the season just finished. Runs BEFORE the
+  // standings reset below so AI development, ATR and driver progression use
+  // the final classification (count-back included). Synchronous, so it has
+  // finished before syncGame() saves. Guarded to run once per season.
+  applySeasonRollover(s, { upcomingCalendar: newCalendar });
 
   s.season = {
     round: 1,
@@ -280,94 +238,34 @@ async function startNextSeason(root: HTMLElement, keepSponsors: boolean, rules: 
   }
   */
   
-  import('../game/development.js').then(({ processSeasonDevelopment }) => {
-     processSeasonDevelopment(s);
-  }).catch(err => console.error("Failed to process academy development", err));
-
   await syncGame();
   renderDashboard(root);
 }
 
-const PRIZE_MONEY = [68.0, 58.0, 50.0, 43.0, 37.0, 31.0, 25.0, 20.0, 15.0, 10.0];
-const TV_RIGHTS_SHARE = [33.0, 28.6, 26.4, 24.2, 22.0, 19.8, 17.6, 15.4, 13.2, 11.0];
-const ATR_MULTIPLIERS = [0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15];
-
+/**
+ * End-of-season payouts and the player's report (official classification,
+ * paid once per season). Kept for callers of the old name; the logic lives in
+ * game/seasonRollover.js.
+ */
 export function processEndofSeasonFinancials(s: any) {
-  const teamList = [s.team!, ...(s.aiTeams || [])];
-  const points = (tName: string) => s.standings.teams?.[tName] ?? 0;
-  teamList.sort((a, b) => points(b.name) - points(a.name));
-
-  let playerReport = null;
-  const alreadyProcessed = s.season.reportProcessed === s.season.year;
-
-  teamList.forEach((team, index) => {
-    const pos = index + 1;
-    const prize = PRIZE_MONEY[index] ?? 10.0;
-    const tvRights = TV_RIGHTS_SHARE[index] ?? 11.0;
-    const atrMultiplier = ATR_MULTIPLIERS[index] ?? 1.0;
-
-    team.atrMultiplier = atrMultiplier;
-
-    if (!alreadyProcessed) {
-      team.budget = parseFloat((team.budget + prize + tvRights).toFixed(1));
-    }
-
-    if (team.name === s.team!.name) {
-      let sponsorTotal = 0;
-      const sponsorDetails: any[] = [];
-      const SPONSOR_SLOTS = [
-        { key: "title", label: "Title sponsor" },
-        { key: "kit", label: "Kit sponsor" },
-        { key: "sidepod", label: "Sidepod sponsor" },
-        { key: "rearWing", label: "Rear wing sponsor" },
-        { key: "halo", label: "Halo sponsor" }
-      ];
-      SPONSOR_SLOTS.forEach(slot => {
-        const sponsor = s.team!.sponsorSlots?.[slot.key];
-        if (sponsor) {
-          const payout = parseFloat(((sponsor.monthlyIncome || 0) * 5 + (sponsor.performanceBonus || 0) * ((sponsor.relationshipLevel || 100) / 100) * 2).toFixed(1));
-          sponsorTotal += payout;
-          sponsorDetails.push({ name: sponsor.name, slot: slot.label, payout });
-          if (!alreadyProcessed) {
-            s.team!.budget = parseFloat((s.team!.budget + payout).toFixed(1));
-          }
-        }
-      });
-
-      // Calculate performance evaluation
-      const sortedByCar = [...teamList].sort((a, b) => b.carPerformance - a.carPerformance);
-      const carRank = sortedByCar.findIndex(t => t.name === s.team!.name) + 1;
-      let performanceEvaluation = "Met expectations";
-      if (pos < carRank) {
-        performanceEvaluation = "Overperformed car rank";
-      } else if (pos > carRank) {
-        performanceEvaluation = "Underperformed car rank";
-      }
-
-      playerReport = {
-        position: pos,
-        carRank,
-        performanceEvaluation,
-        prize,
-        tvRights,
-        atrMultiplier,
-        sponsorTotal,
-        sponsorDetails
-      };
-    }
-  });
-
-  if (!alreadyProcessed) {
-    s.season.reportProcessed = s.season.year;
-    syncGame();
-  }
-
-  return playerReport;
+  const { report, changed } = processEndOfSeasonFinancials(s);
+  if (changed) syncGame();
+  return report;
 }
 
 // UI Components
+let rolloverInFlight = false;
+
 export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
   ensureTeamState(state.team!);
+
+  // Season end runs here, once per navigation, never inside a React render:
+  // prize money / TV rights / ATR by official classification, then the driver
+  // market (contracts tick, moves, AI renewals). Each part is guarded per
+  // season, so re-entering the offseason screen cannot pay or tick twice.
+  const seasonEnd = runSeasonEnd(state as any);
+  if (seasonEnd.changed) syncGame();
+  const seasonReport = seasonEnd.report;
 
   const OffseasonPage = () => {
     const s = state as any;
@@ -405,7 +303,7 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
     };
 
     // Derived Season Review Stats
-    const sortedTeams = Object.entries(s.standings.teams || {}).sort((a: any, b: any) => b[1] - a[1]);
+    const sortedTeams = constructorEntries(s);
     const constPos = sortedTeams.findIndex(t => t[0] === s.team!.name) + 1;
     const teamPts = s.standings.teams[s.team!.name] || 0;
     
@@ -479,7 +377,7 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
     const isChecklistComplete = roster.length >= 2 && keepSponsors !== null;
 
     if (view === 'report') {
-      const report = processEndofSeasonFinancials(s);
+      const report = seasonReport;
       if (!report) return <div style={{ color: HUB.textPrimary, padding: '40px', fontFamily: HUB.fontSans }}>Generating end-of-season report…</div>;
 
       const totalPayout = report.prize + report.tvRights + report.sponsorTotal;
@@ -611,8 +509,16 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
     if (view === 'setup') {
       return (
         <SeasonSetup 
-          onComplete={(rules, newCalendar) => {
-             startNextSeason(root, keepSponsors!, rules, newCalendar, setFlashMessage);
+          onComplete={async (rules, newCalendar) => {
+             // One rollover per click: a double submit would otherwise roll
+             // the new season over too.
+             if (rolloverInFlight) return;
+             rolloverInFlight = true;
+             try {
+               await startNextSeason(root, keepSponsors!, rules, newCalendar, setFlashMessage);
+             } finally {
+               rolloverInFlight = false;
+             }
           }} 
           initialRules={s.season.rules}
         />

@@ -1,5 +1,8 @@
 import { LOAN_DESTINATIONS } from "./academy.js";
+import { academySeasonEnd } from "./academyEngine.js";
 import { getCircuitProfile } from "../utils/devProjects.js";
+import { getDevelopmentConvergenceMult } from "../utils/raceBalance.js";
+import { constructorEntries } from "../utils/championshipModel.js";
 
 /**
  * Helper to clamp values
@@ -91,10 +94,28 @@ export function developAcademyDriver(driver, academy) {
  * Process end-of-season logic for all academy drivers.
  * Handles development, aging, contract expiration, and loan returns.
  */
-export function processSeasonDevelopment(state) {
-  if (!state.academy) return;
+export function processSeasonDevelopment(state, { finalOrder = null, upcomingCalendar = null } = {}) {
+  const currentYear = state.season?.year || 1;
+  if (state.academy && state.academy.lastProcessedYear !== currentYear) {
+    processAcademySeason(state, currentYear);
+    state.academy.lastProcessedYear = currentYear;
+  }
 
-  const currentYear = state.season.year || 1;
+  // AI teams develop even when the player has no academy (this used to be
+  // skipped by the early return above).
+  processAiTeamDevelopment(state, finalOrder, upcomingCalendar);
+}
+
+/**
+ * Academy prospects and loaned drivers: development, aging and contracts.
+ * Contract ownership: this function is the ONLY place academy/loan contracts
+ * tick down (once per season, guarded by academy.lastProcessedYear). Race and
+ * reserve drivers on team rosters tick down in transferMarket.processMarketSeasonEnd.
+ */
+function processAcademySeason(state, currentYear) {
+  if (!state.notifications) state.notifications = [];
+  // Academies on the day-by-day model (game/academyEngine.js) do their season close there
+  if (state.academy.devModel === 2) { academySeasonEnd(state, currentYear); return; }
 
   // Process active academy prospects
   if (state.academy.prospects) {
@@ -164,31 +185,50 @@ export function processSeasonDevelopment(state) {
       }
     }
   }
-
-  // Process AI Teams Development
-  processAiTeamDevelopment(state);
 }
 
 /**
  * Process end-of-season logic for AI Teams.
  * Handles dynamic upgrading of AI facilities and staff based on their season performance.
  */
-function processAiTeamDevelopment(state) {
+/** Facility upgrade chance by final constructors' position (1-based; 0 = unknown). */
+export function getAiUpgradeChance(standingPosition) {
+  if (standingPosition > 0 && standingPosition <= 3) return 0.8;
+  if (standingPosition > 3 && standingPosition <= 7) return 0.5;
+  return 0.3;
+}
+
+/**
+ * Raise a spec with diminishing returns. A spec cannot be pushed above
+ * min(99, carPerformance + 5) by offseason work, so specs stay in step with OVR.
+ */
+function bumpSpec(team, spec, amount) {
+  const cur = team.specs[spec];
+  const ovr = Number(team.carPerformance) || Number(team.specs.ovr) || 85;
+  const ceiling = Math.max(Math.min(cur, 99), Math.min(99, ovr + 5));
+  const gain = amount * getDevelopmentConvergenceMult(cur);
+  team.specs[spec] = Math.round(clamp(cur + gain, 40, ceiling) * 10) / 10;
+}
+
+/**
+ * Process end-of-season logic for AI Teams.
+ * Handles dynamic upgrading of AI facilities and staff based on their season performance.
+ * @param {object} state
+ * @param {string[]|null} finalOrder constructor names in final official order
+ *   (count-back included) for the season just finished. Pass it: by the time
+ *   this runs the live standings may already be reset. Without it, the order
+ *   is taken from the championship model.
+ * @param {Array|null} upcomingCalendar next season's calendar (track weighting)
+ */
+export function processAiTeamDevelopment(state, finalOrder = null, upcomingCalendar = null) {
   if (!state.aiTeams || !state.aiTeams.length) return;
 
-  const currentYear = state.season?.year || 1;
-  const standings = state.standings?.teams || {};
+  const order = finalOrder?.length ? finalOrder : constructorEntries(state).map(([name]) => name);
 
   state.aiTeams.forEach((aiTeam) => {
     // Determine budget/income abstractly based on championship finish
-    const standingPosition = Object.keys(standings).sort((a, b) => standings[b] - standings[a]).indexOf(aiTeam.name) + 1;
-    const isTopTeam = standingPosition > 0 && standingPosition <= 3;
-    const isMidfield = standingPosition > 3 && standingPosition <= 7;
-
-    // Base upgrade chance
-    let upgradeChance = 0.3; // 30% chance to upgrade a random facility
-    if (isTopTeam) upgradeChance = 0.8;
-    else if (isMidfield) upgradeChance = 0.5;
+    const standingPosition = order.indexOf(aiTeam.name) + 1;
+    const upgradeChance = getAiUpgradeChance(standingPosition);
 
     // Facility upgrades
     if (Math.random() < upgradeChance) {
@@ -206,9 +246,7 @@ function processAiTeamDevelopment(state) {
         if (aiTeam.specs) {
           const specMap = { windTunnel: 'aero', cfdDepartment: 'aero', simulator: 'chassis', composites: 'chassis', powerUnitLab: 'engine', reliabilityCentre: 'reliability', vehicleDynamics: 'chassis', pitCrewTraining: 'operations' };
           const spec = specMap[targetFacility];
-          if (spec && aiTeam.specs[spec]) {
-            aiTeam.specs[spec] = Math.min(99, aiTeam.specs[spec] + 2);
-          }
+          if (spec && aiTeam.specs[spec]) bumpSpec(aiTeam, spec, 2);
         }
       }
     }
@@ -218,7 +256,7 @@ function processAiTeamDevelopment(state) {
       const specsList = Object.keys(aiTeam.specs);
       
       // Target upcoming tracks
-      const upcomingTracks = state.season?.calendar?.slice(state.season?.round || 0) || [];
+      const upcomingTracks = upcomingCalendar || state.season?.calendar?.slice(state.season?.round || 0) || [];
       // calendar entries are full objects {name, circuit, ...}; extract the circuit name
       const trackProfiles = upcomingTracks.map(t => getCircuitProfile(typeof t === 'string' ? t : t?.circuit));
       const weights = { aero: 1, chassis: 1, engine: 1, reliability: 1 };
@@ -239,10 +277,10 @@ function processAiTeamDevelopment(state) {
       }
       
       if (aiTeam.specs[targetSpec]) {
-        aiTeam.specs[targetSpec] = Math.min(99, aiTeam.specs[targetSpec] + 1);
+        bumpSpec(aiTeam, targetSpec, 1);
       } else {
-        const randomSpec = specsList[Math.floor(Math.random() * specsList.length)];
-        aiTeam.specs[randomSpec] = Math.min(99, aiTeam.specs[randomSpec] + 1);
+        const randomSpec = specsList.filter((k) => k !== 'ovr')[Math.floor(Math.random() * Math.max(1, specsList.length - 1))];
+        if (randomSpec && typeof aiTeam.specs[randomSpec] === 'number') bumpSpec(aiTeam, randomSpec, 1);
       }
     }
   });

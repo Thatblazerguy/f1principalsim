@@ -107,7 +107,7 @@ function CircuitDetailPanel({ circuit, onClose, onLicense, career }: any) {
   const meta = circuit.calendarStatus && (CALENDAR_STATUS_META as any)[circuit.calendarStatus];
 
   return (
-    <div style={{ ...glassCard({ padding: '24px' }), position: 'sticky', top: 0, maxHeight: '90vh', overflowY: 'auto' }}>
+    <div style={{ ...glassCard({ padding: '24px' }), position: 'sticky', top: 0, maxHeight: 'calc(90*var(--vh))', overflowY: 'auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
@@ -220,7 +220,7 @@ function ComparePanel({ a, b, onClose }: { a: any; b: any; onClose: () => void }
   ];
 
   return (
-    <div style={{ ...glassCard({ padding: '24px' }), position: 'sticky', top: 0, maxHeight: '90vh', overflowY: 'auto' }}>
+    <div style={{ ...glassCard({ padding: '24px' }), position: 'sticky', top: 0, maxHeight: 'calc(90*var(--vh))', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <ArrowLeftRight size={16} strokeWidth={1.5} color={HUB.textMuted} />
@@ -334,7 +334,7 @@ function FIACircuitLibrary({ appRoot }: any) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100*var(--vh))', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
       {notification && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
           {notification}

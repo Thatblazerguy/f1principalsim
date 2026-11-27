@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { CalendarDays, CornerDownLeft, FastForward, Flag, LogOut, Search, Shield, SkipForward } from 'lucide-react';
+import { CalendarDays, CornerDownLeft, FastForward, Flag, LogOut, Moon, Search, Shield, SkipForward, Sun } from 'lucide-react';
 import { state } from '../state.js';
 import { canSimulateNextDay, simulateNextDay } from '../utils/seasonTimeline.js';
 import { syncGame } from '../lib/supabaseApi.js';
@@ -104,11 +104,13 @@ export function CommandPalette({ activeScreen, appRoot, navItems, onNav, onSkipT
     const actions: Command[] = [
       { key: 'action:simulate-day', label: 'Simulate 1 day', hint: 'Advance the season clock', icon: <SkipForward size={16} strokeWidth={1.5} />, disabled: !canAdvance, keywords: 'advance next day',
         run: async () => { const r = simulateNextDay(state); if (!r.advanced) return; await syncGame(); await refreshAfterSimulate(); } },
-      { key: 'action:skip-race-day', label: 'Skip to race day', hint: 'Fast-forward to the next race', icon: <FastForward size={16} strokeWidth={1.5} />, disabled: !canAdvance, keywords: 'advance fast forward',
-        run: async () => { await onSkipToRaceDay(); if (!onSimulate) await refreshAfterSimulate(); } },
+      { key: 'action:skip-race-day', label: 'Skip to race day', hint: 'Run the season clock to the next race', icon: <FastForward size={16} strokeWidth={1.5} />, disabled: !canAdvance, keywords: 'advance fast forward time calendar season clock',
+        run: () => onSkipToRaceDay() },
       { key: 'action:weekend', label: 'Go to race weekend', hint: 'Practice, qualifying and race', icon: <Flag size={16} strokeWidth={1.5} />, current: activeScreen === 'weekend', run: () => onNav('weekend') },
       { key: 'action:calendar', label: 'Open calendar', hint: 'Season schedule', icon: <CalendarDays size={16} strokeWidth={1.5} />, current: activeScreen === 'calendar', run: () => onNav('calendar') },
       { key: 'action:fia', label: 'FIA mode', hint: 'Governing body view', icon: <Shield size={16} strokeWidth={1.5} />, run: () => onNav('fia') },
+      { key: 'action:theme', label: document.documentElement.dataset.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode', hint: 'Appearance', icon: document.documentElement.dataset.theme === 'light' ? <Moon size={16} strokeWidth={1.5} /> : <Sun size={16} strokeWidth={1.5} />, keywords: 'theme appearance dark light colour color',
+        run: () => { window.dispatchEvent(new Event('f1p-theme-toggle')); } },
       { key: 'action:logout', label: 'Log out', hint: 'Sign out of F1P', icon: <LogOut size={16} strokeWidth={1.5} />, keywords: 'sign out', run: () => onLogout() },
     ];
     // "FIA mode" is both a nav screen and a quick action — list it once, as an action.

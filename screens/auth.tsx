@@ -3,29 +3,68 @@ import { renderSetup } from "./setup.tsx";
 import { renderDashboard } from "./dashboard.tsx";
 import { signUpUser, loginUser, getCurrentUserSession, loadUserGameState } from "../lib/supabaseApi.js";
 import { hydrateState, state } from "../state.js";
-import { loadGame } from "../utils/storage.js";
 import { renderToAppRoot } from "../utils/reactRoot.tsx";
 import { HUB, glassCard, btn, btnClass, pageTitle, pageSubtitle } from "../components/HubLayout.tsx";
+
+/**
+ * Load the player's save and open the right screen. A failed load never falls
+ * through to new-team setup: that would let the next sync overwrite the real
+ * cloud save.
+ */
+async function loadSaveAndRoute(root: HTMLElement) {
+  const { data, status, error } = await loadUserGameState();
+  if (status === 'failed') {
+    renderSaveLoadError(root, typeof error === 'string' ? error : 'The save server could not be reached.');
+    return;
+  }
+  if (data && data.game_data) {
+    hydrateState(data.game_data);
+    if (state.team) {
+      renderDashboard(root);
+      return;
+    }
+  }
+  renderSetup(root);
+}
 
 export async function checkAuthAndRoute(root: HTMLElement) {
   try {
     const { session } = await getCurrentUserSession();
     if (session) {
-      const { data } = await loadUserGameState();
-      if (data && data.game_data) {
-        hydrateState(data.game_data);
-        if (state.team) {
-          renderDashboard(root);
-          return;
-        }
-      }
-      renderSetup(root);
+      await loadSaveAndRoute(root);
     } else {
       renderAuth(root);
     }
   } catch (err) {
     renderAuth(root);
   }
+}
+
+function renderSaveLoadError(root: HTMLElement, detail: string) {
+  const SaveLoadError = () => {
+    const [retrying, setRetrying] = useState(false);
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: HUB.bg, padding: '16px' }}>
+        <div role="alert" style={{ ...glassCard(), maxWidth: '440px', width: '100%' }}>
+          {pageTitle('Save unavailable')}
+          <p style={{ color: HUB.textSecondary, fontFamily: HUB.fontRegular, fontSize: '14px', lineHeight: 1.5, margin: '12px 0 8px' }}>
+            Your career save couldn't be loaded, so nothing has been changed. Starting a new team now could overwrite it.
+          </p>
+          <p style={{ color: HUB.textMuted, fontFamily: HUB.fontRegular, fontSize: '12px', margin: '0 0 20px' }}>{detail}</p>
+          <button
+            type="button"
+            className={btnClass('primary')}
+            style={btn('primary', 'md')}
+            disabled={retrying}
+            onClick={async () => { setRetrying(true); await loadSaveAndRoute(root); }}
+          >
+            {retrying ? 'Retrying…' : 'Try again'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+  renderToAppRoot(root, <SaveLoadError />);
 }
 
 export function renderAuth(root: HTMLElement) {
@@ -47,21 +86,12 @@ export function renderAuth(root: HTMLElement) {
         if (mode === 'login') {
           const { error } = await loginUser(email, password);
           if (error) throw error;
-          
-          const { data } = await loadUserGameState();
-          if (data && data.game_data) {
-            hydrateState(data.game_data);
-            if (state.team) {
-              renderDashboard(root);
-            } else {
-              renderSetup(root);
-            }
-          } else {
-            renderSetup(root);
-          }
+          await loadSaveAndRoute(root);
         } else {
           const { error } = await signUpUser(email, password, username || 'Principal');
           if (error) throw error;
+          // Confirms the new account has no cloud save yet, which unlocks cloud writes.
+          await loadUserGameState();
           renderSetup(root);
         }
       } catch(err: any) {
@@ -70,17 +100,9 @@ export function renderAuth(root: HTMLElement) {
       }
     };
 
-    const handlePlayOffline = () => {
+    const handlePlayOffline = async () => {
       localStorage.setItem("f1-play-offline", "true");
-      const localData = loadGame();
-      if (localData) {
-        hydrateState(localData);
-        if (state.team) {
-          renderDashboard(root);
-          return;
-        }
-      }
-      renderSetup(root);
+      await loadSaveAndRoute(root);
     };
 
     const inputStyle = {
@@ -119,7 +141,7 @@ export function renderAuth(root: HTMLElement) {
       <div style={{
         backgroundColor: HUB.bg,
         color: HUB.textPrimary,
-        minHeight: '100vh',
+        minHeight: 'calc(100*var(--vh))',
         fontFamily: HUB.fontRegular,
         position: 'relative',
         display: 'flex',

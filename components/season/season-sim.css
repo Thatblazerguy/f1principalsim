@@ -1,0 +1,207 @@
+/* Season clock: advance-time panel, timeline strip, newswire, race-weekend arrival. Prefix: ssim- */
+
+.ssim-root {
+  position: fixed; inset: 0; z-index: 320; display: flex; align-items: center; justify-content: center;
+  padding: 24px; box-sizing: border-box;
+  --ev-race: #E10600; --ev-quali: rgba(225, 6, 0, 0.6); --ev-practice: rgba(225, 6, 0, 0.38);
+  --ev-development: #4a8fe0; --ev-factory: #45b5b0; --ev-contract: #d9a43a; --ev-market: #a1a1a6;
+  --ev-sponsor: #4cc38a; --ev-scouting: #a98be8; --ev-board: #ededed; --ev-weather: #8fbbe8; --ev-rival: #85858b;
+  --ssim-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+:root[data-theme="light"] .ssim-root { --ev-board: #141416; --ev-market: #66666c; --ev-rival: #85858b; --ev-contract: #a87a1a; --ev-sponsor: #17804f; }
+.ssim-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+
+.ssim-panel {
+  position: relative; width: min(1120px, 100%); max-height: calc(100 * var(--vh, 1vh) - 48px);
+  display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;
+  background: var(--hub-surf); color: var(--hub-t1); font-family: 'Formula1-Regular', sans-serif;
+  border: 1px solid rgba(var(--ink), 0.1); border-radius: 18px;
+  box-shadow: 0 32px 96px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.ssim-panel::before { /* red pinstripe — the pit-wall cue */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, #E10600 0, #E10600 96px, rgba(225, 6, 0, 0.25) 96px, transparent 55%);
+  z-index: 2; pointer-events: none;
+}
+.ssim-clock { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+
+/* Header */
+.ssim-head { display: grid; grid-template-columns: 1fr auto auto; align-items: end; gap: 24px; padding: 24px 24px 18px; position: relative; }
+.ssim-kicker { display: block; font-size: 12px; color: var(--hub-t3); margin-bottom: 6px; }
+.ssim-date { position: relative; height: 44px; overflow: hidden; }
+.ssim-date-main { position: absolute; left: 0; top: 0; white-space: nowrap; font: 400 36px/44px 'Formula1-Wide', sans-serif; text-transform: uppercase; font-variant-numeric: tabular-nums; color: var(--hub-t1); }
+.ssim-date-main b { font-weight: 400; color: var(--hub-red-ink); }
+.ssim-sub { display: block; font-size: 13px; color: var(--hub-t2); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.ssim-head-next { text-align: right; padding-right: 48px; }
+.ssim-next-name { display: block; font: 400 18px/1.2 'Formula1-Bold', sans-serif; text-transform: uppercase; }
+.ssim-next-name em { font-style: normal; color: var(--hub-t3); font-size: 13px; }
+.ssim-countdown { display: block; font-size: 13px; color: var(--hub-t2); margin-top: 4px; }
+.ssim-countdown b { font: 400 15px 'Formula1-Bold', sans-serif; color: var(--hub-t1); font-variant-numeric: tabular-nums; }
+.ssim-close { position: absolute !important; top: 14px; right: 14px; z-index: 3; }
+
+/* Timeline strip */
+.ssim-strip-wrap { border-top: 1px solid rgba(var(--ink), 0.08); border-bottom: 1px solid rgba(var(--ink), 0.08); background: rgba(var(--ink), 0.015); }
+.ssim-strip {
+  display: flex; gap: 2px; overflow-x: auto; padding: 10px 24px 12px; scroll-padding: 24px;
+  scrollbar-width: none; overscroll-behavior-x: contain; mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 40px), transparent);
+}
+.ssim-strip::-webkit-scrollbar { display: none; }
+.ssim-day {
+  position: relative; flex: 0 0 42px; height: 88px; padding: 18px 0 6px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--hub-t2);
+  font: inherit; cursor: pointer; transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+.ssim-day:hover { background: rgba(var(--ink), 0.04); }
+.ssim-day:focus-visible { outline: 2px solid rgba(var(--ink), 0.4); outline-offset: -2px; }
+.ssim-day.is-focus { border-color: rgba(var(--ink), 0.22); }
+.ssim-day.is-past { color: var(--hub-t3); opacity: 0.5; }
+.ssim-month { position: absolute; top: 2px; left: 4px; font: 400 10px 'Formula1-Bold', sans-serif; text-transform: uppercase; color: var(--hub-t3); letter-spacing: 0.02em; }
+.ssim-wd { font-size: 11px; color: var(--hub-t3); }
+.ssim-dn { font: 400 16px 'Formula1-Bold', sans-serif; font-variant-numeric: tabular-nums; color: inherit; }
+.ssim-marks { display: flex; gap: 2px; height: 4px; margin-top: 4px; }
+.ssim-marks i { display: block; width: 8px; height: 3px; border-radius: 2px; }
+.ssim-kind { margin-top: auto; font: 400 10px 'Formula1-Bold', sans-serif; text-transform: uppercase; color: var(--hub-red-ink); height: 12px; }
+
+/* Weekend band: practice → qualifying → race reads as one block */
+.ssim-day.k-practice, .ssim-day.k-qualifying, .ssim-day.k-race { background: rgba(225, 6, 0, 0.06); color: var(--hub-t1); }
+.ssim-day.k-practice { border-radius: 8px 2px 2px 8px; }
+.ssim-day.k-qualifying { border-radius: 2px; background: rgba(225, 6, 0, 0.09); }
+.ssim-day.k-race { border-radius: 2px 8px 8px 2px; background: rgba(225, 6, 0, 0.16); }
+.ssim-day.k-race .ssim-dn { color: var(--hub-red-ink); }
+.ssim-day.k-practice .ssim-kind { color: var(--hub-t3); }
+.ssim-day.k-qualifying .ssim-kind { color: var(--hub-t2); }
+
+.ssim-day.is-today { color: var(--hub-t1); opacity: 1; }
+.ssim-cursor {
+  position: absolute; inset: -1px; border-radius: 8px; border: 1px solid rgba(var(--ink), 0.5);
+  box-shadow: inset 0 2px 0 #E10600; pointer-events: none;
+}
+.ssim-pulse { position: absolute; left: 50%; top: 6px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: #E10600; animation: ssim-pulse 900ms var(--ssim-ease) infinite; }
+@keyframes ssim-pulse { 0% { box-shadow: 0 0 0 0 rgba(225, 6, 0, 0.6); } 100% { box-shadow: 0 0 0 6px rgba(225, 6, 0, 0); } }
+
+.ssim-strip-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px 12px; flex-wrap: wrap; }
+.ssim-focus { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 18px; font-size: 12px; color: var(--hub-t2); }
+.ssim-focus-date { font-family: 'Formula1-Bold', sans-serif; color: var(--hub-t1); }
+.ssim-focus-ev { display: inline-flex; align-items: center; gap: 6px; }
+.ssim-focus-ev i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.ssim-focus-ev.is-quiet { color: var(--hub-t3); }
+.ssim-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; margin: 0; padding: 0; font-size: 11px; color: var(--hub-t3); }
+.ssim-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.ssim-legend i { width: 8px; height: 3px; border-radius: 2px; display: inline-block; }
+
+/* Controls */
+.ssim-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid rgba(var(--ink), 0.08); min-height: 72px; box-sizing: border-box; }
+.ssim-quick { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: 1; }
+.ssim-quick-set { display: flex; gap: 6px; flex-wrap: wrap; margin-right: auto; }
+.ssim-running { flex: 1; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 8px 20px; align-items: center; }
+.ssim-progress-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--hub-t2); }
+.ssim-progress-row b { font-weight: 400; font-family: 'Formula1-Bold', sans-serif; color: var(--hub-t1); }
+.ssim-run-count { font-variant-numeric: tabular-nums; color: var(--hub-t3); }
+.ssim-progress { grid-column: 1; position: relative; height: 3px; border-radius: 3px; background: rgba(var(--ink), 0.08); overflow: hidden; }
+.ssim-progress > span { position: absolute; inset: 0; background: #E10600; transform-origin: 0 50%; transform: scaleX(0); border-radius: 3px; }
+.ssim-progress-sheen { position: absolute; top: 0; bottom: 0; width: 80px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent); animation: ssim-sheen 1.4s linear infinite; }
+@keyframes ssim-sheen { from { transform: translateX(-80px); } to { transform: translateX(1100px); } }
+.ssim-run-actions { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 6px; }
+.ssim-pace { display: inline-flex; padding: 2px; border-radius: 999px; background: rgba(var(--ink), 0.05); flex-shrink: 0; }
+.ssim-pace button { height: 28px; padding: 0 12px; border: none; border-radius: 999px; background: transparent; color: var(--hub-t3); font: 12px 'Formula1-Regular', sans-serif; cursor: pointer; transition: background-color 150ms, color 150ms; }
+.ssim-pace button.is-on { background: var(--hub-raise); color: var(--hub-t1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.ssim-pace button:focus-visible { outline: 2px solid rgba(var(--ink), 0.4); outline-offset: 1px; }
+
+/* Body: newswire + coming up */
+.ssim-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); min-height: 0; flex: 1; }
+.ssim-feed, .ssim-up { padding: 18px 24px 24px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; max-height: 380px; }
+.ssim-up { border-left: 1px solid rgba(var(--ink), 0.08); }
+.ssim-h { margin: 0 0 12px; font: 400 14px 'Formula1-Bold', sans-serif; color: var(--hub-t1); }
+.ssim-empty { margin: 0; font-size: 13px; color: var(--hub-t3); line-height: 1.5; }
+.ssim-feed-list, .ssim-up-list { list-style: none; margin: 0; padding: 0; }
+.ssim-item { position: relative; padding: 10px 12px 10px 16px; border-radius: 10px; margin-bottom: 4px; transition: background-color 600ms; }
+.ssim-item.is-fresh { background: rgba(var(--ink), 0.035); }
+.ssim-item.is-fresh.is-key { background: rgba(225, 6, 0, 0.06); }
+.ssim-bar { position: absolute; left: 4px; top: 12px; bottom: 12px; width: 2px; border-radius: 2px; }
+.ssim-item-meta { display: flex; gap: 10px; font-size: 11px; color: var(--hub-t3); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.ssim-tag { font-family: 'Formula1-Bold', sans-serif; }
+.ssim-item-title { margin: 0; font-size: 13px; line-height: 1.4; color: var(--hub-t1); }
+.ssim-item-detail { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--hub-t2); }
+
+.ssim-up-list li { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: start; padding: 9px 0; border-top: 1px solid rgba(var(--ink), 0.06); }
+.ssim-up-list li:first-child { border-top: none; padding-top: 2px; }
+.ssim-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; display: block; }
+.ssim-up-title { margin: 0; font-size: 13px; color: var(--hub-t1); line-height: 1.35; }
+.ssim-up-detail { margin: 2px 0 0; font-size: 12px; color: var(--hub-t3); line-height: 1.4; }
+.ssim-up-in { font: 400 12px 'Formula1-Bold', sans-serif; color: var(--hub-t2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ssim-up-list li.is-race .ssim-up-title { font-family: 'Formula1-Bold', sans-serif; }
+.ssim-up-list li.is-race .ssim-up-in { color: var(--hub-red-ink); }
+
+/* Event-type colour, shared by every marker */
+[data-type="race"]        { --c: var(--ev-race); }
+[data-type="qualifying"]  { --c: var(--ev-quali); }
+[data-type="practice"]    { --c: var(--ev-practice); }
+[data-type="development"] { --c: var(--ev-development); }
+[data-type="factory"]     { --c: var(--ev-factory); }
+[data-type="contract"]    { --c: var(--ev-contract); }
+[data-type="market"]      { --c: var(--ev-market); }
+[data-type="sponsor"]     { --c: var(--ev-sponsor); }
+[data-type="scouting"]    { --c: var(--ev-scouting); }
+[data-type="board"]       { --c: var(--ev-board); }
+[data-type="weather"]     { --c: var(--ev-weather); }
+[data-type="rival"]       { --c: var(--ev-rival); }
+.ssim-root i[data-type], .ssim-bar[data-type], .ssim-dot[data-type] { background: var(--c, var(--hub-t3)); }
+.ssim-tag[data-type] { color: var(--c, var(--hub-t3)); }
+
+/* Race weekend arrival */
+.ssim-arrival { position: relative; min-height: min(640px, calc(100 * var(--vh, 1vh) - 48px)); overflow: hidden; display: flex; background: radial-gradient(120% 80% at 85% 20%, rgba(225, 6, 0, 0.12), transparent 60%), var(--hub-surf); }
+.ssim-arrival-wipe { position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: #E10600; transform-origin: 0 50%; z-index: 1; }
+.ssim-arrival-track { position: absolute; right: -4%; top: 50%; width: 58%; height: 120%; transform: translateY(-50%); pointer-events: none; }
+.ssim-arrival-track path { stroke: rgba(var(--ink), 0.16); }
+.ssim-arrival-inner { position: relative; z-index: 2; padding: 40px 40px 32px; display: flex; flex-direction: column; flex: 1; box-sizing: border-box; }
+.ssim-arrival-kicker { color: var(--hub-red-ink); font-family: 'Formula1-Bold', sans-serif; margin-bottom: 12px; }
+.ssim-arrival-title { margin: 0; font: 400 clamp(36px, 6vw, 72px)/0.98 'Formula1-Wide', sans-serif; text-transform: uppercase; color: var(--hub-t1); max-width: 14ch; }
+.ssim-arrival-word { display: inline-block; overflow: hidden; vertical-align: top; margin-right: 0.25em; padding-bottom: 0.04em; }
+.ssim-arrival-word > span { display: inline-block; }
+.ssim-arrival-title em { display: block; font-style: normal; font: 400 clamp(16px, 1.6vw, 20px) 'Formula1-Bold', sans-serif; color: var(--hub-t2); margin-top: 10px; }
+.ssim-arrival-sub { margin: 10px 0 0; font-size: 14px; color: var(--hub-t2); }
+.ssim-arrival-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 32px; max-width: 760px; background: rgba(var(--ink), 0.08); border: 1px solid rgba(var(--ink), 0.08); border-radius: 12px; overflow: hidden; }
+.ssim-brief { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: var(--hub-surf); min-width: 0; }
+.ssim-k { display: block; font-size: 12px; color: var(--hub-t3); margin-bottom: 2px; }
+.ssim-v { font: 400 22px/1.15 'Formula1-Bold', sans-serif; color: var(--hub-t1); font-variant-numeric: tabular-nums; }
+.ssim-v small { font: 400 13px 'Formula1-Regular', sans-serif; color: var(--hub-t2); }
+.ssim-v-icon { display: inline-flex; align-items: center; gap: 8px; }
+.ssim-v-text { font-size: 15px; line-height: 1.3; }
+.ssim-s { font-size: 12px; color: var(--hub-t2); line-height: 1.4; }
+.ssim-driver { font-size: 13px; color: var(--hub-t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ssim-driver b { font-weight: 400; font-family: 'Formula1-Bold', sans-serif; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.ssim-driver small { color: var(--hub-t3); font-size: 12px; margin-left: 4px; }
+.ssim-changes { margin-top: 20px; max-width: 760px; }
+.ssim-changes ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ssim-changes li { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--hub-t2); line-height: 1.4; }
+.ssim-changes li i { width: 8px; height: 3px; border-radius: 2px; flex-shrink: 0; position: relative; top: -2px; }
+.ssim-changes li b { font-weight: 400; color: var(--hub-t1); }
+.ssim-arrival-cta { display: flex; gap: 8px; margin-top: auto; padding-top: 32px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .ssim-root { padding: 0; align-items: stretch; }
+  .ssim-panel { max-height: none; height: calc(100 * var(--vh, 1vh)); border-radius: 0; border: none; }
+  .ssim-head { grid-template-columns: 1fr; gap: 12px; padding: 20px 16px 14px; }
+  .ssim-head-next { text-align: left; padding-right: 0; }
+  .ssim-date { height: 30px; }
+  .ssim-date-main { font-size: 20px; line-height: 30px; }
+  .ssim-clock { overflow-y: auto; overscroll-behavior: contain; }
+  .ssim-clock > * { flex-shrink: 0; }
+  .ssim-strip { padding: 10px 16px 12px; }
+  .ssim-strip-foot { padding: 0 16px 12px; }
+  .ssim-controls { flex-direction: column; align-items: stretch; padding: 14px 16px; }
+  .ssim-running { grid-template-columns: 1fr; }
+  .ssim-run-actions { grid-column: 1; grid-row: auto; }
+  .ssim-body { grid-template-columns: 1fr; flex: none; min-height: auto; }
+  .ssim-feed, .ssim-up { max-height: none; overflow: visible; padding: 16px; }
+  .ssim-up { border-left: none; border-top: 1px solid rgba(var(--ink), 0.08); }
+  .ssim-arrival-inner { padding: 32px 16px 24px; }
+  .ssim-arrival-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ssim-arrival-track { width: 100%; opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ssim-pulse, .ssim-progress-sheen { animation: none; display: none; }
+  .ssim-item { transition: none; }
+}

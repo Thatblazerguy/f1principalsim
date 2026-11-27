@@ -136,7 +136,7 @@ export function renderSetup(root: HTMLElement) {
 
     if (setupStep === 'season') {
       return (
-        <div style={{ backgroundColor: HUB.bg, color: HUB.textPrimary, minHeight: '100vh', fontFamily: HUB.fontRegular, position: 'relative', overflowY: 'auto' }}>
+        <div style={{ backgroundColor: HUB.bg, color: HUB.textPrimary, minHeight: 'calc(100*var(--vh))', fontFamily: HUB.fontRegular, position: 'relative', overflowY: 'auto' }}>
            <SeasonSetup 
               onComplete={handleCreate}
            />
@@ -145,7 +145,7 @@ export function renderSetup(root: HTMLElement) {
     }
 
     return (
-      <div style={{ backgroundColor: HUB.bg, color: HUB.textPrimary, minHeight: '100vh', fontFamily: HUB.fontRegular, position: 'relative', overflowY: 'auto', padding: '48px 24px' }}>
+      <div style={{ backgroundColor: HUB.bg, color: HUB.textPrimary, minHeight: 'calc(100*var(--vh))', fontFamily: HUB.fontRegular, position: 'relative', overflowY: 'auto', padding: '48px 24px' }}>
          <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
            
            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>

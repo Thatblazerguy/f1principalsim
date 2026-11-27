@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useRef } from 'react';
+import { useCanvasResizeNudge } from '../../components/useCanvasResizeNudge';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer, MeshReflectorMaterial, Html, Text, Sparkles, Line, useGLTF, PerformanceMonitor } from '@react-three/drei';
@@ -6,7 +7,7 @@ import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { ProceduralCar, ANCHORS } from './Car';
 import { story, smooth, window01, lerp, local, ACCENT, TYRE, CAR_MODEL_URL } from './story';
 import { getTrackPath } from '../../data/realTrackLayouts.js';
-import wideFont from '../../Formula1-Wide_web_0.ttf?url';
+import wideFont from '../../assets/fonts/Formula1-Wide_web_0.ttf?url';
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Camera path. Each key is a story position t (section index + progress).
@@ -526,8 +527,10 @@ function World({ mobile }: { mobile: boolean }) {
 export default function Scene({ onReady }: { onReady: () => void }) {
   const mobile = story.mobile;
   const [dpr, setDpr] = React.useState<number>(mobile ? 1.25 : 1.75);
+  useCanvasResizeNudge();
   return (
     <Canvas
+      resize={{ offsetSize: true }}
       shadows={!mobile}
       dpr={dpr}
       gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}

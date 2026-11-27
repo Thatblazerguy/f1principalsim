@@ -82,10 +82,10 @@ export function gaussian(rng = Math.random) {
 export function getOvertakingDifficulty(track) {
   const t = `${track?.name || ""} ${track?.circuit || ""}`.toLowerCase();
   if (t.includes("monaco")) return 0.95;
-  if (t.includes("singapore") || t.includes("marina")) return 0.75;
+  if (t.includes("singapore") || t.includes("marina bay")) return 0.75; // not "Yas Marina"
   if (t.includes("hungar") || t.includes("zandvoort") || t.includes("dutch")) return 0.7;
   if (t.includes("imola") || t.includes("madrid") || t.includes("suzuka") || t.includes("japan")) return 0.6;
-  if (t.includes("monza") || t.includes("bahrain") || t.includes("spa") || t.includes("baku") ||
+  if (t.includes("monza") || t.includes("bahrain") || t.includes("francorchamps") || t.includes("belgian") || t.includes("baku") ||
       t.includes("jeddah") || t.includes("saudi") || t.includes("vegas") || t.includes("shanghai") ||
       t.includes("chin") || t.includes("interlagos") || t.includes("paulo")) return 0.3;
   return 0.5;

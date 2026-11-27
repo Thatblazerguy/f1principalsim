@@ -7,6 +7,7 @@ import {
   BUDGET_ALLOCATION_LABELS,
   FACILITY_CATALOG,
   applyEmergencyFinanceAction,
+  getEmergencyActionAvailability,
   ensureFinanceState,
   getDriverCommercialValue,
   getFinanceAdvisorNotes,
@@ -63,7 +64,11 @@ function FinanceDashboard({ root }: { root: HTMLElement }) {
   };
 
   const handleEmergencyAction = async (actionId: string, label: string) => {
-    applyEmergencyFinanceAction(state, actionId);
+    const result = applyEmergencyFinanceAction(state, actionId);
+    if (!result.ok) {
+      setFlashMessage(`${label} unavailable: ${result.reason}`);
+      return;
+    }
     await syncGame();
     setFlashMessage(`${label} done. The short-term cash gain carries a long-term cost`);
   };
@@ -266,12 +271,16 @@ function FinanceDashboard({ root }: { root: HTMLElement }) {
               ['minority_sale', 'Sell minority stake', Landmark],
               ['emergency_sponsor', 'Emergency sponsor deal', CircleDollarSign],
               ['staff_cuts', 'Reduce staff', Users],
-            ].map(([id, label, Icon]) => (
-              <button key={id as string} onClick={() => handleEmergencyAction(id as string, label as string)} className={btnClass('secondary')} style={btn('secondary', 'md', { justifyContent:'flex-start' })}>
-                <Icon size={16} strokeWidth={1.5} color={HUB.textMuted} />
-                {label as string}
-              </button>
-            ))}
+            ].map(([id, label, Icon]) => {
+              const availability = getEmergencyActionAvailability(state, id as string);
+              return (
+                <button key={id as string} onClick={() => handleEmergencyAction(id as string, label as string)} disabled={!availability.available} title={availability.reason || undefined} className={btnClass('secondary')} style={btn('secondary', 'md', { justifyContent:'flex-start', ...(availability.available ? {} : { opacity: 0.5, cursor: 'not-allowed' }) })}>
+                  <Icon size={16} strokeWidth={1.5} color={HUB.textMuted} />
+                  {label as string}
+                  {!availability.available && <span style={{marginLeft:'auto', fontSize:'11px', color:HUB.textMuted}}>Unavailable</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

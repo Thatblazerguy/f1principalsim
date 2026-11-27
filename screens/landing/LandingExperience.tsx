@@ -170,12 +170,13 @@ export function LandingExperience({ onEnter, onFIA }: { onEnter: () => void; onF
       ScrollTrigger.create({
         trigger: root.current, start: 'top top', end: 'bottom bottom',
         onUpdate: () => {
-          const y = window.scrollY;
           let t = 0;
           const vh = window.innerHeight;
-          // each section's story completes when its sticky frame releases; the last 100vh holds while it scrolls away
+          // each section's story completes when its sticky frame releases; the last screen holds while it scrolls away.
+          // Screen-space rects keep this right under page zoom.
           sections.forEach((s, i) => {
-            if (y >= s.offsetTop) t = i + Math.min(1, (y - s.offsetTop) / Math.max(1, s.offsetHeight - vh));
+            const r = s.getBoundingClientRect();
+            if (r.top <= 0) t = i + Math.min(1, -r.top / Math.max(1, r.height - vh));
           });
           story.t = t;
           // black cut between the launch and the sunset
@@ -271,7 +272,7 @@ export function LandingExperience({ onEnter, onFIA }: { onEnter: () => void; onF
 
       <main>
         {/* 1 · Hero */}
-        <section id="lx-hero" className="lx-section" style={{ height: '220vh' }}>
+        <section id="lx-hero" className="lx-section" style={{ height: 'calc(220*var(--vh))' }}>
           <div className="lx-sticky lx-hero">
             <div className="lx-copy lx-reveal" data-start="top bottom" data-end="35% top">
               <p className="lx-kicker lx-fade">F1P · Team principal simulation</p>
@@ -288,7 +289,7 @@ export function LandingExperience({ onEnter, onFIA }: { onEnter: () => void; onF
         </section>
 
         {/* 2 · Engineering */}
-        <section id="lx-engineering" className="lx-section" style={{ height: '520vh' }}>
+        <section id="lx-engineering" className="lx-section" style={{ height: 'calc(520*var(--vh))' }}>
           <div className="lx-sticky">
             <div className="lx-copy lx-copy-low lx-reveal" data-start="top 60%" data-end="bottom 40%">
               <p className="lx-kicker lx-fade">The engineering behind speed</p>
@@ -302,7 +303,7 @@ export function LandingExperience({ onEnter, onFIA }: { onEnter: () => void; onF
         </section>
 
         {/* 3 · Team */}
-        <section id="lx-team" className="lx-section" style={{ height: '300vh' }}>
+        <section id="lx-team" className="lx-section" style={{ height: 'calc(300*var(--vh))' }}>
           <div className="lx-sticky">
             <div className="lx-copy lx-copy-low lx-reveal" data-start="top 60%" data-end="bottom 40%">
               <p className="lx-kicker lx-fade">Build your championship team</p>
@@ -316,7 +317,7 @@ export function LandingExperience({ onEnter, onFIA }: { onEnter: () => void; onF
         </section>
 
         {/* 4 · Strategy */}
-        <section id="lx-strategy" className="lx-section" style={{ height: '360vh' }}>
+        <section id="lx-strategy" className="lx-section" style={{ height: 'calc(360*var(--vh))' }}>
           <div className="lx-sticky lx-strategy">
             <div className="lx-copy lx-reveal" data-start="top 50%" data-end="bottom 50%">
               <p className="lx-kicker lx-fade">Strategy is everything · Silverstone</p>
@@ -331,7 +332,7 @@ export function LandingExperience({ onEnter, onFIA }: { onEnter: () => void; onF
         </section>
 
         {/* 5 · Race weekend */}
-        <section id="lx-race" className="lx-section" style={{ height: '320vh' }}>
+        <section id="lx-race" className="lx-section" style={{ height: 'calc(320*var(--vh))' }}>
           <div className="lx-sticky">
             <div className="lx-copy lx-copy-low lx-reveal" data-start="top 60%" data-end="70% 40%">
               <p className="lx-kicker lx-fade">Race weekend · Grid</p>
@@ -344,7 +345,7 @@ export function LandingExperience({ onEnter, onFIA }: { onEnter: () => void; onF
         </section>
 
         {/* 6 · Legacy */}
-        <section id="lx-legacy" className="lx-section" style={{ height: '200vh' }}>
+        <section id="lx-legacy" className="lx-section" style={{ height: 'calc(200*var(--vh))' }}>
           <div className="lx-sticky lx-legacy">
             <div className="lx-copy lx-copy-center lx-reveal" data-start="top 40%" data-end="bottom top">
               <p className="lx-kicker lx-fade">Your legacy begins</p>

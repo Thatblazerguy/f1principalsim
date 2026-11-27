@@ -1,13 +1,26 @@
-import { getTeamLapCredit, getTeamPerformanceBonus } from "../utils/simTeam.js";
-import {
-  DRIVER_QUALI_COEFF,
-  QUALI_NOISE_BASE,
-  QUALI_NOISE_RANGE,
-  QUALI_PERF_BONUS_COEFF,
-  WET_SPECIALIST_BONUS,
-  WET_SPECIALIST_PENALTY,
-  getTrackWetProbability,
-} from "../utils/raceBalance.js";
+/**
+ * qualifying.js
+ * ─────────────
+ * Qualifying on the shared pace model (game/paceModel.js), the same one both
+ * race engines use, so the car is counted once and a grid lines up with race
+ * pace. Before, qualifying multiplied the whole lap by a weekend modifier that
+ * already contained the car rating, so the car counted twice and the fastest
+ * team took almost every pole.
+ *
+ * A qualifying lap = the car's race-pace profile (car, driver, circuit fit,
+ * setup quality, form, PU health, wet skill) on low fuel and fresh softs (or
+ * intermediates in the wet) + the driver's one-lap skill relative to race
+ * pace + any engine qualifying boost + lap-to-lap noise from consistency.
+ */
+
+import { state } from "../state.js";
+import { buildPaceProfile, expectedLapTime, gaussian, clamp, DRIVER_SECONDS_PER_POINT } from "./paceModel.js";
+import { makeRng, newRaceSeed, getRaceRules, decideRaceWeather } from "./raceEvents.js";
+import { DRIVER_QUALI_COEFF } from "../utils/raceBalance.js";
+
+/** One-lap noise (s): consistent drivers repeat their laps more closely. */
+const QUALI_SIGMA_BASE = 0.12;
+const QUALI_SIGMA_PER_POINT = 0.006; // per point of consistency below 100
 
 function getQualifyingBoost(team) {
   const effects = team.engineProfile?.effects || {};
@@ -15,75 +28,43 @@ function getQualifyingBoost(team) {
 }
 
 /**
- * Per-driver qualifying noise.
- * Wider spread than before — grid can shuffle by 2-4 places for midfield.
- * Low consistency drivers: up to ±0.45s noise; top drivers: ±0.15s.
- * This is symmetric so it can both hurt AND help any driver.
+ * @param {Array}  teams          all teams with their drivers
+ * @param {object} track          calendar round
+ * @param {object} weekendContext per-driver setup/form for the weekend
+ * @param {object} [options]      { seed, isWet }
+ * @returns {{ grid: Array, isWet: boolean, seed: number }}
  */
-function qualiNoise(driver) {
-  const c = driver.consistency ?? 80;
-  const spread = QUALI_NOISE_BASE + ((100 - c) / 100) * QUALI_NOISE_RANGE;
-  // Gaussian-ish approximation via summing two uniforms
-  const u1 = Math.random() - 0.5;
-  const u2 = Math.random() - 0.5;
-  return (u1 + u2) * spread; // range ≈ ±spread
-}
-
-
-
-/**
- * simulateQualifying
- *
- * v2 changes:
- *  - Wider symmetrical noise (QUALI_NOISE_BASE + range) allows real grid shuffles
- *  - Driver form (last 5 races) influences qualifier performance
- *  - Weather (isWet) inverts the order partially — wet specialists move forward
- *  - Weekend confidence factor adds session-specific unpredictability
- *  - Qualifying boost from engine profiles preserved
- *
- * @param {Array}  teams        All teams with their drivers
- * @param {object} track        Calendar track entry
- * @param {object} weekendContext Pre-calculated performance context
- * @returns {{ grid: Array, isWet: boolean }}
- */
-export function simulateQualifying(teams, track, weekendContext) {
-  // Determine conditions
-  const wetChance = getTrackWetProbability(track.name || track.circuit || "");
-  const isWet = Math.random() < wetChance;
+export function simulateQualifying(teams, track, weekendContext, options = {}) {
+  const seed = options.seed ?? newRaceSeed();
+  const rng = makeRng(seed);
+  const rules = getRaceRules(state);
+  const isWet = typeof options.isWet === "boolean"
+    ? options.isWet
+    : decideRaceWeather(track, null, rules, rng);
+  const totalLaps = track.laps || 57;
 
   const grid = teams
     .flatMap((t) =>
       t.drivers.map((d) => {
-        // Base lap from driver quali skill + team performance
-        const baseLap =
-          track.baseTime -
-          (d.quali + getQualifyingBoost(t)) * DRIVER_QUALI_COEFF -
-          getTeamLapCredit(t, "quali", d.name) -
-          getTeamPerformanceBonus(t) * QUALI_PERF_BONUS_COEFF;
-
-        // Form modifier from weekend context
-        const finalModifier = weekendContext?.drivers?.[d.name]?.finalModifier ?? 1.0;
-
-        // Random lap noise (reduced in v3)
-        const noise = qualiNoise(d);
-
-        // Weather effects
-        let weatherDelta = 0;
-        if (isWet) {
-          const wetAbove85 = Math.max(0, d.wet - 85);
-          const wetBelow85 = Math.max(0, 85 - d.wet);
-          // Specialists gain lap time (negative = faster)
-          weatherDelta = -wetAbove85 * WET_SPECIALIST_BONUS
-                        + wetBelow85 * WET_SPECIALIST_PENALTY;
-        }
-
-        // Effective lap time
-        const lap = baseLap * finalModifier + noise + weatherDelta;
-
+        const profile = buildPaceProfile({ team: t, driver: d, track, isWet, weekendContext, appState: state });
+        // Low fuel, fully rubbered-in track, a fresh set of the fastest tyre
+        const base = expectedLapTime(profile, {
+          compound: isWet ? "Intermediate" : "Soft",
+          tyreAge: 1,
+          lap: totalLaps,
+          totalLaps,
+          fuelFrac: 0.05,
+        });
+        // One-lap specialists vs race-pace drivers
+        const qualiSkillDelta = -((d.quali ?? d.pace ?? 85) - profile.raceSkill) * DRIVER_SECONDS_PER_POINT;
+        const boost = -getQualifyingBoost(t) * DRIVER_QUALI_COEFF;
+        const sigma = (QUALI_SIGMA_BASE + (100 - (d.consistency ?? 85)) * QUALI_SIGMA_PER_POINT) * (isWet ? 1.8 : 1);
+        const noise = clamp(gaussian(rng) * sigma, -2.5 * sigma, 2.5 * sigma);
+        const lap = base + qualiSkillDelta + boost + noise;
         return { driver: d, team: t, lap, isWet };
       })
     )
     .sort((a, b) => a.lap - b.lap);
 
-  return { grid, isWet };
+  return { grid, isWet, seed };
 }

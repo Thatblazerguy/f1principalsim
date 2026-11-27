@@ -1,5 +1,18 @@
+import { constructorEntries, driverEntries } from "./championshipModel.js";
 import { state } from "../state.js";
 import { getCircuitProfile } from "./devProjects.js";
+import { forecastRace } from "./raceForecast.js";
+import { getTrackWetProbability } from "./raceBalance.js";
+import { getActiveDrivers } from "./teamState.js";
+import { hashString } from "../game/setup/carSetup.js";
+
+/*
+ * Race objectives are set from a Monte Carlo forecast of the Grand Prix
+ * (utils/raceForecast.js): every car's pace on this circuit, current form,
+ * weather, the grid once qualifying has run, and reliability. The targets
+ * offered, their success probabilities and their explanations all come from
+ * that forecast.
+ */
 
 // ============================================
 // UTILITIES
@@ -9,91 +22,51 @@ const average = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.lengt
 const pct = (val) => Math.round(clamp(val, 1, 99));
 
 // ============================================
-// 1. EXPECTATION SCORE CALCULATION
+// 1. INPUTS: TEAMS, WEATHER, HISTORY
 // ============================================
-export function calculateExpectationScore(team, track, currentRound = 1) {
-  const { standings, raceHistory, aiTeams } = state;
-  const allTeams = [team, ...aiTeams];
-  const teamCarOverall = team.carPerformance ||
-    (team.car.aero + team.car.engine + team.car.chassis + team.car.reliability) / 4;
-  let score = 0;
-  const factors = [];
-  const carMin = Math.min(...allTeams.map(t => t.carPerformance || 60));
-  const carMax = Math.max(...allTeams.map(t => t.carPerformance || 95));
-  const carScore = carMax > carMin ? ((teamCarOverall - carMin) / (carMax - carMin)) * 85 + 15 : 50;
-  factors.push({ weight: 40, value: carScore });
-  let constructorPos = allTeams.length;
-  if (standings.teams && Object.keys(standings.teams).length > 0) {
-    const sorted = Object.entries(standings.teams).sort(([, a], [, b]) => b - a);
-    const idx = sorted.findIndex(([name]) => name === team.name);
-    constructorPos = idx >= 0 ? idx + 1 : allTeams.length;
-  }
-  const constructorScore = 100 - ((constructorPos - 1) / Math.max(1, allTeams.length - 1)) * 85;
-  factors.push({ weight: 20, value: constructorScore });
-  let driverScore = 50;
-  if (standings.drivers && Object.keys(standings.drivers).length > 0) {
-    const allDrivers = Object.entries(standings.drivers).sort(([, a], [, b]) => b - a);
-    const teamDrivers = team.drivers.map(d => {
-      const idx = allDrivers.findIndex(([name]) => name === d.name);
-      return idx >= 0 ? idx + 1 : allDrivers.length;
-    });
-    driverScore = 100 - ((average(teamDrivers) - 1) / Math.max(1, allDrivers.length - 1)) * 85;
-  }
-  factors.push({ weight: 15, value: driverScore });
-  let recentFormScore = 50;
-  if (raceHistory && raceHistory.length > 0) {
-    const teamResults = raceHistory.slice(-5).map(race => {
-      const positions = team.drivers.map(d => {
-        const result = race.results?.find(r => r.driver === d.name || r.driver?.name === d.name);
-        return result ? (result.position || result.pos || 20) : 20;
-      });
-      return Math.min(...positions);
-    });
-    recentFormScore = clamp(100 - ((average(teamResults) - 1) / 19) * 70 + 15, 10, 100);
-  }
-  factors.push({ weight: 12, value: recentFormScore });
-  const avgDriverRating = average(team.drivers.map(d => (d.pace + d.racecraft + d.consistency) / 3));
-  factors.push({ weight: 10, value: clamp(avgDriverRating, 50, 95) });
-  let momentumScore = 50;
-  if (raceHistory && raceHistory.length >= 2) {
-    const recent = raceHistory.slice(-3);
-    const improving = recent.every((race, i) => {
-      if (i === 0) return true;
-      const prevRace = recent[i - 1];
-      const cur = Math.min(...team.drivers.map(d => race.results?.find(r => r.driver === d.name || r.driver?.name === d.name)?.position || 20));
-      const prev = Math.min(...team.drivers.map(d => prevRace.results?.find(r => r.driver === d.name || r.driver?.name === d.name)?.position || 20));
-      return cur <= prev;
-    });
-    momentumScore = improving ? 70 : 40;
-  }
-  factors.push({ weight: 8, value: momentumScore });
-  let circuitScore = 50;
-  if (track) {
-    const profile = getCircuitProfile(track.circuit || track);
-    const carSpecs = team.specs || {};
-    if (profile.type === 'Power') circuitScore = 50 + ((carSpecs.engine || 75) - 75) * 1.2;
-    else if (profile.type === 'Street') circuitScore = 50 + ((carSpecs.chassis || 75) - 75) * 1.2;
-    else if (profile.type === 'Highspeed') circuitScore = 50 + ((carSpecs.aero || 75) - 75) * 1.2;
-    else circuitScore = 50 + ((carSpecs.chassis || 75) + (carSpecs.aero || 75) - 150) * 0.6;
-  }
-  factors.push({ weight: 7, value: clamp(circuitScore, 10, 100) });
-  const totalWeight = factors.reduce((s, f) => s + f.weight, 0);
-  score = factors.reduce((s, f) => s + (f.value * f.weight / 100), 0) * (100 / totalWeight);
-  const bestCar = Math.max(...allTeams.map(t => t.carPerformance || 60));
-  if (teamCarOverall >= bestCar - 2) score += 15;
-  else if (teamCarOverall >= bestCar - 5) score += 8;
-  return clamp(Math.round(score), 5, 100);
+
+const FORECAST_SIMS = 300;
+const HOT_COUNTRIES = ["bahrain", "saudi", "qatar", "uae", "abu dhabi", "singapore", "mexico", "usa", "miami", "hungary", "spain", "brazil", "azerbaijan"];
+
+/** Teams as they'll race: the player's active drivers, flagged so engineering upgrades count. */
+function raceTeams(appState) {
+  const player = appState.team;
+  const active = (getActiveDrivers(player) || player.drivers || []).slice(0, 2);
+  return [{ ...player, drivers: active, isPlayerTeam: true }, ...(appState.aiTeams || [])];
+}
+
+/**
+ * Weekend weather. Before qualifying it's a forecast (the track's rain
+ * probability); once qualifying has run, its weather is the race weather.
+ * Temperatures are stable for a given season and round.
+ */
+export function getWeekendWeather(appState, round) {
+  const rulesOff = appState.season?.rules?.weather === false;
+  const rainChance = rulesOff ? 0 : getTrackWetProbability(`${round.name || ""} ${round.circuit || ""}`);
+  const wp = appState.weekendProgress;
+  const known = wp && wp.round === round.round && wp.qualifyingComplete && typeof wp.isWet === "boolean" ? wp.isWet : null;
+  const h = hashString(`${appState.season?.year || 1}-${round.round}-${round.circuit}`);
+  const hot = HOT_COUNTRIES.some((c) => `${round.country} ${round.name}`.toLowerCase().includes(c));
+  const air = (hot ? 27 : 19) + (h % 9);
+  const isWet = known ?? false;
+  return {
+    isWet,
+    known: known != null,
+    rainProbability: known != null ? (known ? 100 : 0) : Math.round(rainChance * 100),
+    airTemperature: isWet ? air - 6 : air,
+    trackTemperature: isWet ? air - 2 : air + 8 + ((h >> 4) % 10),
+  };
 }
 
 // ============================================
-// 2. TEAM TIER
+// 2. TEAM TIER (from the forecast)
 // ============================================
-export function getTeamTier(expectationScore) {
-  if (expectationScore >= 80) return { id: "championship-favourite", label: "Championship Favourite" };
-  if (expectationScore >= 65) return { id: "front-running", label: "Front Running Team" };
-  if (expectationScore >= 50) return { id: "upper-midfield", label: "Upper Midfield" };
-  if (expectationScore >= 35) return { id: "midfield", label: "Midfield" };
-  if (expectationScore >= 20) return { id: "lower-midfield", label: "Lower Midfield" };
+export function getTeamTier(expectedBestFinish) {
+  if (expectedBestFinish <= 2.2) return { id: "championship-favourite", label: "Race Favourite" };
+  if (expectedBestFinish <= 4.5) return { id: "front-running", label: "Front Running Team" };
+  if (expectedBestFinish <= 7.5) return { id: "upper-midfield", label: "Upper Midfield" };
+  if (expectedBestFinish <= 11) return { id: "midfield", label: "Midfield" };
+  if (expectedBestFinish <= 15) return { id: "lower-midfield", label: "Lower Midfield" };
   return { id: "backmarker", label: "Backmarker" };
 }
 
@@ -109,7 +82,7 @@ export function getChampionshipContext(team) {
     remainingRounds: (season.totalRounds || 24) - (season.round || 1) + 1
   };
   if (!standings.teams || Object.keys(standings.teams).length === 0) return context;
-  const sorted = Object.entries(standings.teams).sort(([, a], [, b]) => b - a);
+  const sorted = constructorEntries(state);
   const teamIndex = sorted.findIndex(([name]) => name === team.name);
   if (teamIndex < 0) return context;
   context.constructorPos = teamIndex + 1;
@@ -131,276 +104,272 @@ export function getChampionshipContext(team) {
   return context;
 }
 
-// ============================================
-// 4. WEATHER IMPACT
-// ============================================
 export function getWeatherImpact(isWet) {
   return { isWet, varianceMultiplier: isWet ? 1.8 : 1.0, opportunityScore: isWet ? 1.5 : 1.0, riskLevel: isWet ? "Elevated" : "Normal" };
 }
 
 // ============================================
-// 5. CIRCUIT HISTORY STATS (Learning)
+// 4. CIRCUIT HISTORY (our past results here)
 // ============================================
 export function getCircuitHistoryStats(circuitName, teamName) {
   const raceHistory = state.raceHistory || [];
-  const relevant = raceHistory.filter(r => r.circuit === circuitName || r.name?.includes((circuitName || '').split(' ')[0]));
+  const relevant = raceHistory.filter((r) => r.circuit === circuitName && r.type !== "sprint");
   if (!relevant.length) return { sampleSize: 0 };
   const finishes = [];
+  let entries = 0;
   let dnfCount = 0;
-  relevant.forEach(race => {
-    (race.results || []).filter(r => r.team === teamName || r.team?.name === teamName).forEach(r => {
-      if (r.retired || r.position > 20) dnfCount++;
-      else finishes.push(r.position || r.pos || 20);
+  relevant.forEach((race) => {
+    (race.driverResults || []).filter((r) => r.team === teamName).forEach((r) => {
+      entries++;
+      if (r.retired) dnfCount++;
+      else finishes.push(r.finishPos);
     });
   });
-  const scRaces = relevant.filter(r => r.replayData?.scLaps?.length > 0);
+  const scRaces = relevant.filter((r) => r.replayData?.scLaps?.length > 0);
   return {
     sampleSize: relevant.length,
     avgFinish: finishes.length > 0 ? Math.round(average(finishes)) : null,
     bestFinish: finishes.length > 0 ? Math.min(...finishes) : null,
-    dnfRate: Math.round((dnfCount / relevant.length) * 100),
+    dnfRate: entries ? Math.round((dnfCount / entries) * 100) : 0,
     safetyCarFrequency: Math.round((scRaces.length / relevant.length) * 100),
   };
 }
 
 // ============================================
-// 6. FINISH DISTRIBUTION
+// 5. OBJECTIVES FROM THE FORECAST
 // ============================================
-export function generateFinishDistribution(expectationScore, circuitProfile, weatherImpact, reliability, circuitHistory) {
-  const baseExpectedFinish = expectationScore >= 85 ? 1.5 : expectationScore >= 75 ? 3 : expectationScore >= 65 ? 5 :
-    expectationScore >= 55 ? 7 : expectationScore >= 45 ? 9 : expectationScore >= 35 ? 12 : expectationScore >= 25 ? 15 : 18;
-  const reliabilityFactor = reliability < 75 ? (75 - reliability) * 0.05 : 0;
-  const weatherVariance = weatherImpact.isWet ? (expectationScore < 50 ? -2 : 0.5) : 0;
-  let historyAdjust = 0;
-  if (circuitHistory?.sampleSize >= 2 && circuitHistory.avgFinish) {
-    historyAdjust = (circuitHistory.avgFinish - baseExpectedFinish) * 0.2;
+const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const ordinal = (n) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
+const riskFor = (p) => (p >= 0.65 ? "Low" : p >= 0.45 ? "Medium" : p >= 0.25 ? "High" : "Very High");
+const sponsorFor = (pos) => (pos <= 1 ? 4.5 : pos <= 3 ? 3.2 : pos <= 5 ? 2.1 : pos <= 10 ? 1.4 : 0.8);
+const champImpact = (pos) => (pos >= 1 && pos <= 10 ? `+${F1_POINTS[pos - 1]} pts` : "No points");
+
+/** Ladder of finishing targets, most ambitious first. */
+const POSITION_TARGETS = [
+  { n: 1, id: "win-race", label: "Win the race", emoji: "🏆", phrase: "won" },
+  { n: 3, id: "secure-podium", label: "Finish on the podium", emoji: "🥈", phrase: "finished on the podium" },
+  { n: 5, id: "top-5", label: "Finish in the top 5", emoji: "🎯", phrase: "finished in the top 5" },
+  { n: 8, id: "top-8", label: "Finish in the top 8", emoji: "🎯", phrase: "finished in the top 8" },
+  { n: 10, id: "score-points", label: "Score points", emoji: "✅", phrase: "scored points" },
+  { n: 13, id: "top-13", label: "Finish in the top 13", emoji: "📈", phrase: "finished in the top 13" },
+  { n: 16, id: "top-16", label: "Beat the back of the field", emoji: "📈", phrase: "finished in the top 16" },
+];
+
+/** Plain-language facts about the weekend, all computed from the forecast inputs. */
+function conditionNotes(f, weather, track, grid) {
+  const notes = [];
+  notes.push(f.paceRank === 1
+    ? `On pace we're the fastest team at ${track.circuit}.`
+    : `On pace we're ${ordinal(f.paceRank)} of ${f.teamsCount} teams at ${track.circuit}, ${f.gapToFastest.toFixed(2)}s a lap off the quickest car.`);
+  if (Math.abs(f.circuitFit) >= 0.04) {
+    notes.push(f.circuitFit < 0
+      ? `The layout suits our car (worth ${Math.abs(f.circuitFit).toFixed(2)}s a lap).`
+      : `The layout works against our car (costs ${f.circuitFit.toFixed(2)}s a lap).`);
   }
-  const expectedFinish = clamp(Math.round(baseExpectedFinish + reliabilityFactor + weatherVariance + historyAdjust), 1, 20);
-  const winProb = pct(expectationScore >= 80 ? 55 - (expectedFinish - 1) * 8 : expectationScore >= 65 ? 30 - (expectedFinish - 1) * 5 : expectationScore >= 50 ? 15 - (expectedFinish - 1) * 2 : Math.max(1, 8 - expectedFinish));
-  const podiumProb = pct(winProb * 1.6 + (expectationScore >= 65 ? 25 : 10));
-  const top5Prob = pct(podiumProb * 1.3 + 15);
-  const top10Prob = pct(Math.min(99, top5Prob + (expectedFinish <= 10 ? 20 : 10)));
+  if (weather.known && weather.isWet) notes.push("It's a wet race: the car matters less and driver skill more, and results spread out.");
+  else if (!weather.known && weather.rainProbability >= 15) notes.push(`There's a ${weather.rainProbability}% chance of rain, which would shuffle the order.`);
+  if (f.overtakingDifficulty >= 0.7) notes.push(grid ? "Overtaking is very hard here, so the grid decides a lot." : "Overtaking is very hard here, so qualifying will decide a lot.");
+  else if (f.overtakingDifficulty <= 0.35) notes.push("Overtaking is relatively easy here, so race pace can make up for a poor grid slot.");
+  if (f.tyreWear >= 1.4) notes.push("Tyre wear is high, which opens up strategy.");
+  return notes;
+}
+
+function makeObjective(base, prob, f, notes, extra = {}) {
+  const sims = f.sims;
   return {
-    win: Math.min(winProb, 75),
-    podium: clamp(podiumProb, winProb + 3, 85),
-    top5: clamp(top5Prob, podiumProb + 5, 95),
-    top10: clamp(top10Prob, top5Prob + 3, 99),
-    expectedFinish,
-    worstCase: clamp(expectedFinish + 3 + Math.round(reliabilityFactor * 2), expectedFinish + 1, 20),
+    type: "primary",
+    riskLevel: riskFor(prob),
+    successProbability: pct(prob * 100),
+    expectedFinishRange: f.bestRange[0] === f.bestRange[1] ? `P${f.bestRange[0]}` : `P${f.bestRange[0]}–P${f.bestRange[1]}`,
+    boardImpact: "High",
+    ...base,
+    rationale: `${notes.join(" ")} In ${sims} simulated races ${base.resultPhrase} ${Math.round(prob * 100)}% of the time.`,
+    ...extra,
   };
 }
 
-// ============================================
-// 7. AI RATIONALE GENERATOR
-// ============================================
-function generateAIRationale(objectiveType, ctx) {
-  const { circuitProfile, circuitHistory, weather, championship, track } = ctx;
-  const trackName = track?.circuit || 'this circuit';
-  const rival = championship?.nearestRival;
-  const circType = circuitProfile?.type || 'Mixed';
-  const bank = {
-    'win': weather.isWet
-      ? [`Wet conditions open the door — mixed strategies can neutralise car gaps. The pace window is real.`]
-      : [`The car is performing at its peak this weekend. Simulations show a genuine victory window if tyre strategy is optimised.`],
-    'one-two': [`Both drivers are showing strong pace across all compounds. A coordinated 1-2 is operationally feasible.`],
-    'podium': [weather.isWet ? `Wet weather levels the field. Engineering rates a podium probability high based on recent wet pace.` : `Race pace data puts the car consistently in the top-3 window. A podium is the realistic optimum.`],
-    'beat-rival': [rival ? `${rival} are our nearest championship threat. Finishing ahead scores critical constructor points.` : `Direct constructor battle. Outscoring the nearest rival is the priority strategic objective.`],
-    'championship-extend': [`We lead the championship. Scoring maximum points while rivals underperform is the optimal path.`],
-    'championship-close': [rival ? `We trail ${rival} by ${Math.abs(championship.gapToNearest || 0)} points. A strong result here shifts the momentum.` : `The points gap is closable. A strong points haul keeps the championship fight alive.`],
-    'score-points': [`The car has the pace to fight for points. A clean race, avoiding incidents, maximises every opportunity.`,
-      `Midfield competition is tight at ${trackName}. Reliability and tyre management will separate the points finishers.`],
-    'reach-q3': [circType === 'Street' ? `Street circuits reward clean qualifying. Reaching Q3 locks in a crucial grid slot for the race.` : `The performance margin over Q2 rivals is small. A clean Q3 lap secures an important race starting position.`],
-    'reach-q2': [`Q2 is a realistic and meaningful target. Grid position significantly impacts race day strategy options.`],
-    'gain-positions': [`Race simulations show overtaking potential from the grid. Tyre strategy can be used to jump rivals in the pit window.`],
-    'wet-opportunity': [`Safety Car probability is elevated. Staying on track and managing tyre transitions will be critical.`],
-    'top-speed': [`${trackName} rewards raw straight-line speed. ERS deployment optimisation and slipstream exploitation are key.`],
-    'protect-position': [circType === 'Street' ? `Overtaking at ${trackName} is extremely limited. Qualifying position is almost everything — protecting it is the race.` : `Track position is critical here. Clean pit stops and consistent pace can secure the target finish.`],
-    'reliability': [`High tyre degradation and heat stress are forecast. Bringing the car home cleanly is a victory in itself.`],
-  };
-  const pool = bank[objectiveType] || [`Data-driven analysis across historical results and track characteristics supports this objective.`];
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-// ============================================
-// 8. DYNAMIC OBJECTIVE GENERATOR
-// ============================================
-function generateTrackAwareObjectives(tier, championship, weather, finishDist, circuitProfile, circuitHistory, track, team) {
+/**
+ * Build the objective list from a race forecast: targets are pitched where
+ * the simulated odds say they're meaningful for this team at this track in
+ * these conditions, and every success probability is a simulated frequency.
+ */
+export function buildObjectivesFromForecast(f, { team, track, weather, grid, championship }) {
+  const notes = conditionNotes(f, weather, track, grid);
+  // Pace first, then the weather when it's in play, else the next most relevant fact.
+  const lead = [notes[0], notes.find((n) => /\brain\b|wet race/.test(n)) || notes[1]].filter(Boolean);
   const objectives = [];
-  const circType = circuitProfile?.type || 'Mixed';
-  const isStreet = circType === 'Street';
-  const isPower = circType === 'Power';
-  const highDnfRisk = (circuitHistory?.dnfRate > 30) || (team?.car?.reliability < 75);
-  const rival = championship?.nearestRival;
-  const ctx = { tier, circuitProfile, circuitHistory, weather, championship, track, team };
-  const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
-  const champImpact = pos => pos >= 1 && pos <= 10 ? `+${F1_POINTS[pos-1]} pts` : 'No points';
-  const riskLevel = prob => prob >= 65 ? 'Low' : prob >= 45 ? 'Medium' : prob >= 25 ? 'High' : 'Very High';
-  const sponsorM = pos => pos <= 1 ? 4.5 : pos <= 3 ? 3.2 : pos <= 5 ? 2.1 : pos <= 10 ? 1.4 : 0.8;
-  const makeRange = (best, worst) => best === worst ? `P${best}` : `P${best}–P${worst}`;
+  const ladder = POSITION_TARGETS.map((t) => ({ ...t, prob: f.positionProb(t.n) }));
 
-  if (tier.id === 'championship-favourite') {
-    objectives.push({ id: 'win-race', label: 'Win the race', type: 'primary', emoji: '🏆',
-      rationale: generateAIRationale('win', ctx), expectedFinishRange: makeRange(1,2),
-      successProbability: pct(finishDist.win), riskLevel: weather.isWet ? 'High' : 'Medium',
-      sponsorRewardM: sponsorM(1), boardImpact: 'Critical', championshipImpact: '+25 pts', targetPosition: 1 });
-    objectives.push({ id: 'secure-one-two', label: 'One-two finish', type: 'primary', emoji: '🥇',
-      rationale: generateAIRationale('one-two', ctx), expectedFinishRange: '1 & 2',
-      successProbability: pct(finishDist.win * 0.65), riskLevel: 'High',
-      sponsorRewardM: 6.0, boardImpact: 'Critical', championshipImpact: '+43 pts combined', targetPosition: 2 });
-    if (championship.leadingConstructors) {
-      objectives.push({ id: 'extend-lead', label: 'Extend championship lead', type: 'championship', emoji: '📈',
-        rationale: generateAIRationale('championship-extend', ctx), expectedFinishRange: makeRange(1,3),
-        successProbability: pct(finishDist.podium), riskLevel: 'Medium',
-        sponsorRewardM: sponsorM(2), boardImpact: 'Critical', championshipImpact: 'Extend lead', targetPosition: 3 });
-    }
-  } else if (tier.id === 'front-running') {
-    objectives.push({ id: 'fight-for-victory', label: 'Fight for victory', type: 'primary', emoji: '⚔️',
-      rationale: generateAIRationale('win', ctx), expectedFinishRange: makeRange(1,3),
-      successProbability: pct(finishDist.win), riskLevel: weather.isWet ? 'Very High' : 'High',
-      sponsorRewardM: sponsorM(1), boardImpact: 'High', championshipImpact: '+25 pts potential', targetPosition: 1 });
-    objectives.push({ id: 'secure-podium', label: 'Secure podium', type: 'primary', emoji: '🥈',
-      rationale: generateAIRationale('podium', ctx), expectedFinishRange: makeRange(2,4),
-      successProbability: pct(finishDist.podium), riskLevel: 'Medium',
-      sponsorRewardM: sponsorM(3), boardImpact: 'High', championshipImpact: champImpact(3), targetPosition: 3 });
-    objectives.push({ id: 'maximise-constructor', label: 'Maximise constructor points', type: 'points', emoji: '📊',
-      rationale: `Bringing both cars into the points scores maximum constructor value and applies pressure on rivals.`,
-      expectedFinishRange: 'Both Top 10', successProbability: pct(finishDist.top10 * 0.8), riskLevel: 'Low',
-      sponsorRewardM: 2.0, boardImpact: 'High', championshipImpact: 'Double points swing', targetPosition: 8 });
-  } else if (tier.id === 'upper-midfield') {
-    objectives.push({ id: 'top-6', label: 'Finish inside top 6', type: 'primary', emoji: '🎯',
-      rationale: generateAIRationale('score-points', ctx), expectedFinishRange: makeRange(5,7),
-      successProbability: pct(finishDist.top5 + 10), riskLevel: 'Medium',
-      sponsorRewardM: sponsorM(6), boardImpact: 'High', championshipImpact: champImpact(6), targetPosition: 6 });
-    if (weather.isWet || (circuitHistory?.safetyCarFrequency || 0) > 50) {
-      objectives.push({ id: 'opportunistic-podium', label: 'Opportunistic podium', type: 'opportunistic', emoji: '🌟',
-        rationale: weather.isWet ? `Wet conditions greatly improve our odds of a podium overperformance.` : `High Safety Car frequency means strategic positioning can yield a surprise podium.`,
-        expectedFinishRange: makeRange(2,5), successProbability: pct(finishDist.podium), riskLevel: 'High',
-        sponsorRewardM: sponsorM(3), boardImpact: 'High', championshipImpact: champImpact(3), targetPosition: 3 });
-    }
-  } else if (tier.id === 'midfield') {
-    objectives.push({ id: 'score-points', label: 'Score points', type: 'primary', emoji: '✅',
-      rationale: generateAIRationale('score-points', ctx),
-      expectedFinishRange: makeRange(finishDist.expectedFinish, Math.min(10, finishDist.expectedFinish + 2)),
-      successProbability: pct(finishDist.top10), riskLevel: riskLevel(finishDist.top10),
-      sponsorRewardM: sponsorM(10), boardImpact: 'High', championshipImpact: champImpact(10), targetPosition: 10 });
-    objectives.push({ id: 'reach-q3', label: 'Reach Q3', type: 'qualifying', emoji: '⏱️',
-      rationale: generateAIRationale('reach-q3', ctx), expectedFinishRange: 'Top 10 grid',
-      successProbability: pct(finishDist.top10 * 0.85), riskLevel: 'Low',
-      sponsorRewardM: 0.8, boardImpact: 'Medium', championshipImpact: 'Improved grid', targetPosition: 10 });
-  } else if (tier.id === 'lower-midfield') {
-    objectives.push({ id: 'fight-for-points', label: 'Fight for points', type: 'primary', emoji: '🎯',
-      rationale: generateAIRationale('score-points', ctx), expectedFinishRange: makeRange(9, 12),
-      successProbability: pct(finishDist.top10 - 5), riskLevel: riskLevel(finishDist.top10),
-      sponsorRewardM: sponsorM(10), boardImpact: 'High', championshipImpact: champImpact(10), targetPosition: 10 });
-    objectives.push({ id: 'reach-q2', label: 'Reach Q2', type: 'qualifying', emoji: '⏱️',
-      rationale: generateAIRationale('reach-q2', ctx), expectedFinishRange: 'Top 15 grid',
-      successProbability: pct(finishDist.top10 + 20), riskLevel: 'Low',
-      sponsorRewardM: 0.6, boardImpact: 'Low', championshipImpact: 'Grid improvement', targetPosition: 15 });
-    objectives.push({ id: 'gain-positions', label: 'Gain positions from grid', type: 'progress', emoji: '📈',
-      rationale: generateAIRationale('gain-positions', ctx), expectedFinishRange: '+3–5 positions',
-      successProbability: pct(55), riskLevel: 'Low', sponsorRewardM: 0.8, boardImpact: 'Low', championshipImpact: 'No direct impact', targetPosition: null });
-  } else {
-    objectives.push({ id: 'reach-q2-backmarker', label: 'Reach Q2', type: 'qualifying', emoji: '⏱️',
-      rationale: generateAIRationale('reach-q2', ctx), expectedFinishRange: 'Top 15 grid',
-      successProbability: pct(30 + (weather.isWet ? 15 : 0)), riskLevel: 'High',
-      sponsorRewardM: 1.0, boardImpact: 'Medium', championshipImpact: 'Positional improvement', targetPosition: 15 });
-    objectives.push({ id: 'capitalise-safety-car', label: 'Capitalise on safety car', type: 'opportunistic', emoji: '🚗',
-      rationale: `Safety Cars are the backmarker's greatest ally. Staying out under SC while rivals pit earns positions pace alone cannot provide.`,
-      expectedFinishRange: 'Any', successProbability: pct(40), riskLevel: 'Medium',
-      sponsorRewardM: 0.5, boardImpact: 'Low', championshipImpact: 'No direct impact', targetPosition: null });
-    objectives.push({ id: 'gain-positions-backmarker', label: 'Gain positions from grid', type: 'progress', emoji: '📈',
-      rationale: generateAIRationale('gain-positions', ctx), expectedFinishRange: '+2–4 positions',
-      successProbability: pct(55), riskLevel: 'Low', sponsorRewardM: 0.6, boardImpact: 'Low', championshipImpact: 'No direct impact', targetPosition: null });
-    if (weather.isWet) {
-      objectives.push({ id: 'top-10-backmarker', label: 'Finish in top 10', type: 'opportunistic', emoji: '🌟',
-        rationale: `Wet weather collapses the competitive order. A tactical SC gamble or tyre advantage could produce a historic result.`,
-        expectedFinishRange: 'P8–P12', successProbability: pct(finishDist.top10), riskLevel: 'Very High',
-        sponsorRewardM: sponsorM(10), boardImpact: 'High', championshipImpact: champImpact(10), targetPosition: 10 });
-    }
+  // Primary: the most ambitious target we hit at least 40% of the time.
+  let primaryIdx = ladder.findIndex((t) => t.prob >= 0.4);
+  if (primaryIdx < 0) primaryIdx = ladder.length - 1;
+  const primary = ladder[primaryIdx];
+  const posObjective = (t, type, boardImpact) => makeObjective({
+    id: t.id, label: t.label, emoji: t.emoji, type, boardImpact,
+    sponsorRewardM: sponsorFor(t.n), championshipImpact: champImpact(t.n), targetPosition: t.n,
+    evaluation: { kind: "bestPos", target: t.n },
+    resultPhrase: `one of our cars ${t.phrase}`,
+  }, t.prob, f, lead);
+
+  objectives.push(posObjective(primary, "primary", "High"));
+
+  // Stretch: one rung up, if it happens at least occasionally.
+  const stretch = ladder[primaryIdx - 1];
+  if (stretch && stretch.prob >= 0.05) {
+    const why = [notes.find((n) => /\brain\b|wet race|Overtaking is relatively easy|Tyre wear/.test(n)) || lead[0]];
+    objectives.push(posObjective(stretch, "opportunistic", "Medium"));
+    objectives[objectives.length - 1].rationale = `${why.join(" ")} In ${f.sims} simulated races one of our cars ${stretch.phrase} ${Math.round(stretch.prob * 100)}% of the time: possible, but things have to go our way.`;
   }
 
-  // Cross-tier: beat rival
-  if (rival && !objectives.find(o => o.id === 'beat-rival')) {
-    objectives.push({ id: 'beat-rival', label: `Beat ${rival}`, type: 'rival', emoji: '⚔️',
-      rationale: generateAIRationale('beat-rival', ctx), expectedFinishRange: 'Ahead',
-      successProbability: pct(50 + (finishDist.top5 - 50) * 0.5), riskLevel: 'Medium',
-      sponsorRewardM: 1.6, boardImpact: 'High', championshipImpact: 'Constructor swing',
-      targetPosition: null, targetTeam: rival });
+  // Safe: a lower rung we land most of the time (a banker for the board).
+  const safe = ladder.slice(primaryIdx + 1).find((t) => t.prob >= 0.75);
+  if (safe) objectives.push(posObjective(safe, "points", "Low"));
+
+  // Both cars in the points, when it's genuinely in play.
+  if (f.probs.bothPoints >= 0.2 && f.probs.bothPoints <= 0.92) {
+    objectives.push(makeObjective({
+      id: "both-in-points", label: "Both cars in the points", emoji: "📊", type: "points",
+      sponsorRewardM: 2.0, championshipImpact: "Double points", targetPosition: 10,
+      evaluation: { kind: "bothPos", target: 10 },
+      expectedFinishRange: "Both top 10",
+      resultPhrase: "both cars scored",
+    }, f.probs.bothPoints, f, lead));
   }
 
-  // Street circuit: protect position
-  if (isStreet && !objectives.find(o => o.id === 'protect-position')) {
-    objectives.push({ id: 'protect-position', label: 'Protect track position', type: 'track', emoji: '🛡️',
-      rationale: generateAIRationale('protect-position', ctx), expectedFinishRange: 'Hold grid',
-      successProbability: pct(65), riskLevel: 'Low', sponsorRewardM: 1.0, boardImpact: 'Medium',
-      championshipImpact: 'Defensive points', targetPosition: null });
+  // One-two, for a car that can dominate.
+  if (f.probs.oneTwo >= 0.12) {
+    objectives.push(makeObjective({
+      id: "secure-one-two", label: "One-two finish", emoji: "🥇", type: "opportunistic",
+      sponsorRewardM: 6.0, boardImpact: "Critical", championshipImpact: "+43 pts", targetPosition: 2,
+      evaluation: { kind: "oneTwo" },
+      expectedFinishRange: "P1 & P2",
+      resultPhrase: "we finished one-two",
+    }, f.probs.oneTwo, f, lead));
   }
 
-  // Power circuit: top speed
-  if (isPower && !objectives.find(o => o.id === 'top-speed-assault')) {
-    objectives.push({ id: 'top-speed-assault', label: 'Exploit top speed', type: 'track', emoji: '🔥',
-      rationale: generateAIRationale('top-speed', ctx),
-      expectedFinishRange: makeRange(Math.max(1, finishDist.expectedFinish - 1), finishDist.expectedFinish + 2),
-      successProbability: pct(55), riskLevel: 'Medium', sponsorRewardM: 1.1, boardImpact: 'Medium',
-      championshipImpact: champImpact(finishDist.expectedFinish), targetPosition: finishDist.expectedFinish });
+  // Rival: our nearest championship rival, or the team closest to us on pace here.
+  const rivals = Object.entries(f.beatTeam);
+  let rival = championship?.nearestRival && f.beatTeam[championship.nearestRival] != null ? championship.nearestRival : null;
+  if (!rival && rivals.length) rival = rivals.sort((a, b) => Math.abs(a[1] - 0.5) - Math.abs(b[1] - 0.5))[0][0];
+  if (rival) {
+    const p = f.beatTeam[rival];
+    const why = championship?.nearestRival === rival
+      ? `${rival} are our nearest rival in the constructors' championship.`
+      : `${rival} are the closest team to us on pace at this circuit.`;
+    objectives.push(makeObjective({
+      id: "beat-rival", label: `Beat ${rival}`, emoji: "⚔️", type: "rival",
+      sponsorRewardM: 1.6, championshipImpact: "Constructor swing", targetPosition: null, targetTeam: rival,
+      evaluation: { kind: "beatTeam", team: rival },
+      expectedFinishRange: `Ahead of ${rival}`,
+      resultPhrase: `our best car finished ahead of ${rival}'s`,
+    }, p, f, [why]));
   }
 
-  // High SC frequency: SC gamble
-  if ((circuitHistory?.safetyCarFrequency > 60 || isStreet) && !objectives.find(o => o.id === 'sc-strategy')) {
-    objectives.push({ id: 'sc-strategy', label: 'Safety car gamble', type: 'opportunistic', emoji: '🚗',
-      rationale: `SC frequency at this venue is historically high. Staying out while rivals pit can vault us several positions instantly.`,
-      expectedFinishRange: 'Opportunistic', successProbability: pct(35 + (weather.isWet ? 15 : 0)),
-      riskLevel: 'High', sponsorRewardM: 2.0, boardImpact: 'Medium', championshipImpact: 'Opportunity dependent', targetPosition: null });
+  // Track position: depends on the real grid and how hard passing is here.
+  const ourGridSlots = Object.values(f.drivers).map((d) => d.grid).filter(Boolean);
+  const bestGrid = ourGridSlots.length ? Math.min(...ourGridSlots) : null;
+  if (grid && f.probs.holdGrid != null && f.overtakingDifficulty >= 0.6) {
+    objectives.push(makeObjective({
+      id: "protect-position", label: "Hold our grid position", emoji: "🛡️", type: "track",
+      sponsorRewardM: 1.0, boardImpact: "Medium", championshipImpact: "Defensive points", targetPosition: null,
+      evaluation: { kind: "hold" },
+      expectedFinishRange: bestGrid ? `Hold P${bestGrid} or better` : "Hold grid",
+      resultPhrase: "one of our cars finished at or ahead of its grid slot",
+    }, f.probs.holdGrid, f, [notes.find((n) => n.startsWith("Overtaking")) || lead[0]]));
+  }
+  // Gaining places is only a fair ask when we start far enough back.
+  if (grid && f.probs.gain3 != null && f.overtakingDifficulty <= 0.5 && bestGrid >= 6 && f.probs.gain3 >= 0.1) {
+    objectives.push(makeObjective({
+      id: "gain-positions", label: "Gain 3+ places from the grid", emoji: "📈", type: "progress",
+      sponsorRewardM: 0.8, boardImpact: "Low", championshipImpact: "No direct impact", targetPosition: null,
+      evaluation: { kind: "gain", positions: 3 },
+      expectedFinishRange: `From P${bestGrid}`,
+      resultPhrase: "one of our cars gained three or more places",
+    }, f.probs.gain3, f, [notes.find((n) => n.startsWith("Overtaking")) || lead[0]]));
   }
 
-  // Reliability concern
-  if (highDnfRisk && !objectives.find(o => o.id === 'finish-race')) {
-    objectives.push({ id: 'finish-race', label: 'Classified finish', type: 'reliability', emoji: '🔧',
-      rationale: generateAIRationale('reliability', ctx), expectedFinishRange: 'Any finish',
-      successProbability: pct(100 - (circuitHistory?.dnfRate || 25)), riskLevel: 'Low',
-      sponsorRewardM: 0.5, boardImpact: 'Low', championshipImpact: 'Prevents zero-point round', targetPosition: 20 });
+  // Reliability: when the simulations lose a car often enough to matter.
+  if (1 - f.probs.cleanWeekend >= 0.15) {
+    objectives.push(makeObjective({
+      id: "finish-race", label: "Both cars to the flag", emoji: "🔧", type: "reliability",
+      sponsorRewardM: 0.5, boardImpact: "Low", championshipImpact: "Avoids a zero", targetPosition: null,
+      evaluation: { kind: "classified" },
+      expectedFinishRange: "Both classified",
+      resultPhrase: "both cars finished",
+    }, f.probs.cleanWeekend, f, [`Our reliability gives a ${Math.round((1 - f.probs.cleanWeekend) * 100)}% chance of losing a car.`]));
   }
 
-  // Wet opportunity
-  if (weather.isWet && !objectives.find(o => o.id === 'wet-opportunity')) {
-    objectives.push({ id: 'wet-opportunity', label: 'Wet race opportunity', type: 'weather', emoji: '🌧️',
-      rationale: `Safety Car probability is elevated in wet conditions. Staying on track and managing tyre transitions will be critical.`,
-      expectedFinishRange: 'Any', successProbability: pct(40 + (100 - finishDist.expectedFinish * 4)),
-      riskLevel: 'High', sponsorRewardM: 2.2, boardImpact: 'Medium', championshipImpact: 'Weather-dependent', targetPosition: null });
-  }
-
-  // Championship closing push
-  if (championship.trailingConstructors && championship.gapToNearest > 0 && championship.remainingRounds <= 6) {
-    objectives.push({ id: 'championship-push', label: 'Championship rescue push', type: 'championship', emoji: '🏁',
-      rationale: generateAIRationale('championship-close', ctx),
-      expectedFinishRange: makeRange(Math.max(1, finishDist.expectedFinish - 2), finishDist.expectedFinish),
-      successProbability: pct(finishDist.top5), riskLevel: 'High', sponsorRewardM: 2.5, boardImpact: 'Critical',
-      championshipImpact: `Close gap by up to ${championship.gapToNearest} pts`,
-      targetPosition: Math.max(1, finishDist.expectedFinish - 2) });
+  // Late-season title push
+  if (championship?.trailingConstructors && championship.gapToNearest > 0 && championship.remainingRounds <= 6) {
+    const t = ladder[Math.max(0, primaryIdx - 1)];
+    objectives.push(makeObjective({
+      id: "championship-push", label: "Championship rescue push", emoji: "🏁", type: "championship",
+      boardImpact: "Critical", sponsorRewardM: 2.5,
+      championshipImpact: `Close gap of ${championship.gapToNearest} pts`, targetPosition: t.n,
+      evaluation: { kind: "bestPos", target: t.n },
+      resultPhrase: `one of our cars ${t.phrase}`,
+    }, t.prob, f, [`We trail ${championship.nearestRivalAhead || "the car ahead"} by ${championship.gapToNearest} points with ${championship.remainingRounds} rounds left.`]));
   }
 
   const typeOrder = { primary: 0, championship: 1, rival: 2, track: 3, opportunistic: 4, qualifying: 5, points: 6, weather: 7, reliability: 8, progress: 9 };
   objectives.sort((a, b) => (typeOrder[a.type] ?? 99) - (typeOrder[b.type] ?? 99));
+  objectives.forEach((o) => { delete o.resultPhrase; });
   return objectives;
 }
 
-// ============================================
-// 9. MAIN OBJECTIVE GENERATOR
-// ============================================
-export function generateRaceObjectives(team, track, isWet = false) {
-  const expectationScore = calculateExpectationScore(team, track);
-  const tier = getTeamTier(expectationScore);
-  const championship = getChampionshipContext(team);
-  const weatherImpact = getWeatherImpact(isWet);
-  const circuitProfile = getCircuitProfile(track?.circuit || track);
-  const circuitHistory = getCircuitHistoryStats(track?.circuit || track, team.name);
-  const reliability = team.car?.reliability || team.specs?.reliability || 80;
-  const finishDist = generateFinishDistribution(expectationScore, circuitProfile, weatherImpact, reliability, circuitHistory);
-  const objectives = generateTrackAwareObjectives(tier, championship, weatherImpact, finishDist, circuitProfile, circuitHistory, track, team);
+function finishDistributionFrom(f) {
+  const p = (x) => Math.round(x * 100);
   return {
-    expectationScore, tier, championshipContext: championship, weatherImpact,
-    circuitProfile, circuitHistory, finishDistribution: finishDist,
-    objectives, recommendedObjective: objectives.find(o => o.type === 'primary') || objectives[0],
+    win: p(f.probs.win),
+    podium: p(f.probs.podium),
+    top5: p(f.probs.top5),
+    top10: p(f.positionProb(10)),
+    expectedFinish: Math.round(f.expectedBest),
+    worstCase: Math.min(22, f.bestRange[1] + 2),
+  };
+}
+
+// ============================================
+// 6. MAIN OBJECTIVE GENERATOR
+// ============================================
+/**
+ * Forecast the race and build objectives.
+ * @param opts.grid   qualifying grid once known
+ * @param opts.teams  teams as they'll race (defaults to the player's active line-up + AI)
+ */
+export function generateRaceObjectives(team, track, isWet = null, opts = {}) {
+  const appState = opts.appState || state;
+  const weather = opts.weather || getWeekendWeather(appState, track);
+  const knownWet = isWet != null ? isWet : weather.known ? weather.isWet : null;
+  const teams = opts.teams || raceTeams(appState);
+  const forecast = forecastRace({
+    teams, playerTeam: team, track,
+    wetProbability: weather.rainProbability / 100, isWet: knownWet,
+    grid: opts.grid || null,
+    weekendContext: opts.weekendContext || null,
+    appState,
+    sims: opts.sims || FORECAST_SIMS,
+    seed: `${appState.season?.year || 1}-${track.round}-${opts.grid ? "grid" : "pre"}`,
+  });
+  const championship = getChampionshipContext(team);
+  const objectives = buildObjectivesFromForecast(forecast, { team, track, weather: { ...weather, isWet: knownWet ?? weather.isWet, known: knownWet != null }, grid: opts.grid || null, championship });
+  const tier = getTeamTier(forecast.expectedBest);
+  return {
+    expectationScore: Math.round(clamp(100 - (forecast.expectedBest - 1) * 5.5, 5, 100)),
+    tier,
+    championshipContext: championship,
+    weatherImpact: getWeatherImpact(knownWet ?? false),
+    circuitProfile: getCircuitProfile(track?.circuit || track),
+    circuitHistory: getCircuitHistoryStats(track?.circuit || track, team.name),
+    finishDistribution: finishDistributionFrom(forecast),
+    forecast: {
+      sims: forecast.sims, paceRank: forecast.paceRank, teamsCount: forecast.teamsCount,
+      gapToFastest: forecast.gapToFastest, circuitFit: forecast.circuitFit,
+      rainChance: forecast.rainChance, overtakingDifficulty: forecast.overtakingDifficulty,
+      expectedBest: forecast.expectedBest, bestRange: forecast.bestRange, usesGrid: Boolean(opts.grid),
+    },
+    objectives,
+    recommendedObjective: objectives.find((o) => o.type === "primary") || objectives[0],
   };
 }
 
@@ -414,7 +383,38 @@ export function evaluateObjective(objectiveDef, results, grid, team, round, repl
   const targetPos = objectiveDef.targetPosition;
   const targetTeam = objectiveDef.targetTeam;
   let achieved = false, partiallyAchieved = false;
-  if (targetTeam) {
+  const ev = objectiveDef.evaluation;
+  const running = playerResults.filter(x => !x.r.retired);
+  const gridPosOf = (r) => (grid ? grid.findIndex(g => g.driver?.name === r.driver?.name) + 1 : 0);
+  if (ev) {
+    // Objectives from the race forecast say exactly how they're judged.
+    if (ev.kind === 'bestPos') {
+      achieved = running.some(x => x.pos <= ev.target);
+      partiallyAchieved = !achieved && running.some(x => x.pos <= ev.target + 2);
+    } else if (ev.kind === 'bothPos') {
+      const inside = running.filter(x => x.pos <= ev.target).length;
+      achieved = playerResults.length > 0 && inside === playerResults.length;
+      partiallyAchieved = !achieved && inside > 0;
+    } else if (ev.kind === 'oneTwo') {
+      achieved = running.map(x => x.pos).sort((a, b) => a - b).slice(0, 2).join() === '1,2';
+      partiallyAchieved = !achieved && running.some(x => x.pos === 1);
+    } else if (ev.kind === 'beatTeam') {
+      const rivalIdx = results.findIndex(r => (r.team?.name === ev.team || r.team === ev.team) && !r.retired);
+      const rivalPos = rivalIdx >= 0 ? rivalIdx + 1 : 99;
+      achieved = running.some(x => x.pos < rivalPos);
+      partiallyAchieved = !achieved && running.some(x => x.pos === rivalPos + 1);
+    } else if (ev.kind === 'gain') {
+      const gains = running.map(x => (gridPosOf(x.r) ? gridPosOf(x.r) - x.pos : 0));
+      achieved = gains.some(g => g >= ev.positions);
+      partiallyAchieved = !achieved && gains.some(g => g > 0);
+    } else if (ev.kind === 'hold') {
+      achieved = running.some(x => gridPosOf(x.r) && x.pos <= gridPosOf(x.r));
+      partiallyAchieved = !achieved && running.some(x => gridPosOf(x.r) && x.pos <= gridPosOf(x.r) + 2);
+    } else if (ev.kind === 'classified') {
+      achieved = playerResults.length > 0 && running.length === playerResults.length;
+      partiallyAchieved = !achieved && running.length > 0;
+    }
+  } else if (targetTeam) {
     const rivalIdx = results.findIndex(r => r.team?.name === targetTeam || r.team === targetTeam);
     const rivalPos = rivalIdx >= 0 ? rivalIdx + 1 : 20;
     achieved = bestPos < rivalPos;
@@ -462,7 +462,7 @@ export function evaluateObjective(objectiveDef, results, grid, team, round, repl
 // ============================================
 function calculateStandingsImpact(team) {
   const { standings } = state;
-  const sorted = Object.entries(standings.teams || {}).sort(([, a], [, b]) => b - a);
+  const sorted = constructorEntries(state);
   const teamIndex = sorted.findIndex(([name]) => name === team.name);
   let constructorPos = 0, teamPoints = 0;
   if (teamIndex >= 0) { constructorPos = teamIndex + 1; teamPoints = sorted[teamIndex][1]; }
@@ -475,12 +475,11 @@ function calculateStandingsImpact(team) {
 // ============================================
 // 12. UNIFIED RACE WEEKEND GENERATOR
 // ============================================
-export function generateUnifiedRaceWeekend(team, currentRound = state.season.round) {
-  const activeCalendar = state.season.calendar || [];
+function buildRaceWeekend(team, currentRound, appState, opts = {}) {
+  const activeCalendar = appState.season.calendar || [];
   const round = activeCalendar[currentRound - 1];
   if (!round) return null;
-  const wetProbability = 0.3 + (Math.sin(currentRound * 0.7) * 0.2);
-  const isWet = Math.random() < wetProbability;
+  const weather = getWeekendWeather(appState, round);
   const circuitType = (() => {
     const name = (round.circuit || '').toLowerCase();
     if (name.includes('monaco') || name.includes('singapore') || name.includes('baku') || name.includes('madrid') || name.includes('jeddah')) return 'Street Circuit';
@@ -488,20 +487,38 @@ export function generateUnifiedRaceWeekend(team, currentRound = state.season.rou
     if (name.includes('suzuka') || name.includes('silverstone')) return 'High Downforce';
     return 'Permanent Circuit';
   })();
-  const objData = generateRaceObjectives(team, round, isWet);
-  const { expectationScore, tier, championshipContext, weatherImpact, circuitProfile, circuitHistory, finishDistribution, objectives, recommendedObjective } = objData;
+  const objData = generateRaceObjectives(team, round, weather.known ? weather.isWet : null, { ...opts, appState, weather });
   const standingsImpact = calculateStandingsImpact(team);
-  const trackTemp = Math.floor(20 + Math.random() * 25);
-  const daysUntilRace = Math.max(0, 14 - state.season.currentDay + (currentRound - 1) * 14);
-  const raceStatus = !state.weekendProgress ? 'Not Started' : state.weekendProgress.raceComplete ? 'Complete' : state.weekendProgress.qualifyingComplete ? 'Qualifying Complete' : 'Practice/Qualifying Pending';
+  const daysUntilRace = Math.max(0, 14 - appState.season.currentDay + (currentRound - 1) * 14);
+  const wp = appState.weekendProgress;
+  const raceStatus = !wp ? 'Not Started' : wp.raceComplete ? 'Complete' : wp.qualifyingComplete ? 'Qualifying Complete' : 'Practice/Qualifying Pending';
   return {
-    raceId: `${state.season.year}-${currentRound}`, round: currentRound, grandPrix: round.name,
+    raceId: `${appState.season.year}-${currentRound}`, round: currentRound, grandPrix: round.name,
     circuit: round.circuit, laps: round.laps, circuitType,
-    weather: { isWet, rainProbability: Math.round(wetProbability * 100), trackTemperature: trackTemp, airTemperature: Math.floor(trackTemp - 4 + Math.random() * 6) },
-    objectives, recommendedObjective, championshipContext, standingsImpact,
+    weather,
+    ...objData,
+    standingsImpact,
     countdown: daysUntilRace > 0 ? `${daysUntilRace} days until race` : 'Race weekend open',
-    raceStatus, expectationScore, tier, circuitProfile, circuitHistory, finishDistribution,
+    raceStatus,
   };
+}
+
+/** Pre-qualifying forecast and objectives for the round. */
+export function generateUnifiedRaceWeekend(team, currentRound = state.season.round) {
+  return buildRaceWeekend(team, currentRound, state);
+}
+
+/**
+ * Re-forecast once qualifying is done: the real grid and the real weather
+ * replace the simulated qualifying and the rain probability.
+ * @param opts.grid  qualifying grid [{ driver, team }]
+ * @param opts.teams teams as they'll race
+ * @param opts.weekendContext per-driver setup/form for this weekend
+ */
+export function refreshRaceWeekendAfterQualifying(appState, opts = {}) {
+  if (!appState.team) return null;
+  appState.raceWeekend = buildRaceWeekend(appState.team, appState.season.round, appState, opts);
+  return appState.raceWeekend;
 }
 
 // ============================================

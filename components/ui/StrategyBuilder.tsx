@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { Route, Plus, Minus, Lock, Check, AlertTriangle, Info, RotateCcw } from 'lucide-react';
 import { HUB, glassCard, btn, btnClass, tyreDot } from '../HubLayout.tsx';
@@ -22,6 +22,7 @@ import {
   planIssues,
   buildFieldBaseline,
   finishingRange,
+  compareStrategies,
 } from '../../utils/strategyModel.js';
 import './strategy-builder.css';
 
@@ -81,11 +82,13 @@ function useTween(value: number, reduced: boolean, duration = 450) {
 
 function WearChart({ proj, recProj, totalLaps, driverName }: { proj: any; recProj: any; totalLaps: number; driverName: string }) {
   const wrap = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
+  const [width, setWidth] = useState(280);
   const [hover, setHover] = useState<number | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = wrap.current;
     if (!el) return;
+    // measure before first paint so a narrow screen never sees a wide default
+    if (el.clientWidth) setWidth(Math.max(240, el.clientWidth));
     const ro = new ResizeObserver(([e]) => setWidth(Math.max(240, e.contentRect.width)));
     ro.observe(el);
     return () => ro.disconnect();
@@ -147,7 +150,7 @@ function WearChart({ proj, recProj, totalLaps, driverName }: { proj: any; recPro
       {hl && (
         <div className="sb-readout" style={x(hl.lap) > width - 190 ? { right: width - x(hl.lap) + 12 } : { left: x(hl.lap) + 12 }}>
           <div><strong>Lap {hl.lap}</strong> · <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle' }}>{tyreDot(hl.compound, 8)}{hl.compound}</span>{hl.pit ? ' · box' : ''}</div>
-          <div>Wear <strong>{Math.round(hl.wear)}%</strong> · {hl.age} laps old</div>
+          <div>Wear <strong>{Math.round(hl.wear)}%</strong> · {hl.age} laps old · {(() => { const st = proj.stints[hl.stint]; const left = st ? st.end - hl.lap : 0; return st && hl.stint < proj.stints.length - 1 ? (left ? `box in ${left}` : 'boxing') : `${left} to the flag`; })()}</div>
           <div>Lap time <strong>{fmtLap(hl.pit ? hl.lapTime - PIT_LOSS - 0.6 : hl.lapTime)}</strong>{hl.pit ? ` + ${PIT_LOSS.toFixed(0)}s stop` : ''}</div>
           {hr && <div>Recommended <strong>{Math.round(hr.wear)}%</strong> on {hr.compound.toLowerCase()}</div>}
         </div>
@@ -171,9 +174,13 @@ export interface StrategyBuilderProps {
   selectedStrategies: Record<string, any>;
   rainProbability: number;
   onLock: (labels: Record<string, string>) => void;
+  /** 'workstation' = column layout for the preparation screen, with the comparison view. */
+  variant?: 'card' | 'workstation';
 }
 
-export function StrategyBuilder({ appState, track, totalLaps, playerTeam, drivers, teams, grid, weekendContext, selectedStrategies, rainProbability, onLock }: StrategyBuilderProps) {
+export function StrategyBuilder({ appState, track, totalLaps, playerTeam, drivers, teams, grid, weekendContext, selectedStrategies, rainProbability, onLock, variant = 'card' }: StrategyBuilderProps) {
+  const ws = variant === 'workstation';
+  const [lower, setLower] = useState<'wear' | 'compare'>('wear');
   const reduced = !!useReducedMotion();
   const N = totalLaps;
   const names = drivers.map((d) => d.name);
@@ -229,6 +236,7 @@ export function StrategyBuilder({ appState, track, totalLaps, playerTeam, driver
     .map((n) => ({ n, issue: planIssues(profiles[n], (plans[n] || recs[n]), N).find((i: any) => i.blocking) }))
     .filter((x) => x.issue);
   const delta = proj.total - recProj.total;
+  const comparison = useMemo(() => (ws ? compareStrategies({ profile, field, driverName: name, totalLaps: N, rec }) : []), [ws, profile, field, name, N, rec]);
 
   const tTotal = useTween(proj.total, reduced);
   const tDelta = useTween(delta, reduced);
@@ -346,11 +354,11 @@ export function StrategyBuilder({ appState, track, totalLaps, playerTeam, driver
   );
 
   return (
-    <section aria-labelledby="sb-title" className="sb-root" style={{ ...glassCard(), marginBottom: 24 }}>
+    <section aria-labelledby="sb-title" className={ws ? 'sb-root wk-col wk-strat' : 'sb-root'} style={ws ? undefined : { ...glassCard(), marginBottom: 24 }}>
       {/* Header */}
       <div className="sb-rise" style={{ animationDelay: '0ms',  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
         <h4 id="sb-title" style={{ margin: 0, fontSize: 16, fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Route size={16} strokeWidth={1.5} color={HUB.textMuted} /> Race strategy
+          {ws ? <span className="wk-code">03</span> : null}<Route size={16} strokeWidth={1.5} color={HUB.textMuted} /> Race strategy
         </h4>
         <div className="sb-tabs" role="tablist" aria-label="Driver" onKeyDown={onTabKey}>
           {names.map((n, i) => {
@@ -476,7 +484,13 @@ export function StrategyBuilder({ appState, track, totalLaps, playerTeam, driver
           </span>
         </div>
 
-        {/* Wear chart */}
+        {ws && (
+          <div className="wk-seg" role="tablist" aria-label="Strategy analysis" style={{ marginBottom: 8 }}>
+            <button role="tab" aria-selected={lower === 'wear'} className={`wk-seg-btn ${lower === 'wear' ? 'is-on' : ''}`} onClick={() => setLower('wear')}>Tyre wear</button>
+            <button role="tab" aria-selected={lower === 'compare'} className={`wk-seg-btn ${lower === 'compare' ? 'is-on' : ''}`} onClick={() => setLower('compare')}>Compare strategies</button>
+          </div>
+        )}
+        {(!ws || lower === 'wear') && (
         <div className="sb-rise" style={{ animationDelay: '240ms',  background: HUB.raised, borderRadius: 10, padding: '12px 12px 4px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 4, fontSize: 12 }}>
             <span style={{ color: HUB.textMuted }}>Tyre wear per lap</span>
@@ -487,6 +501,33 @@ export function StrategyBuilder({ appState, track, totalLaps, playerTeam, driver
           </div>
           <WearChart proj={proj} recProj={recProj} totalLaps={N} driverName={name} />
         </div>
+
+        )}
+        {ws && lower === 'compare' && (
+          <div className="wk-compare">
+            <table className="wk-table">
+              <thead><tr><th>Plan</th><th>Tyres · stops</th><th className="num">Race time</th><th className="num">Finish</th><th className="num">Pit loss</th><th className="num">Peak wear</th><th>Risk</th><th /></tr></thead>
+              <tbody>
+                {comparison.map((r: any) => {
+                  const current = samePlan(plan, r.plan);
+                  return (
+                    <tr key={r.id} className={`${r.id === 'rec' ? 'is-rec' : ''} ${current ? 'is-cur' : ''}`}>
+                      <td><strong>{r.label}</strong>{r.same && <em className="wk-muted"> = rec.</em>}</td>
+                      <td><span className="wk-tyres">{r.plan.compounds.map((c: string, i: number) => <span key={i}>{tyreDot(c, 9)}</span>)}</span> {r.stops} · {r.plan.pitLaps.map((l: number) => `L${l}`).join(', ')}</td>
+                      <td className="num">{fmtRace(r.total)}{r.id !== 'rec' && <em className={r.delta < -0.05 ? 'is-up' : r.delta > 0.05 ? 'is-down' : ''}> {fmtDelta(r.delta)}</em>}</td>
+                      <td className="num">P{r.finish}</td>
+                      <td className="num">{r.pitLoss.toFixed(1)}s</td>
+                      <td className="num">{Math.round(r.peakWear)}%</td>
+                      <td><span className={`wk-risk is-${r.risk === 'Low' ? 'low' : r.risk === 'Medium' ? 'med' : 'high'}`} title={r.riskReason}>{r.risk}</span></td>
+                      <td>{current ? <span className="wk-muted">Current</span> : <button type="button" className={btnClass('ghost')} style={btn('ghost', 'sm', { height: 28 })} onClick={() => setPlan({ compounds: r.plan.compounds.slice(), pitLaps: r.plan.pitLaps.slice() })}>Use</button>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p style={{ margin: '8px 0 0', fontSize: 11, color: HUB.textFaint }}>Same pace model as the race. Stints use the sim's own split for each compound plan. Risk is high when a stint runs past the tyre cliff, medium when tyres pass 85% wear or the plan needs three stops.</p>
+          </div>
+        )}
 
         {/* Issues and notes */}
         <div className="sb-rise" style={{ animationDelay: '300ms',  display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>

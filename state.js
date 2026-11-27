@@ -4,6 +4,7 @@ import { Driver } from "./game/driver.js";
 import { ensureFinanceState } from "./utils/financeSystem.js";
 import { ensureEngineeringState } from "./utils/engineeringSystem.js";
 import { calendar } from "./data/calendar.js";
+import { syncStandingsFromHistory } from "./utils/championshipModel.js";
 
 export const state = {
   team: null,
@@ -160,7 +161,7 @@ export function hydrateState(payload) {
     // Restore every other saved system (engineering, setup lab, ...) that the
     // explicit assignments above don't cover, so a reload doesn't wipe it.
     const HANDLED = new Set(['team', 'aiTeams', 'season', 'standings', 'bestFinishes', 'driverWins', 'driverPodiums',
-      'raceHistory', 'signedSponsors', 'notifications', 'sponsorOffers', 'raceWeekend', 'weekendProgress', 'finance', 'academy', 'isDemo']);
+      'raceHistory', 'signedSponsors', 'notifications', 'sponsorOffers', 'raceWeekend', 'weekendProgress', 'finance', 'academy', 'isDemo', '_savedAt']);
     for (const [key, value] of Object.entries(rawData)) {
       if (!HANDLED.has(key) && value !== undefined) state[key] = value;
     }
@@ -170,6 +171,11 @@ export function hydrateState(payload) {
 
     ensureFinanceState(state);
     ensureEngineeringState(state);
+
+    // Race results are the authoritative source for points: realign the stored
+    // standings with them (fixes saves that drifted, e.g. points given to a DNF).
+    const fixes = syncStandingsFromHistory(state);
+    if (fixes.length) console.info(`[standings] realigned ${fixes.length} totals with race results`, fixes);
 
     return true;
   } catch (e) {

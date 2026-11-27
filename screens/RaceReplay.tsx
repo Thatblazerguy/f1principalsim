@@ -31,7 +31,7 @@ export function RaceReplay({ race, onClose }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(calc(100*var(--vh)) - 100px)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           {sectionLabel('Race archive')}

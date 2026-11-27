@@ -62,6 +62,7 @@ const DEMO_SCREENS = {
   racecontrol: renderRaceControlDemo,
   fia:         async (root) => (await import("./fia/FIADashboard.tsx")).renderFIADashboard(root),
   history:     async (root) => (await import("./screens/history.tsx")).renderHistory(root),
+  standings:   async (root) => (await import("./screens/leaderboard.tsx")).renderLeaderboard(root),
   finance:     async (root) => (await import("./screens/finance.tsx")).renderFinance(root),
 };
 

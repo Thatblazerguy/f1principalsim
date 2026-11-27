@@ -50,7 +50,7 @@ export function RivalDrawer({ you, rival, onClose }: { you: Profile | null; riva
                   <CompareRow label="Points" a={you.points} b={rival.points} />
                   <CompareRow label="Wins" a={you.wins} b={rival.wins} />
                   <CompareRow label="Podiums" a={you.podiums} b={rival.podiums} />
-                  <p className="dbx-note">Wins and podiums count a team's best finisher in each race this season ({you.races} race{you.races === 1 ? '' : 's'}).</p>
+                  <p className="dbx-note">Wins and podiums count every car's result this season ({you.races} race{you.races === 1 ? '' : 's'}).</p>
                 </Section>
               </Stagger>
 

@@ -169,7 +169,7 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', maxHeight: '60vh', overflowY: 'auto', paddingRight: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', maxHeight: 'calc(60*var(--vh))', overflowY: 'auto', paddingRight: '16px' }}>
         {ALL_CIRCUITS.map(c => {
           const isSelected = selectedCircuits.includes(c.name);
           const profile = getCircuitProfile(c.circuit);

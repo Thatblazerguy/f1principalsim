@@ -485,7 +485,7 @@ function FIACalendarBoard({ appRoot }: any) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100*var(--vh))', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
       {/* Toast Notification */}
       {notification && (
         <div style={{
@@ -737,7 +737,7 @@ function FIACalendarBoard({ appRoot }: any) {
         }}>
           <div style={{
             ...glassCard({ padding: '24px' }), maxWidth: 840, width: '100%',
-            maxHeight: '90vh', overflowY: 'auto'
+            maxHeight: 'calc(90*var(--vh))', overflowY: 'auto'
           }}>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>

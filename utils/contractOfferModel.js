@@ -210,5 +210,126 @@ export function getComparisonFacts(driver) {
     potential: driver.potentialCeiling ?? null,
     merch: commercial.merchandiseRevenue,
     popularity: commercial.popularity,
+    morale: driver.morale ?? null,
+    pace: driver.pace ?? null,
+    quali: driver.quali ?? null,
+    consistency: driver.consistency ?? null,
+  };
+}
+
+// ─── Contract renewal and salary talks (My drivers) ───────────────────────
+// The game had no renewal path. These rules are new but small and fully shown
+// in the builder: the driver's asking salary follows their rating and morale,
+// acceptance is one roll against the displayed odds, and a refusal costs morale
+// and closes talks until the next round. Salary is still charged through
+// financeSystem (salary / 24 per race), so no finance rules change.
+
+/** What the driver expects per season to extend. Rated 80 asks for their current salary; each point above adds 1%. */
+export function getRenewalAsking(driver) {
+  const base = Number(driver?.salary) || 1;
+  const overall = driverOverall(driver);
+  const morale = driver?.morale ?? 75;
+  let f = 1 + Math.max(0, overall - 80) * 0.01;
+  if (morale > 85) f -= 0.05;
+  else if (morale < 50) f += 0.1;
+  return Math.max(0.5, Math.round(base * f * 2) / 2);
+}
+
+export function areContractTalksClosed(appState, driver) {
+  const t = driver?.contractTalks;
+  return !!t && t.year === (appState?.season?.year || 1) && t.round === (appState?.season?.round || 1);
+}
+
+/**
+ * kind "renew"  → new salary and length.
+ * kind "salary" → change salary only, length unchanged. A raise is always accepted.
+ */
+export function computeRenewalOdds(appState, driver, terms, kind = "renew") {
+  const base = Number(driver?.salary) || 1;
+  const morale = driver?.morale ?? 75;
+  const age = driver?.age ?? 28;
+  const factors = [];
+  if (areContractTalksClosed(appState, driver)) {
+    return {
+      odds: 0, asking: getRenewalAsking(driver), rule: "They turned down an offer this round. Talks reopen next round.",
+      factors: [{ text: "Refused an offer this round", effect: "against" }], failureOutcome: null,
+    };
+  }
+
+  if (kind === "salary") {
+    if (terms.salary >= base - 1e-9) {
+      return {
+        odds: 100, asking: base,
+        rule: "A raise or the same salary is always accepted. A raise lifts morale by up to 10.",
+        factors: [{ text: `Not below the current $${base}M`, effect: "for" }], failureOutcome: null,
+      };
+    }
+    const cutPct = Math.round((1 - terms.salary / base) * 100);
+    let odds = 70 - cutPct * 4;
+    factors.push({ text: `${cutPct}% pay cut: −${cutPct * 4} points`, effect: "against" });
+    if (morale > 85) { odds += 10; factors.push({ text: `High morale (${morale})`, effect: "for" }); }
+    else if (morale < 50) { odds -= 20; factors.push({ text: `Low morale (${morale})`, effect: "against" }); }
+    odds = clamp(Math.round(odds), 0, 95);
+    return {
+      odds, asking: base,
+      rule: `A pay cut starts at 70% and loses 4 points for every 1% cut. Accepting costs ${Math.ceil(cutPct / 2)} morale.`,
+      factors, failureOutcome: "If they refuse, morale drops by 8 and talks close until next round.",
+    };
+  }
+
+  const asking = getRenewalAsking(driver);
+  let odds = 85;
+  const gapPct = Math.round((terms.salary / asking - 1) * 100);
+  if (gapPct < 0) { odds += gapPct * 3; factors.push({ text: `${-gapPct}% under their $${asking}M asking: ${gapPct * 3} points`, effect: "against" }); }
+  else { odds += Math.min(10, gapPct); factors.push({ text: gapPct > 0 ? `${gapPct}% over asking: +${Math.min(10, gapPct)} points` : `Meets the $${asking}M asking salary`, effect: "for" }); }
+  if (morale > 85) { odds += 10; factors.push({ text: `High morale (${morale})`, effect: "for" }); }
+  else if (morale < 50) { odds -= 20; factors.push({ text: `Low morale (${morale})`, effect: "against" }); }
+  if (age >= 34 && terms.seasons > 2) {
+    const pen = (terms.seasons - 2) * 10;
+    odds -= pen; factors.push({ text: `Age ${age}: prefers two seasons or fewer (−${pen})`, effect: "against" });
+  }
+  odds = clamp(Math.round(odds), 0, 98);
+  return {
+    odds, asking,
+    rule: `Starts at 85% at their $${asking}M asking salary, loses 3 points per 1% under it and gains up to 10 for paying more.`,
+    factors, failureOutcome: "If they refuse, morale drops by 5 and talks close until next round.",
+  };
+}
+
+/** Rolls the offer and applies it to the driver. Returns { accepted, headline, reply }. */
+export function runRenewalOffer(appState, driver, terms, kind = "renew", roll = Math.random()) {
+  const { odds } = computeRenewalOdds(appState, driver, terms, kind);
+  const base = Number(driver.salary) || 1;
+  const accepted = odds > 0 && roll * 100 < odds;
+  const year = appState?.season?.year || 1;
+  const seasonsWord = (n) => `${n} ${n === 1 ? "season" : "seasons"}`;
+  driver.careerTimeline = driver.careerTimeline || [];
+  if (accepted) {
+    if (kind === "salary") {
+      const change = terms.salary / base - 1;
+      const delta = change >= 0 ? Math.min(10, Math.round(change * 50)) : -Math.ceil(-change * 50);
+      driver.morale = clamp((driver.morale ?? 75) + delta, 0, 100);
+    } else {
+      driver.contractYearsRemaining = terms.seasons;
+      driver.morale = clamp((driver.morale ?? 75) + 3, 0, 100);
+    }
+    driver.salary = terms.salary;
+    driver.careerTimeline.unshift({
+      seasonYear: year,
+      event: kind === "salary" ? "Salary changed" : "Contract renewed",
+      detail: kind === "salary" ? `Now $${terms.salary}M a season.` : `$${terms.salary}M a season for ${seasonsWord(terms.seasons)}.`,
+    });
+    return {
+      accepted: true,
+      headline: kind === "salary" ? `${driver.name} agreed to $${terms.salary}M a season.` : `${driver.name} signed for ${seasonsWord(terms.seasons)}.`,
+      reply: kind === "salary" && terms.salary < base ? "Not what I hoped for, but I'm committed to this team." : "Happy to keep building with the team.",
+    };
+  }
+  driver.morale = clamp((driver.morale ?? 75) - (kind === "salary" ? 8 : 5), 0, 100);
+  driver.contractTalks = { year, round: appState?.season?.round || 1 };
+  return {
+    accepted: false,
+    headline: `${driver.name} turned the offer down.`,
+    reply: kind === "salary" ? "I'm not taking a pay cut. We can talk again later." : "That's not where I need it to be. Come back with something better.",
   };
 }

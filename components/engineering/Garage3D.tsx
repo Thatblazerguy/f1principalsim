@@ -4,6 +4,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer, MeshReflectorMaterial, OrbitControls, Html, ContactShadows } from '@react-three/drei';
 import { ProceduralCar, type CarPart } from '../../screens/landing/Car';
 import { GARAGE_PARTS, OVERVIEW_CAM } from './garageParts';
+import { useCanvasResizeNudge } from '../useCanvasResizeNudge';
+import { zoomSafeEvents } from '../zoomSafeEvents';
 
 /*
  * The team's car in the garage. Drag to orbit, click a hotspot to fly the camera
@@ -86,8 +88,11 @@ export default function Garage3D({ selected, onSelect, upgraded, active, reduced
 }) {
   const controls = useRef<any>(null);
   const flying = useRef(false);
+  useCanvasResizeNudge();
   return (
     <Canvas
+      events={zoomSafeEvents}
+      resize={{ offsetSize: true }}
       shadows={!mobile}
       dpr={mobile ? 1.25 : [1, 1.75]}
       camera={{ position: OVERVIEW_CAM.cam, fov: 32, near: 0.1, far: 120 }}

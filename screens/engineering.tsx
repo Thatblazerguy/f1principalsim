@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { constructorEntries } from "../utils/championshipModel.js";
 import { state } from "../state.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { GarageView } from "../components/engineering/GarageView.tsx";
@@ -58,7 +59,7 @@ function OverviewTab({ s }: any) {
   const { delta, trend } = getPerformanceTrend(s);
   const specs = eng?.carSpecs || {};
 
-  const sortedTeams = Object.entries(s.standings?.teams || {}).sort((a: any, b: any) => b[1] - a[1]);
+  const sortedTeams = constructorEntries(s);
   const constPos = sortedTeams.findIndex(t => t[0] === s.team?.name) + 1;
 
   const avgStaffRating = staff.length > 0
@@ -950,12 +951,12 @@ const TABS = [
   { id: 'reports', label: 'Reports', icon: <BookOpen size={16} strokeWidth={1.5} /> },
 ];
 
-function EngineeringHQ({ root }: { root: HTMLElement }) {
+function EngineeringHQ({ root, initialTab }: { root: HTMLElement; initialTab?: string }) {
   ensureTeamState(state.team!);
   ensureEngineeringState(state);
   ensureFinanceState(state);
 
-  const [activeTab, setActiveTab] = useState('garage');
+  const [activeTab, setActiveTab] = useState(initialTab || 'garage');
   const [flashMessage, setFlashMessage] = useState('');
   const s = state as any;
 
@@ -1024,7 +1025,7 @@ function EngineeringHQ({ root }: { root: HTMLElement }) {
   );
 }
 
-export function renderEngineering(root: HTMLElement) {
+export function renderEngineering(root: HTMLElement, initialTab?: string) {
   ensureTeamState(state.team!);
-  mountLayout(root, 'engineering', <EngineeringHQ root={root} />, () => renderEngineering(root));
+  mountLayout(root, 'engineering', <EngineeringHQ key={initialTab || 'garage'} root={root} initialTab={initialTab} />, () => renderEngineering(root, initialTab));
 }

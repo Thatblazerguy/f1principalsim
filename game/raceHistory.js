@@ -17,8 +17,11 @@
  * }
  */
 
+import { buildChampionship } from "../utils/championshipModel.js";
+
 // ─── F1 Points Table ─────────────────────────────────────────────────────────
 const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+export const SPRINT_POINTS = [8, 7, 6, 5, 4, 3, 2, 1];
 
 /**
  * Record a completed race into state.raceHistory.
@@ -40,8 +43,11 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
       team:      entry.team.name,
       finishPos: idx + 1,
       gridPos:   gridPos,
-      points:    entry.retired ? 0 : (F1_POINTS[idx] || 0),
+      // A retired car that completed 90% of the distance is still classified and scores
+      points:    entry.retired && !entry.classified ? 0 : (F1_POINTS[idx] || 0),
       retired:   Boolean(entry.retired),
+      classified: entry.retired ? Boolean(entry.classified) : true,
+      disqualified: Boolean(entry.disqualified),
       lapTimes:  entry.lapTimes || [],
     };
   });
@@ -92,6 +98,7 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
     circuit,
     day:      state.season?.currentDay || 0,
     weather:  replayData?.weather || 'dry', // Capture weather if available
+    seed:     replayData?.seed ?? null,      // replays the race (with the same inputs)
     driverResults,
     teamResults,
     standingsAfter: {
@@ -102,6 +109,10 @@ export function recordRaceHistory(round, raceName, circuit, results, standings, 
     replayData,
   };
 
+  // A round is recorded once per season: re-processing replaces the old record
+  // instead of adding a second one (which would double-count it in the standings).
+  state.raceHistory = state.raceHistory.filter(r =>
+    !((r.season ?? 1) === record.season && r.round === record.round && r.type !== 'sprint'));
   state.raceHistory.push(record);
 }
 
@@ -238,16 +249,57 @@ export function getTeamSeasonStats(teamName, raceHistory, season) {
     if (!r) return;
     points += r.points;
     positions.push(r.bestPos);
-    if (r.bestPos === 1) wins++;
-    if (r.bestPos <= 3) podiums++;
+    // Every car counts: a P1 and a P3 in the same race are one win and two podiums.
+    for (const d of race.driverResults || []) {
+      if (d.team !== teamName || d.retired) continue;
+      if (d.finishPos === 1) wins++;
+      if (d.finishPos <= 3) podiums++;
+    }
   });
 
+  // Championship position after each round, with count-back tie-breaks.
+  const champ = season != null ? buildChampionship({ raceHistory: races, season: { year: season } }, { season }) : null;
   const standingsProgression = races.map(race => {
-    const teams = Object.entries(race.standingsAfter?.teams || {})
-      .sort((a, b) => b[1] - a[1]);
-    const pos = teams.findIndex(([t]) => t === teamName);
-    return { round: race.round, name: race.name, pos: pos === -1 ? null : pos + 1, points: race.teamResults?.find(t => t.team === teamName)?.points || 0 };
+    let pos = null;
+    const i = champ ? champ.progression.rounds.findIndex(r => r.round === race.round) : -1;
+    if (i >= 0) pos = champ.progression.teams[i][teamName]?.pos ?? null;
+    else {
+      const teams = Object.entries(race.standingsAfter?.teams || {}).sort((a, b) => b[1] - a[1]);
+      const idx = teams.findIndex(([t]) => t === teamName);
+      pos = idx === -1 ? null : idx + 1;
+    }
+    return { round: race.round, name: race.name, pos, points: race.teamResults?.find(t => t.team === teamName)?.points || 0 };
   });
 
   return { wins, podiums, points, racesEntered: races.length, standingsProgression };
+}
+
+
+/**
+ * Record a sprint as its own history entry (type: 'sprint'). The championship
+ * model adds sprint points on top of the Grand Prix for that round.
+ */
+export function recordSprintHistory(round, raceName, circuit, results, state, grid = null, seed = null) {
+  if (!Array.isArray(state.raceHistory)) state.raceHistory = [];
+  const season = state.season?.year || 1;
+  const driverResults = results.map((entry, idx) => {
+    const g = grid ? grid.findIndex((x) => x.driver?.name === entry.driver.name) : -1;
+    return {
+      name: entry.driver.name,
+      team: entry.team.name,
+      finishPos: idx + 1,
+      gridPos: g >= 0 ? g + 1 : null,
+      points: entry.retired && !entry.classified ? 0 : (SPRINT_POINTS[idx] || 0),
+      retired: Boolean(entry.retired),
+      classified: entry.retired ? Boolean(entry.classified) : true,
+      lapTimes: entry.lapTimes || [],
+    };
+  });
+  const record = { type: 'sprint', round, season, name: `${raceName} Sprint`, circuit, day: state.season?.currentDay || 0, driverResults, seed };
+  state.raceHistory = state.raceHistory.filter((r) => !(r.type === 'sprint' && (r.season ?? 1) === season && r.round === round));
+  // Keep the sprint before that round's Grand Prix in the history
+  const gpIdx = state.raceHistory.findIndex((r) => r.type !== 'sprint' && (r.season ?? 1) === season && r.round === round);
+  if (gpIdx >= 0) state.raceHistory.splice(gpIdx, 0, record);
+  else state.raceHistory.push(record);
+  return record;
 }

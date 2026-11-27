@@ -22,7 +22,7 @@
 - [📸 Screenshots Showcase](#-screenshots-showcase)
 - [🚀 Key Features](#-key-features)
   - [1. Live Pit Wall Command Center (Race Control)](#1-live-pit-wall-command-center-race-control)
-  - [2. AI Race Objectives & ML Strategy Intelligence](#2-ai-race-objectives--ml-strategy-intelligence)
+  - [2. ML Pit Strategy, AI Race Engineer & Setup Neural Network](#2-ml-pit-strategy-ai-race-engineer--setup-neural-network)
   - [3. Full Championship Race Weekend](#3-full-championship-race-weekend)
   - [4. Car Development & Engineering R&D](#4-car-development--engineering-rd)
   - [5. FIA Governance & Circuit Designer Suite](#5-fia-governance--circuit-designer-suite)
@@ -57,7 +57,7 @@ The application is deployed live on Vercel with automatic CI/CD and production a
 ## 📸 Screenshots Showcase
 
 ### 1. Live Pit Wall Command Center (Race Control)
-*Real-time GPS circuit telemetry, broadcast-style timing tower, 4-wheel tire surface thermals, AI race engineer recommendations, and live driver orders.*
+*Live circuit map with every car, broadcast-style timing tower, battles, race feed, AI race engineer and driver orders.*
 
 ![Live Pit Wall Command Center](./assets/screenshots/pitwall-dashboard.png)
 
@@ -108,38 +108,68 @@ The application is deployed live on Vercel with automatic CI/CD and production a
 ## 🚀 Key Features
 
 ### 1. Live Pit Wall Command Center (Race Control)
-- **Vector GPS Circuit Positioning (`TrackMap.tsx`):** Real track geometry mapped with corner numbers, DRS zones, and live car coordinates.
-- **Broadcast F1 Timing Tower (`TimingTower.tsx`):** Live intervals, gap to leader, tire compound (Soft/Med/Hard/Inter/Wet), tire age in laps, and pit stop counts.
-- **Player Tactical Controls (`PlayerStrategyPanel.tsx`):**
-  - **Pace Modes:** *Conserve* (protect tires/fuel), *Balanced*, *Push*, and *Attack* (high wear/speed).
-  - **Fuel Management:** *Lean* (save fuel), *Standard*, and *Rich* (maximum horsepower).
-  - **ERS Battery Deployment:** *Charge* (regenerate battery), *Neutral*, *Deploy*, and *Overtake* boost.
-  - **Pit Commands:** Immediate *Box This Lap* order with compound selection.
-- **Live Telemetry Matrix (`TelemetryCenter.tsx`):** Real-time monitoring of speed, gear, RPM, throttle percentage, brake bias (54-58% F), PU water temperature, and individual 4-tire surface temperatures (FL, FR, RL, RR).
-- **Head-to-Head Battle Tracker (`BattleTracker.tsx`):** Displays real-time DRS detection gaps, slipstream speed deltas, and overtake probabilities.
-- **Team Radio & Event Feed (`CommsPanel.tsx`, `LiveEventFeed.tsx`):** Instant radio transmissions between driver and race engineer, sector flags, fastest lap alerts, and safety car notifications.
+Everything on this screen reads the live race engine (`game/LiveRaceEngine.js`); player commands go through the engine's own pit, pace, fuel and ERS calls.
+- **Live circuit map (`components/race/LiveCircuit.tsx`):** The real layout with every car in team colours, start line, sector markers, the DRS straight, corner numbers and a pit lane. Markers ease toward each car's engine position every frame. Hover for position, speed and tyres; click for telemetry; zoom, pan or focus a sector.
+- **Timing tower (`components/race/RaceParts.tsx`):** Interval or gap to leader, tyre compound and age, stops, places gained or lost, pit and retirement status. Filters for our drivers, constructor and pit status; rows animate and flash on position changes.
+- **Pit wall (`components/race/PitWall.tsx`):**
+  - **Race tab:** position against the projected finish and target, gaps ahead and behind with trend, tyre wear, fuel margin, ERS battery and engine temperature.
+  - **Driver instructions:** pace (*Attack*, *Push*, *Balanced*, *Conserve*, *Defend*), fuel mix (*Rich*, *Standard*, *Lean*) and ERS (*Overtake*, *Deploy*, *Balanced*, *Harvest*), each showing its effect. The AI race engineer's calls and auto mode are here too.
+  - **Pit strategy tab:** stint timeline, predicted tyre life and degradation, pit window, recommended compound, pit-lane time loss and rejoin estimate. *Box this lap* with compound choice, *Stay out*, or a stop planned for a later lap; the strategy model's ranking of options.
+  - **Radio tab:** driver and engineer messages.
+- **Battles (`components/race/BattleBoard.tsx`):** Cars within a second, our drivers first, with gap trend, DRS range, tyre age difference and relative pace.
+- **Race feed:** Lights out, overtakes, pit stops, fastest laps, retirements and the chequered flag, with lap and race time, in a filterable log.
+- **Telemetry (`components/race/TelemetryPanel.tsx`):** Average speed, last and best lap, tyres, fuel, ERS, gaps to leader and teammate, and per-lap charts compared with the teammate.
+- **Playback:** Pause, 1× to 16× speed, next event, next lap and skip to the flag. Space pauses; keys 1 to 5 set the speed.
+- **Broadcast mode:** A larger map and timing tower without the pit wall, with banners for overtakes, fastest laps and retirements.
 
 ---
 
-### 2. AI Race Objectives & ML Strategy Intelligence
-- **AI-Powered Pre-Race Objectives (`ObjectiveCards.tsx`, `PreRaceBriefingModal.tsx`):**
-  - High-stakes board targets (e.g., *Double Podium Finish*, *Tyre Management Index > 75%*, *Outscore Rival Constructor*).
-  - Financial prize bonuses ($500K–$2.5M) and board confidence modifiers upon completion.
-- **ML Strategy Assistant (`RaceEngineerPanel.tsx`, `MLStrategyEngine.js`):**
-  - In-browser machine learning recommendation engine powered by `strategy_ml/model.json`.
-  - Calculates real-time **Undercut** and **Overcut** probability matrices based on rival pit windows and tire cliff degradation.
-  - Monte Carlo stint duration simulations comparing 1-stop vs 2-stop strategies with pit lane loss deltas.
+### 2. ML Pit Strategy, AI Race Engineer & Setup Neural Network
+- **ML pit-strategy model (`game/strategy/`, `scripts/train-strategy-model.mjs`):**
+  - Predicts our expected finishing position for each pit option (box now, in 2/4/7/11 laps, or no stop) from the live race state, in ~55 µs per decision.
+  - **Teacher:** a seeded Monte Carlo rollout simulator built on the shared pace model, with traffic, dirty air, overtaking rolls and rivals' own pit stops. A rollout-based decision takes ~113 ms, too slow to run live for every option, so the network learns to imitate it.
+  - **Architecture:** a value ensemble (race state → places gained or lost) plus an advantage ensemble (state + option → how much better or worse this option is). Both are 3-member MLPs written from scratch in plain JS. The advantage net also gets the time-only planner's cost for each option, so it learns a *correction* on top of the physics (traffic, undercuts) rather than relearning tyre maths. The ensemble spread is shown in-game as uncertainty.
+  - **Data:** 6,000 race states (32k state–option samples) on 19 circuits, labelled with 24 rollouts per option using common random numbers.
+  - **Offline evaluation** on 5 held-out circuits (Suzuka, Hungaroring, Singapore, Interlagos, Lusail), against a fresh oracle with 96 rollouts per option. "Regret" is how many positions a pick loses against the best option:
+
+    | Decision rule | Mean regret (positions) |
+    |---|---|
+    | **Strategy model** | **0.174** |
+    | Race engineer's time-only planner | 0.208 |
+    | Always box now | 1.446 |
+    | Random option | 1.456 |
+
+  - **End-to-end evaluation** (`npm run eval:strategy`): 200 paired races in the real live race engine (with safety cars, VSCs and archetype-based AI strategies) on the held-out circuits, with the engineer on auto and both runs from the same seed. Pit calls from the model finished **0.63 places better per car** than the planner (standard error 0.11, average P12.30 vs P12.93); the model was ahead in 114 races and behind in 56. Under a safety car the engineer takes the cheap stop itself, since the model was trained without neutralisations.
+  - In Race Control the pit wall shows the model's ranking of options next to the planner's pick. It flags disagreements worth ≥0.3 places, and on auto it makes the pit calls.
+- **Forecast-driven race objectives (`utils/raceForecast.js`, `utils/raceObjectives.js`):**
+  - Before each Grand Prix the game simulates the race 300 times. It uses every car's pace profile on this circuit (car rating including your engineering upgrades, driver skill, form, setup quality, circuit fit), the track's rain odds, its overtaking difficulty and tyre wear, per-car reliability, and, once qualifying has run, the real grid and weather.
+  - Targets are pitched from those odds: the primary objective is the most ambitious finish you reach at least 40% of the time, plus a stretch goal and a banker. Rival, hold-position (hard-to-pass tracks), gain-places (easier tracks, when starting out of position) and reliability objectives appear only when the forecast says they're in play.
+  - Every success percentage is a simulated frequency, and each explanation cites the numbers behind it, e.g. *"On pace we're 4th of 11 teams here, 0.31s a lap off the quickest car. There's a 40% chance of rain… In 300 simulated races one of our cars finished on the podium 46% of the time."*
+  - Each objective records how it will be judged after the race (best finish, both cars, beat a team, places gained, held position, both classified).
+- **AI Race Engineer (`game/RaceEngineer.js`, shown in `components/race/PitWall.tsx`):**
+  - A rule-based pit-wall strategist built on the shared pace model (`game/paceModel.js`), the same model both race engines use.
+  - Every tick it computes real gaps and closing rates, laps to the tyre cliff, the best pit plan for the rest of the race (box now / in N laps / stay out) and the rejoin position.
+  - Flags undercut/overcut chances and threats from behind, makes pace/ERS/fuel calls, and can run the car on its own.
+- **Setup Lab neural network (`game/setup/`, `scripts/train-setup-model.mjs`):**
+  - A 3-member MLP ensemble (19→24→16→1), written from scratch in plain JavaScript and trained on 24,000 generated "simulator" samples across real and synthetic circuits (`npm run train:setup`, seeded for reproducibility).
+  - Evaluated on 8 held-out real circuits (held-out MAE 0.0245). It cuts setup loss from 0.180 (neutral setup) to 0.094 before practice, and to 0.033 after the practice runs refine it.
 
 ---
 
 ### 3. Full Championship Race Weekend
 - **Free Practice Sessions (`game/practice.js`):** Run setup test runs to dial in aerodynamic balance, tire wear rates, and mechanical grip.
 - **Knockout Qualifying (`game/qualifying.js`):** Authentic 3-session shootout (Q1 → Q2 → Q3) where the 5 slowest drivers are eliminated each round.
-- **Dynamic Grand Prix Simulation (`game/race.js`, `game/raceSimulator.js`):**
-  - Dynamic weather transitions (Dry → Drizzle → Heavy Rain).
-  - Safety Car (SC) and Virtual Safety Car (VSC) periods creating tactical pit windows.
-  - Mechanical reliability failures (ERS faults, hydraulics, engine blowouts).
-- **Post-Race Debrief & Detailed Report (`components/ui/DetailedRaceReport.tsx`):** Full 20-driver classification, championship point awards (25-18-15-12-10-8-6-4-2-1 + fastest lap point), penalty notices, and financial earnings breakdown.
+- **One set of race rules, two engines (`game/raceEvents.js`):** the lap-batched quick sim (`game/raceSimulator.js`) and the live pit wall (`game/LiveRaceEngine.js`) share the same pace model and the same race events, so a Grand Prix plays by the same rules whichever you choose:
+  - **Safety cars and VSCs:** the field bunches up, no overtaking, and pit stops cost about half. The AI and the race engineer take the cheap stop.
+  - **Season settings:** weather, safety-car frequency, failure rate and AI aggressiveness are all applied. Aggressive AI races harder and makes more mistakes.
+  - **Strategy and reliability:** AI strategy is chosen by team archetype; first-lap incidents; one reliability model (tracked component wear for your cars, team reliability for the rest).
+  - **Weather:** decided once per weekend. Qualifying's conditions are the race's conditions.
+  - **Sporting rules:** two dry compounds in a dry race or disqualification; a retired car that completed 90% of the distance is still classified and scores.
+  - **Seeded and reproducible:** every qualifying session and race runs from a stored seed, and the same seed (with the same inputs) replays the same race.
+- **Sprint weekends:** on sprint rounds (when sprints are on), a sprint runs from the qualifying grid before the Grand Prix: about a third of the distance, no mandatory stop, points for the top 8 (8-7-6-5-4-3-2-1).
+- **Qualifying on the same pace model:** a qualifying lap is the car's race-pace profile on low fuel and fresh softs, plus the driver's one-lap skill, so the car counts once and poles are shared out realistically rather than one team taking almost all of them.
+- **Race objectives are a trade-off:** pushing for a win is quicker per lap but wears tyres faster and brings more mistakes and failures; across hundreds of simulated races no objective gives a free advantage.
+- **Post-Race Debrief & Detailed Report (`components/ui/DetailedRaceReport.tsx`):** Full classification, championship points, penalty notices, and financial earnings breakdown.
 
 ---
 
@@ -211,7 +241,7 @@ The application is deployed live on Vercel with automatic CI/CD and production a
 | **Charts & Visuals** | [Chart.js 4](https://www.chartjs.org/) + `react-chartjs-2` |
 | **Backend & Auth** | [Supabase](https://supabase.com/) (PostgreSQL, Row Level Security, Supabase Auth) |
 | **F1 Telemetry & Data**| [OpenF1 API](https://openf1.org/) integration for real-time driver/team data |
-| **Strategy Intelligence**| In-Browser Monte Carlo Simulation + Exported Strategy Models (`strategy_ml/`) |
+| **Strategy & ML** | Neural pit-strategy model distilled from Monte Carlo rollouts; AI race engineer on a shared pace model; from-scratch MLP ensemble for car setup |
 | **Deployment** | [Vercel](https://vercel.com/) (Edge Network, Static SPA Hosting) |
 
 ---
@@ -234,18 +264,17 @@ f1manager/
 │   ├── HubLayout.tsx                # Championship hub navigation shell
 │   ├── NavDropdown.tsx              # Navigation menu popovers
 │   ├── driverComparison.tsx         # Driver attribute comparison radar
+│   ├── race/                        # Live race control
+│   │   ├── LiveCircuit.tsx          # Live circuit map with every car
+│   │   ├── RaceParts.tsx            # Header, timing tower, feed, playback bar
+│   │   ├── PitWall.tsx              # Driver instructions and pit strategy
+│   │   ├── BattleBoard.tsx          # Cars within a second
+│   │   └── TelemetryPanel.tsx       # Per-driver telemetry and charts
 │   └── ui/                          # Radix primitives & Pit Wall HUD
-│       ├── BattleTracker.tsx        # Real-time DRS & overtake battles
-│       ├── CommsPanel.tsx           # Team radio & engineer chatter
 │       ├── DetailedRaceReport.tsx   # Grand Prix post-race classification
-│       ├── LiveEventFeed.tsx        # Race events, flags & pit stops
 │       ├── ObjectiveCards.tsx       # AI pre-race objective cards
-│       ├── PlayerStrategyPanel.tsx  # Push mode, fuel, ERS & box commands
 │       ├── PreRaceBriefingModal.tsx # Pre-race strategy briefing dialog
-│       ├── RaceEngineerPanel.tsx    # AI ML race engineer recommendations
 │       ├── StrategyIntelligenceCard.tsx # Pit delta & undercut calculators
-│       ├── TelemetryCenter.tsx      # 4-wheel tire temps & speed gauges
-│       ├── TimingTower.tsx          # F1-style live timing & intervals
 │       └── TrackMap.tsx             # Vector GPS circuit tracking
 ├── data/                            # Game datasets & real-world records
 │   ├── calendar.js                  # 24-race 2026 championship calendar
@@ -269,11 +298,14 @@ f1manager/
 │       └── FIASeasonReview.tsx      # Season ratification & review
 ├── game/                            # Core simulation engines
 │   ├── LiveRaceEngine.js            # Lap-by-lap interactive race simulation
-│   ├── MLStrategyEngine.js          # Strategy assistant model runner
+│   ├── RaceEngineer.js              # AI pit-wall strategist
+│   ├── strategy/                    # ML pit strategy: rollout oracle, features, model
 │   ├── academy.js                   # Driver academy training mechanics
 │   ├── development.js               # Car performance upgrade logic
 │   ├── qualifying.js                # Q1/Q2/Q3 knockout session logic
-│   ├── race.js                      # Single race simulation engine
+│   ├── raceSimulator.js             # Quick-sim race engine
+│   ├── paceModel.js                 # Shared lap-time model
+│   ├── setup/                       # Setup physics + neural network
 │   └── raceHistory.js               # Historical season stats accumulator
 ├── lib/                             # External clients & API helpers
 │   ├── supabaseClient.js            # Supabase initialization with fallback
@@ -295,16 +327,18 @@ f1manager/
 │   ├── setup.tsx                    # New season team & driver setup
 │   ├── sponsors.tsx                 # Sponsorship contract management
 │   └── weekend.tsx                  # Practice → Qualifying → Race flow
-├── strategy_ml/                     # Machine learning models & training
-│   ├── model.json                   # Exported ML rules for in-browser inference
-│   └── train_model.py               # Python model training script
+├── strategy_ml/                     # Real-world F1 data fetchers (OpenF1, Jolpica, FastF1)
 ├── utils/                           # Helper utilities
 │   ├── circuitSuitability.js        # 7-pillar circuit performance modifier
 │   ├── classificationValidator.js   # Race classification consistency checks
 │   └── reactRoot.tsx                # Dynamic React mount helper
 ├── vercel.json                      # Vercel SPA routing rewrite rules
-├── supabase_schema.sql              # Supabase table definitions & RLS
-├── f1_save_patch.sql                # Database migration patches
+├── supabase/
+│   ├── schema.sql                   # Supabase table definitions & RLS
+│   └── save_patch.sql               # Database migration patches
+├── scripts/                         # Model training/eval scripts (legacy/ = old one-off patches)
+├── assets/fonts/                    # Formula1 typefaces (loaded from style.css)
+├── eslint.config.js / .prettierrc.json  # Lint & format config
 ├── vite.config.js                   # Vite configuration
 └── package.json                     # Project manifest & dependencies
 ```
@@ -394,18 +428,19 @@ cd f1principalsim
 # 2. Install dependencies
 npm install
 
-# 3. Create .env file (optional)
-cp .env.example .env 2>/dev/null || cat << 'EOF' > .env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key_here
-VITE_OPENF1_API_URL=https://api.openf1.org
-EOF
+# 3. Create .env file (optional — without it the app runs in demo mode)
+cp .env.example .env
 
 # 4. Launch development server with HMR
 npm run dev
 
 # 5. Build for production
 npm run build
+
+# Checks: lint, typecheck, tests (or all three with `npm run check`)
+npm run lint
+npm run typecheck
+npm test
 ```
 
 The development server runs at `http://localhost:5173`.
@@ -423,8 +458,8 @@ When running with Supabase enabled, user save states and championship records ar
 
 To initialize your own Supabase project:
 1. Open your Supabase Dashboard → **SQL Editor**.
-2. Run `supabase_schema.sql` to generate tables and RLS security policies.
-3. Run `f1_save_patch.sql` for incremental schema updates.
+2. Run `supabase/schema.sql` to generate tables and RLS security policies.
+3. Run `supabase/save_patch.sql` for incremental schema updates.
 
 ---
 
