@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { HUB, glassCard, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../HubLayout.tsx';
-import { Settings, ShieldAlert, Zap, CloudRain, Shield, AlertTriangle, ChevronRight, Activity, Map, MapPin } from "lucide-react";
+import { HUB, glassCard, btn, btnClass, sectionLabel, pageTitle, pageSubtitle, pill } from '../HubLayout.tsx';
+import { Settings, ShieldAlert, Zap, CloudRain, Shield, AlertTriangle, ChevronRight, ArrowLeft, Activity, Map, MapPin } from "lucide-react";
 import { calendar as ALL_CIRCUITS } from '../../data/calendar.js';
 import { getCircuitProfile } from '../../utils/devProjects.js';
 import { getCompetitivenessForecast } from '../../utils/teamState.js';
@@ -59,83 +59,89 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ marginBottom: '16px' }}>
         {sectionLabel('Step 1 of 3')}
-        {pageTitle('Championship Format')}
-        {pageSubtitle('Configure the rules and length of the upcoming season. Development timescales and costs will scale dynamically.')}
+        {pageTitle('Championship format')}
+        {pageSubtitle('Configure the rules and length of the upcoming season. Development timescales and costs scale with season length.')}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#fff' }}>Calendar Length</h3>
+          <h3 style={{ margin: 0, fontSize: '16px', fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Calendar length</h3>
           <p style={{ margin: 0, fontSize: '13px', color: HUB.textMuted }}>Select the number of races. Shorter seasons have cheaper, faster development.</p>
           <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
             {[6, 12, 24].map(rounds => (
               <button 
                 key={rounds}
                 onClick={() => setRules({...rules, totalRounds: rounds})}
+                aria-pressed={rules.totalRounds === rounds}
+                className="hub-btn"
                 style={{
-                  ...actionBtn({ backgroundColor: rules.totalRounds === rounds ? HUB.accent : 'rgba(255,255,255,0.05)', color: rules.totalRounds === rounds ? '#fff' : HUB.textMuted }),
+                  ...btn('secondary', 'sm', rules.totalRounds === rounds ? { backgroundColor: HUB.accentSoft, borderColor: 'rgba(225,6,0,0.4)' } : { color: HUB.textMuted }),
                   flex: 1
                 }}
               >
-                {rounds} Races
+                {rounds} races
               </button>
             ))}
           </div>
         </div>
 
         <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#fff' }}>Sprint Weekends</h3>
+          <h3 style={{ margin: 0, fontSize: '16px', fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Sprint weekends</h3>
           <p style={{ margin: 0, fontSize: '13px', color: HUB.textMuted }}>Enable or disable sprint races at selected venues.</p>
           <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
             <button 
               onClick={() => setRules({...rules, sprints: true})}
-              style={{ ...actionBtn({ backgroundColor: rules.sprints ? HUB.accent : 'rgba(255,255,255,0.05)', color: rules.sprints ? '#fff' : HUB.textMuted }), flex: 1 }}
+              aria-pressed={rules.sprints}
+              className="hub-btn"
+              style={{ ...btn('secondary', 'sm', rules.sprints ? { backgroundColor: HUB.accentSoft, borderColor: 'rgba(225,6,0,0.4)' } : { color: HUB.textMuted }), flex: 1 }}
             >Enabled</button>
             <button 
               onClick={() => setRules({...rules, sprints: false})}
-              style={{ ...actionBtn({ backgroundColor: !rules.sprints ? HUB.accent : 'rgba(255,255,255,0.05)', color: !rules.sprints ? '#fff' : HUB.textMuted }), flex: 1 }}
+              aria-pressed={!rules.sprints}
+              className="hub-btn"
+              style={{ ...btn('secondary', 'sm', !rules.sprints ? { backgroundColor: HUB.accentSoft, borderColor: 'rgba(225,6,0,0.4)' } : { color: HUB.textMuted }), flex: 1 }}
             >Disabled</button>
           </div>
         </div>
       </div>
 
       <div style={{ ...glassCard({ padding: '24px' }) }}>
-        <h3 style={{ margin: '0 0 24px', fontSize: '16px', color: '#fff' }}>Simulation Parameters</h3>
+        <h3 style={{ margin: '0 0 24px', fontSize: '16px', fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Simulation parameters</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
           {/* Weather */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-            <CloudRain size={20} color={HUB.accent} style={{ marginBottom: '12px' }} />
-            <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: '#fff' }}>Weather</h4>
-            <select value={rules.weather ? 'dynamic' : 'dry'} onChange={(e) => setRules({...rules, weather: e.target.value === 'dynamic'})} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '8px', borderRadius: '4px', cursor: 'pointer' }}>
+          <div style={{ background: HUB.raised, border: `1px solid ${HUB.border}`, padding: '16px', borderRadius: '8px' }}>
+            <CloudRain size={16} strokeWidth={1.5} color={HUB.textMuted} style={{ marginBottom: '12px' }} />
+            <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Weather</h4>
+            <select value={rules.weather ? 'dynamic' : 'dry'} onChange={(e) => setRules({...rules, weather: e.target.value === 'dynamic'})} style={{ width: '100%', height: '36px', background: HUB.raised, border: `1px solid ${HUB.borderMid}`, color: HUB.textPrimary, padding: '0 8px', borderRadius: '8px', cursor: 'pointer', fontFamily: HUB.fontRegular }}>
               <option value="dynamic">Dynamic</option>
-              <option value="dry">Dry Only</option>
+              <option value="dry">Dry only</option>
             </select>
           </div>
           {/* Safety Cars */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-            <ShieldAlert size={20} color={HUB.accent} style={{ marginBottom: '12px' }} />
-            <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: '#fff' }}>Safety Cars</h4>
-            <select value={rules.scFrequency} onChange={(e) => setRules({...rules, scFrequency: e.target.value})} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '8px', borderRadius: '4px', cursor: 'pointer' }}>
+          <div style={{ background: HUB.raised, border: `1px solid ${HUB.border}`, padding: '16px', borderRadius: '8px' }}>
+            <ShieldAlert size={16} strokeWidth={1.5} color={HUB.textMuted} style={{ marginBottom: '12px' }} />
+            <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Safety cars</h4>
+            <select value={rules.scFrequency} onChange={(e) => setRules({...rules, scFrequency: e.target.value})} style={{ width: '100%', height: '36px', background: HUB.raised, border: `1px solid ${HUB.borderMid}`, color: HUB.textPrimary, padding: '0 8px', borderRadius: '8px', cursor: 'pointer', fontFamily: HUB.fontRegular }}>
               <option value="low">Low</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
             </select>
           </div>
           {/* Reliability */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-            <Zap size={20} color={HUB.accent} style={{ marginBottom: '12px' }} />
-            <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: '#fff' }}>Failures</h4>
-            <select value={rules.failures} onChange={(e) => setRules({...rules, failures: e.target.value})} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '8px', borderRadius: '4px', cursor: 'pointer' }}>
+          <div style={{ background: HUB.raised, border: `1px solid ${HUB.border}`, padding: '16px', borderRadius: '8px' }}>
+            <Zap size={16} strokeWidth={1.5} color={HUB.textMuted} style={{ marginBottom: '12px' }} />
+            <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Failures</h4>
+            <select value={rules.failures} onChange={(e) => setRules({...rules, failures: e.target.value})} style={{ width: '100%', height: '36px', background: HUB.raised, border: `1px solid ${HUB.borderMid}`, color: HUB.textPrimary, padding: '0 8px', borderRadius: '8px', cursor: 'pointer', fontFamily: HUB.fontRegular }}>
               <option value="low">Low</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
             </select>
           </div>
           {/* AI Aggressiveness */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
-            <AlertTriangle size={20} color={HUB.accent} style={{ marginBottom: '12px' }} />
-            <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: '#fff' }}>AI Aggression</h4>
-            <select value={rules.aiAggressiveness} onChange={(e) => setRules({...rules, aiAggressiveness: e.target.value})} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '8px', borderRadius: '4px', cursor: 'pointer' }}>
+          <div style={{ background: HUB.raised, border: `1px solid ${HUB.border}`, padding: '16px', borderRadius: '8px' }}>
+            <AlertTriangle size={16} strokeWidth={1.5} color={HUB.textMuted} style={{ marginBottom: '12px' }} />
+            <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontFamily: HUB.fontBold, color: HUB.textPrimary }}>AI aggression</h4>
+            <select value={rules.aiAggressiveness} onChange={(e) => setRules({...rules, aiAggressiveness: e.target.value})} style={{ width: '100%', height: '36px', background: HUB.raised, border: `1px solid ${HUB.borderMid}`, color: HUB.textPrimary, padding: '0 8px', borderRadius: '8px', cursor: 'pointer', fontFamily: HUB.fontRegular }}>
               <option value="low">Low</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
@@ -145,7 +151,7 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-        <button onClick={() => setStep(2)} style={actionBtn({ backgroundColor: HUB.accent })}>Next: Circuit Selection <ChevronRight size={16}/></button>
+        <button onClick={() => setStep(2)} className={btnClass('primary')} style={btn('primary', 'md')}>Next: circuits <ChevronRight size={16} strokeWidth={1.5}/></button>
       </div>
     </div>
   );
@@ -155,11 +161,11 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           {sectionLabel('Step 2 of 3')}
-          {pageTitle('Circuit Selection')}
+          {pageTitle('Circuits')}
           {pageSubtitle(`Select ${rules.totalRounds} circuits for the upcoming championship calendar.`)}
         </div>
-        <div style={{ fontSize: '18px', fontWeight: 800, color: selectedCircuits.length === rules.totalRounds ? '#10b981' : '#f59e0b' }}>
-          {selectedCircuits.length} / {rules.totalRounds} Selected
+        <div style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: selectedCircuits.length === rules.totalRounds ? HUB.textPrimary : HUB.warning }}>
+          {selectedCircuits.length} / {rules.totalRounds} selected
         </div>
       </div>
 
@@ -174,28 +180,29 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
               style={{
                 ...glassCard({ padding: '16px' }), 
                 cursor: 'pointer',
-                border: isSelected ? `2px solid ${HUB.accent}` : `1px solid ${HUB.border}`,
-                background: isSelected ? 'rgba(225, 6, 0, 0.05)' : 'rgba(0,0,0,0.4)',
+                border: `1px solid ${isSelected ? 'rgba(225,6,0,0.4)' : HUB.border}`,
+                background: isSelected ? HUB.accentSoft : HUB.surface,
+                transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}`,
                 opacity: (!isSelected && selectedCircuits.length >= rules.totalRounds) ? 0.5 : 1
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
-                  <h4 style={{ margin: '0 0 4px', fontSize: '15px', color: '#fff', fontWeight: 700 }}>{c.name}</h4>
+                  <h4 style={{ margin: '0 0 4px', fontSize: '16px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{c.name}</h4>
                   <p style={{ margin: 0, fontSize: '12px', color: HUB.textMuted }}>{c.country}</p>
                 </div>
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? HUB.accent : '#555'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? HUB.accent : HUB.borderMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: HUB.accent }} />}
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                <span style={{ ...pill(false), fontSize: '10px' }}>{profile.type}</span>
-                <span style={{ ...pill(false), fontSize: '10px' }}>Diff: {c.difficulty}</span>
+                <span style={{ ...pill(false), fontSize: '11px' }}>{profile.type}</span>
+                <span style={{ ...pill(false), fontSize: '11px' }}>Difficulty {c.difficulty}</span>
               </div>
               
-              <div style={{ fontSize: '11px', color: HUB.textMuted }}>
-                <strong>Key:</strong> {profile.strengths.map(s => s.split('.')[1]).join(', ') || 'Balanced'}
+              <div style={{ fontSize: '12px', color: HUB.textMuted }}>
+                <span style={{ color: HUB.textFaint }}>Key</span> {profile.strengths.map(s => s.split('.')[1]).join(', ') || 'Balanced'}
               </div>
             </div>
           );
@@ -203,13 +210,14 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
-        <button onClick={() => setStep(1)} style={actionBtn({ backgroundColor: 'transparent', border: `1px solid ${HUB.border}` })}>Back</button>
+        <button onClick={() => setStep(1)} className={btnClass('secondary')} style={btn('secondary', 'md')}><ArrowLeft size={16} strokeWidth={1.5} /> Back to format</button>
         <button 
           onClick={() => setStep(3)} 
           disabled={selectedCircuits.length !== rules.totalRounds}
-          style={{ ...actionBtn({ backgroundColor: selectedCircuits.length === rules.totalRounds ? HUB.accent : 'rgba(255,255,255,0.1)' }), opacity: selectedCircuits.length === rules.totalRounds ? 1 : 0.5 }}
+          className={btnClass('primary')}
+          style={btn('primary', 'md')}
         >
-          Next: Season Forecast <ChevronRight size={16}/>
+          Next: forecast <ChevronRight size={16} strokeWidth={1.5}/>
         </button>
       </div>
     </div>
@@ -219,19 +227,19 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ marginBottom: '16px' }}>
         {sectionLabel('Step 3 of 3')}
-        {pageTitle('Engineering Forecast')}
-        {pageSubtitle('AI projection of your car\'s competitiveness across the selected calendar.')}
+        {pageTitle('Season forecast')}
+        {pageSubtitle('Projected competitiveness of your car at each circuit on the calendar.')}
       </div>
 
       <div style={{ ...glassCard({ padding: '24px' }), overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr style={{ borderBottom: `1px solid ${HUB.border}`, color: HUB.textMuted, fontSize: '12px', textTransform: 'uppercase' }}>
-              <th style={{ padding: '12px' }}>Rnd</th>
-              <th style={{ padding: '12px' }}>Circuit</th>
-              <th style={{ padding: '12px' }}>Track Type</th>
-              <th style={{ padding: '12px' }}>Proj. Rank</th>
-              <th style={{ padding: '12px' }}>Expected Finish</th>
+            <tr style={{ borderBottom: `1px solid ${HUB.border}`, color: HUB.textMuted, fontSize: '12px' }}>
+              <th style={{ padding: '12px', fontWeight: 400 }}>Round</th>
+              <th style={{ padding: '12px', fontWeight: 400 }}>Circuit</th>
+              <th style={{ padding: '12px', fontWeight: 400 }}>Track type</th>
+              <th style={{ padding: '12px', fontWeight: 400 }}>Projected rank</th>
+              <th style={{ padding: '12px', fontWeight: 400 }}>Expected finish</th>
             </tr>
           </thead>
           <tbody>
@@ -241,12 +249,12 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
               const forecast = getCompetitivenessForecast(state, c.circuit);
               
               return (
-                <tr key={cName} style={{ borderBottom: `1px solid rgba(255,255,255,0.05)` }}>
-                  <td style={{ padding: '12px', color: '#fff', fontFamily: HUB.fontMono }}>{idx + 1}</td>
-                  <td style={{ padding: '12px', color: '#fff', fontWeight: 700 }}>{cName}</td>
+                <tr key={cName} style={{ borderBottom: `1px solid ${HUB.border}` }}>
+                  <td style={{ padding: '12px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{idx + 1}</td>
+                  <td style={{ padding: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{cName}</td>
                   <td style={{ padding: '12px', color: HUB.textMuted, fontSize: '13px' }}>{profile.type}</td>
-                  <td style={{ padding: '12px', color: '#fff', fontFamily: HUB.fontMono, fontWeight: 700 }}>P{forecast.rank}</td>
-                  <td style={{ padding: '12px', color: forecast.rank <= 3 ? '#10b981' : forecast.rank <= 6 ? '#3b82f6' : '#f59e0b', fontSize: '13px', fontWeight: 600 }}>{forecast.finish}</td>
+                  <td style={{ padding: '12px', color: HUB.textPrimary, fontFamily: HUB.fontMono, fontWeight: 400 }}>P{forecast.rank}</td>
+                  <td style={{ padding: '12px', color: forecast.rank <= 3 ? HUB.positive : HUB.textPrimary, fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold }}>{forecast.finish}</td>
                 </tr>
               );
             })}
@@ -255,14 +263,14 @@ export function SeasonSetup({ onComplete, initialRules = null }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
-        <button onClick={() => setStep(2)} style={actionBtn({ backgroundColor: 'transparent', border: `1px solid ${HUB.border}` })}>Back</button>
-        <button onClick={handleComplete} style={actionBtn({ backgroundColor: HUB.accent })}>Confirm Season Setup</button>
+        <button onClick={() => setStep(2)} className={btnClass('secondary')} style={btn('secondary', 'md')}><ArrowLeft size={16} strokeWidth={1.5} /> Back to circuits</button>
+        <button onClick={handleComplete} className={btnClass('primary')} style={btn('primary', 'md')}>Confirm season setup</button>
       </div>
     </div>
   );
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 20px' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 24px' }}>
       {step === 1 && renderStep1()}
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HUB, glassCard, actionBtn } from './HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass } from './HubLayout.tsx';
 import { NegotiationSession } from '../game/driverNegotiation.js';
 import { getDriverHeadshotUrl } from '../data/drivers.js';
 
@@ -36,7 +36,6 @@ export const DriverNegotiationModal = ({
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.85)',
-      backdropFilter: 'blur(8px)',
       zIndex: 9999,
       display: 'flex',
       alignItems: 'center',
@@ -63,32 +62,31 @@ export const DriverNegotiationModal = ({
           borderBottom: `1px solid ${HUB.border}`,
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
-          background: 'linear-gradient(to right, rgba(255,255,255,0.05), transparent)'
+          gap: '24px'
         }}>
           <div style={{
             width: '80px', height: '80px',
             borderRadius: '50%',
             overflow: 'hidden',
             backgroundColor: HUB.sidebar,
-            border: `2px solid ${HUB.accent}`
+            border: `1px solid ${HUB.borderMid}`
           }}>
-            <img 
-              src={getDriverHeadshotUrl(driver.name)} 
+            <img
+              src={getDriverHeadshotUrl(driver.name)}
               alt={driver.name}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           </div>
           <div>
-            <div style={{ fontFamily: HUB.fontWide, fontSize: '12px', color: HUB.accent, letterSpacing: '1px' }}>
-              CONTRACT NEGOTIATION
+            <div style={{ fontFamily: HUB.fontRegular, fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>
+              Contract negotiation
             </div>
             <div style={{ fontFamily: HUB.fontBold, fontSize: '24px', color: HUB.textPrimary }}>
               {driver.name}
             </div>
             <div style={{ fontFamily: HUB.fontRegular, fontSize: '14px', color: HUB.textMuted }}>
-              Resistance: {Math.max(0, session.resistance)} | Morale: {driver.morale}
+              Resistance {Math.max(0, session.resistance)} · Morale {driver.morale}
             </div>
           </div>
         </div>
@@ -112,16 +110,16 @@ export const DriverNegotiationModal = ({
                 style={{
                   alignSelf: line.speaker === 'You' ? 'flex-end' : 'flex-start',
                   maxWidth: '70%',
-                  background: line.speaker === 'You' ? 'rgba(225, 6, 0, 0.1)' : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${line.speaker === 'You' ? 'rgba(225, 6, 0, 0.3)' : HUB.border}`,
-                  borderRadius: '12px',
+                  background: line.speaker === 'You' ? HUB.raised : HUB.bg,
+                  border: `1px solid ${line.speaker === 'You' ? HUB.borderMid : HUB.border}`,
+                  borderRadius: '8px',
                   padding: '16px'
                 }}
               >
-                <div style={{ fontFamily: HUB.fontBold, fontSize: '12px', color: line.speaker === 'You' ? HUB.accent : HUB.textMuted, marginBottom: '8px' }}>
+                <div style={{ fontFamily: HUB.fontBold, fontSize: '12px', color: line.speaker === 'You' ? HUB.textPrimary : HUB.textMuted, marginBottom: '8px' }}>
                   {line.speaker}
                 </div>
-                <div style={{ fontFamily: HUB.fontRegular, fontSize: '16px', color: HUB.textPrimary, lineHeight: 1.5 }}>
+                <div style={{ fontFamily: HUB.fontRegular, fontSize: '14px', color: HUB.textPrimary, lineHeight: 1.5 }}>
                   "{line.text}"
                 </div>
               </motion.div>
@@ -142,28 +140,12 @@ export const DriverNegotiationModal = ({
             <button
               key={opt.id}
               onClick={() => handleOptionClick(opt.id)}
-              style={{
-                ...actionBtn({ 
-                  width: '100%', 
-                  textAlign: 'left', 
-                  justifyContent: 'flex-start',
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${HUB.border}`,
-                  padding: '16px'
-                }),
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.borderColor = HUB.accent;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
-                e.currentTarget.style.borderColor = HUB.border;
-              }}
+              className={btnClass('secondary')}
+              // Dialogue replies wrap onto several lines, so the fixed height is relaxed here.
+              style={btn('secondary', 'md', { width: '100%', justifyContent: 'flex-start', textAlign: 'left', height: 'auto', minHeight: '36px', padding: '10px 16px', whiteSpace: 'normal' })}
             >
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: HUB.accent }} />
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: HUB.textFaint, flexShrink: 0 }} />
                 <span style={{ fontFamily: HUB.fontRegular, fontSize: '14px', color: HUB.textPrimary }}>
                   "{opt.text}"
                 </span>

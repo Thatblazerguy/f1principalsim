@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { state } from "../state.js";
 import { syncGame } from "../lib/supabaseApi.js";
+import { GarageView } from "../components/engineering/GarageView.tsx";
 import { ensureTeamState, getTeamRoster, getCompetitivenessForecast } from "../utils/teamState.js";
 import { ensureFinanceState, FACILITY_CATALOG, STAFF_CATALOG } from "../utils/financeSystem.js";
 import {
@@ -8,38 +9,43 @@ import {
   getEngineeringAdvisorNotes, getOverallCarRating, getPerformanceTrend
 } from "../utils/engineeringSystem.js";
 import { DEVELOPMENT_CATALOG, startProject, processProjectCompletions, getCircuitProfile, ensureDevProjectsState } from "../utils/devProjects.js";
-import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
+import { mountLayout, HUB, glassCard, statCell, btn, btnClass, iconBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
 import { getDriverHeadshotUrl } from '../data/drivers.js';
 import { calendar as ALL_CIRCUITS } from '../data/calendar.js';
+import { TrackFitPanel } from '../components/ui/TrackFitPanel.tsx';
 import {
   Activity, AlertTriangle, BarChart2, BookOpen, CheckCircle, ChevronRight,
   Clock, Cpu, DollarSign, FlaskConical, Gauge, LayoutDashboard, RefreshCw,
   Settings, Shield, ShieldAlert, Target, Timer, TrendingDown, TrendingUp,
-  Wrench, Zap, Wind, Layers, MapPin
-} from 'lucide-react';
+  Wrench, Zap, Wind, Layers, MapPin, X, Rotate3d } from 'lucide-react';
 
 // ─── Shared Helpers ───────────────────────────────────────────────────────────
+const NEUTRAL = 'rgba(237,237,237,0.5)';
 function getHealthColor(wear: number) {
-  if (wear < 30) return '#10b981';
-  if (wear < 60) return '#eab308';
-  if (wear < 80) return '#f97316';
-  return '#ef4444';
+  if (wear < 60) return HUB.textPrimary;
+  if (wear < 80) return HUB.warning;
+  return HUB.negative;
+}
+function outcomeColor(outcome: string) {
+  if (outcome === 'success' || outcome === 'overperform') return HUB.positive;
+  if (outcome === 'underperform') return HUB.warning;
+  return HUB.negative;
 }
 function money(v: number) { return `$${v.toFixed(1)}M`; }
-function statBar(value: number, max = 99, color = HUB.accent) {
+function statBar(value: number, max = 99, color = NEUTRAL) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
-    <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '2px', transition: 'width 0.4s ease' }} />
+    <div style={{ height: '4px', background: HUB.border, borderRadius: '2px', overflow: 'hidden' }}>
+      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '2px', transition: `width 400ms ${HUB.ease}` }} />
     </div>
   );
 }
 function trendIcon(trend: string, delta: number) {
-  if (trend === 'up') return <TrendingUp size={14} color="#10b981" />;
-  if (trend === 'down') return <TrendingDown size={14} color="#ef4444" />;
-  return <Activity size={14} color="#f59e0b" />;
+  if (trend === 'up') return <TrendingUp size={16} strokeWidth={1.5} color={HUB.positive} />;
+  if (trend === 'down') return <TrendingDown size={16} strokeWidth={1.5} color={HUB.negative} />;
+  return <Activity size={16} strokeWidth={1.5} color={HUB.textMuted} />;
 }
-const riskColor: Record<string, string> = { Low: '#10b981', Medium: '#f59e0b', High: '#ef4444' };
+const riskColor: Record<string, string> = { Low: HUB.textMuted, Medium: HUB.warning, High: HUB.negative };
 
 // ─── TAB 1: Overview ──────────────────────────────────────────────────────────
 function OverviewTab({ s }: any) {
@@ -73,12 +79,12 @@ function OverviewTab({ s }: any) {
   );
 
   const topStats = [
-    { label: 'Overall Car Rating', value: overallRating.toFixed(1), unit: '/99', color: '#fff', icon: <Gauge size={18} color={HUB.accent} /> },
-    { label: 'Constructor Position', value: constPos > 0 ? `P${constPos}` : '-', color: '#fff', icon: <Target size={18} color="#3b82f6" /> },
-    { label: 'Performance Trend', value: delta >= 0 ? `+${delta}` : `${delta}`, color: trend === 'up' ? '#10b981' : trend === 'down' ? '#ef4444' : '#f59e0b', icon: trendIcon(trend, delta) },
-    { label: 'Reliability', value: `${reliabilityAvg}/99`, color: reliabilityAvg > 80 ? '#10b981' : '#f59e0b', icon: <Shield size={18} color="#10b981" /> },
-    { label: 'Staff Rating', value: `${avgStaffRating}/99`, color: '#fff', icon: <Settings size={18} color="#8b5cf6" /> },
-    { label: 'Active Projects', value: String(activeProjects.length), color: activeProjects.length > 0 ? '#3b82f6' : HUB.textMuted, icon: <FlaskConical size={18} color="#3b82f6" /> },
+    { label: 'Overall car rating', value: overallRating.toFixed(1), unit: '/99', color: HUB.textPrimary, icon: <Gauge size={16} strokeWidth={1.5} color={HUB.textMuted} /> },
+    { label: 'Constructor position', value: constPos > 0 ? `P${constPos}` : '-', color: HUB.textPrimary, icon: <Target size={16} strokeWidth={1.5} color={HUB.textMuted} /> },
+    { label: 'Performance trend', value: delta >= 0 ? `+${delta}` : `${delta}`, color: trend === 'up' ? HUB.positive : trend === 'down' ? HUB.negative : HUB.textPrimary, icon: trendIcon(trend, delta) },
+    { label: 'Reliability', value: `${reliabilityAvg}/99`, color: reliabilityAvg > 80 ? HUB.textPrimary : HUB.warning, icon: <Shield size={16} strokeWidth={1.5} color={HUB.textMuted} /> },
+    { label: 'Staff rating', value: `${avgStaffRating}/99`, color: HUB.textPrimary, icon: <Settings size={16} strokeWidth={1.5} color={HUB.textMuted} /> },
+    { label: 'Active projects', value: String(activeProjects.length), color: activeProjects.length > 0 ? HUB.textPrimary : HUB.textMuted, icon: <FlaskConical size={16} strokeWidth={1.5} color={HUB.textMuted} /> },
   ];
 
   const currentRound = s.season?.round || 1;
@@ -90,13 +96,13 @@ function OverviewTab({ s }: any) {
       {/* Top stat bar */}
       <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {topStats.map((stat, i) => (
-          <div key={i} style={{ ...glassCard({ padding: '20px' }), display: 'flex', gap: '14px', alignItems: 'center' }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '10px', display: 'flex', alignItems: 'center' }}>
+          <div key={i} style={{ ...glassCard({ padding: '16px' }), display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ background: HUB.raised, borderRadius: '8px', padding: '10px', display: 'flex', alignItems: 'center' }}>
               {stat.icon}
             </div>
             <div>
-              <span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>{stat.label}</span>
-              <span style={{ fontSize: '22px', fontWeight: 900, color: stat.color, fontFamily: HUB.fontMono }}>
+              <span style={{ fontSize: '12px', color: HUB.textFaint, display: 'block', marginBottom: '2px' }}>{stat.label}</span>
+              <span style={{ fontSize: '22px', fontWeight: 400, color: stat.color, fontFamily: HUB.fontMono }}>
                 {stat.value}<span style={{ fontSize: '11px', color: HUB.textMuted }}>{stat.unit}</span>
               </span>
             </div>
@@ -106,51 +112,56 @@ function OverviewTab({ s }: any) {
 
       <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
         {/* Car Performance Radar */}
-        <div style={{ ...glassCard({ padding: '28px' }) }}>
-          <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#fff', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart2 size={16} color={HUB.accent} /> Performance Metrics
+        <div style={{ ...glassCard({ padding: '24px' }) }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BarChart2 size={16} strokeWidth={1.5} color={HUB.textMuted} /> Performance metrics
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              { key: 'cornering', label: 'Cornering' },
-              { key: 'downforce', label: 'Downforce' },
-              { key: 'topSpeed', label: 'Top Speed' },
-              { key: 'mechanicalGrip', label: 'Mechanical Grip' },
-              { key: 'tyreWear', label: 'Tyre Management' },
-              { key: 'balance', label: 'Balance & Stability' },
-              { key: 'acceleration', label: 'Acceleration' },
-              { key: 'fuelEfficiency', label: 'Fuel Efficiency' },
-              { key: 'reliability', label: 'Reliability' },
-            ].map(({ key, label }) => {
+            {(() => {
+              const metricRows = [
+                { key: 'cornering', label: 'Cornering' },
+                { key: 'downforce', label: 'Downforce' },
+                { key: 'topSpeed', label: 'Top speed' },
+                { key: 'mechanicalGrip', label: 'Mechanical grip' },
+                { key: 'tyreWear', label: 'Tyre management' },
+                { key: 'balance', label: 'Balance and stability' },
+                { key: 'acceleration', label: 'Acceleration' },
+                { key: 'fuelEfficiency', label: 'Fuel efficiency' },
+                { key: 'reliability', label: 'Reliability' },
+              ];
+              // One neutral series; the accent marks only the car's strongest area.
+              const strongestKey = metricRows.reduce((best, m) => ((specs[m.key] || 75) > (specs[best] || 75) ? m.key : best), metricRows[0].key);
+              return metricRows.map(({ key, label }) => {
               const val = specs[key] || 75;
-              const barColor = val > 85 ? '#10b981' : val > 75 ? '#3b82f6' : val > 65 ? '#f59e0b' : '#ef4444';
+              const barColor = key === strongestKey ? HUB.accent : NEUTRAL;
               return (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '130px 1fr 36px', gap: '12px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>{label}</span>
+                  <span style={{ fontSize: '12px', color: key === strongestKey ? HUB.textPrimary : HUB.textMuted }}>{label}</span>
                   {statBar(val, 99, barColor)}
-                  <span style={{ fontSize: '11px', fontFamily: HUB.fontMono, color: '#fff', textAlign: 'right' }}>{val.toFixed(0)}</span>
+                  <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: HUB.textPrimary, textAlign: 'right' }}>{val.toFixed(0)}</span>
                 </div>
               );
-            })}
+            });
+            })()}
           </div>
         </div>
 
         {/* Sidebar: Tunnel usage + active projects */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ ...glassCard({ padding: '20px' }) }}>
-            <h3 style={{ fontSize: '12px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Wind size={15} color="#3b82f6" /> Tunnel & CFD Allocation
+            <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Wind size={16} strokeWidth={1.5} color={HUB.textMuted} /> Wind tunnel and CFD
             </h3>
             {[
-              { label: 'Current Car (WT)', value: devAlloc.currentCar, color: HUB.accent },
-              { label: 'Next Car (WT)', value: devAlloc.nextCar, color: '#3b82f6' },
-              { label: 'Wind Tunnel Lv.', value: windLevel * 20, color: '#8b5cf6', suffix: `Lv${windLevel}` },
-              { label: 'CFD Dept Lv.', value: cfdLevel * 20, color: '#8b5cf6', suffix: `Lv${cfdLevel}` },
+              { label: 'Current car (WT)', value: devAlloc.currentCar, color: NEUTRAL },
+              { label: 'Next car (WT)', value: devAlloc.nextCar, color: NEUTRAL },
+              { label: 'Wind tunnel level', value: windLevel * 20, color: NEUTRAL, suffix: `Lv${windLevel}` },
+              { label: 'CFD level', value: cfdLevel * 20, color: NEUTRAL, suffix: `Lv${cfdLevel}` },
             ].map((row, i) => (
               <div key={i} style={{ marginBottom: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <span style={{ fontSize: '11px', color: HUB.textMuted }}>{row.label}</span>
-                  <span style={{ fontSize: '11px', fontFamily: HUB.fontMono, color: '#fff' }}>{row.suffix || `${row.value}%`}</span>
+                  <span style={{ fontSize: '11px', fontFamily: HUB.fontMono, color: HUB.textPrimary }}>{row.suffix || `${row.value}%`}</span>
                 </div>
                 {statBar(row.value, 100, row.color)}
               </div>
@@ -158,16 +169,16 @@ function OverviewTab({ s }: any) {
           </div>
 
           <div style={{ ...glassCard({ padding: '20px' }) }}>
-            <h3 style={{ fontSize: '12px', fontWeight: 800, color: '#fff', margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Clock size={15} color="#f59e0b" /> Active Projects
+            <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={16} strokeWidth={1.5} color={HUB.textMuted} /> Active projects
             </h3>
-            {activeProjects.length === 0 && <p style={{ fontSize: '12px', color: HUB.textMuted }}>No projects running. Start one in the Development tab.</p>}
+            {activeProjects.length === 0 && <p style={{ fontSize: '12px', color: HUB.textMuted }}>No projects running. Start one in the Development tab</p>}
             {activeProjects.slice(0, 4).map((p: any, i: number) => (
-              <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px', marginBottom: '10px' }}>
-                <p style={{ fontSize: '12px', color: '#fff', margin: '0 0 4px', fontWeight: 700 }}>{p.label}</p>
+              <div key={i} style={{ borderBottom: `1px solid ${HUB.border}`, paddingBottom: '10px', marginBottom: '10px' }}>
+                <p style={{ fontSize: '12px', color: HUB.textPrimary, margin: '0 0 4px', fontWeight: 400, fontFamily: HUB.fontBold }}>{p.label}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '10px', color: HUB.textMuted }}>Done: R{p.completionRound}</span>
-                  <span style={{ fontSize: '10px', color: riskColor[p.risk] }}>{p.risk} Risk</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>Done: R{p.completionRound}</span>
+                  <span style={{ fontSize: '11px', color: riskColor[p.risk] }}>{p.risk} risk</span>
                 </div>
               </div>
             ))}
@@ -178,16 +189,16 @@ function OverviewTab({ s }: any) {
       {/* Upgrade History */}
       {recentHistory.length > 0 && (
         <div style={{ ...glassCard({ padding: '24px' }) }}>
-          <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BookOpen size={16} color={HUB.accent} /> Recent Upgrade History
+          <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BookOpen size={16} strokeWidth={1.5} color={HUB.textMuted} /> Recent upgrades
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {recentHistory.map((h: any, i: number) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 80px 80px', gap: '16px', alignItems: 'center', padding: '10px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 80px 80px', gap: '16px', alignItems: 'center', padding: '10px 12px', background: HUB.raised, borderRadius: '8px' }}>
                 <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>R{h.round}</span>
-                <span style={{ fontSize: '12px', color: '#fff' }}>{h.label}</span>
-                <span style={{ fontSize: '11px', color: riskColor[h.outcome === 'success' ? 'Low' : h.outcome === 'overperform' ? 'Low' : h.outcome === 'underperform' ? 'Medium' : 'High'], textAlign: 'center' }}>
-                  {h.outcome.toUpperCase()}
+                <span style={{ fontSize: '12px', color: HUB.textPrimary }}>{h.label}</span>
+                <span style={{ fontSize: '11px', color: outcomeColor(h.outcome), textAlign: 'center' }}>
+                  {h.outcome}
                 </span>
                 <span style={{ fontSize: '11px', color: HUB.textMuted, textAlign: 'right' }}>{h.expectedGain}</span>
               </div>
@@ -199,8 +210,8 @@ function OverviewTab({ s }: any) {
       {/* Upcoming Races Forecast */}
       {upcomingRaces.length > 0 && (
         <div style={{ ...glassCard({ padding: '24px' }) }}>
-          <h3 style={{ fontSize: '13px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MapPin size={16} color={HUB.accent} /> Upcoming Races Forecast
+          <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MapPin size={16} strokeWidth={1.5} color={HUB.textMuted} /> Upcoming races forecast
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${upcomingRaces.length}, 1fr)`, gap: '16px' }}>
             {upcomingRaces.map((entry: any, i: number) => {
@@ -212,19 +223,19 @@ function OverviewTab({ s }: any) {
               const forecast = getCompetitivenessForecast(s, raceObj?.circuit);
               
               return (
-                <div key={i} style={{ padding: '16px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: `1px solid rgba(255,255,255,0.05)` }}>
+                <div key={i} style={{ padding: '16px', background: HUB.raised, borderRadius: '8px', border: `1px solid ${HUB.border}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {currentRound + i}</span>
-                    <span style={{ fontSize: '10px', color: HUB.textMuted }}>{raceObj?.country}</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {currentRound + i}</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted }}>{raceObj?.country}</span>
                   </div>
-                  <h4 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 4px', color: '#fff' }}>{raceObj?.name}</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, margin: '0 0 4px', color: HUB.textPrimary }}>{raceObj?.name}</h4>
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', color: '#fff' }}>{profile.type}</span>
+                    <span style={pill()}>{profile.type}</span>
                   </div>
-                  <div style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, paddingTop: '12px' }}>
-                    <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '2px' }}>Expected Rank</div>
-                    <div style={{ fontSize: '16px', fontWeight: 800, color: forecast.rank <= 3 ? '#10b981' : forecast.rank <= 6 ? '#f59e0b' : '#ef4444' }}>
-                      {forecast.rank === 1 ? 'Fastest Car' : `P${forecast.rank} / ${forecast.finish}`}
+                  <div style={{ borderTop: `1px solid ${HUB.border}`, paddingTop: '12px' }}>
+                    <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '2px' }}>Expected rank</div>
+                    <div style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>
+                      {forecast.rank === 1 ? 'Fastest car' : `P${forecast.rank} / ${forecast.finish}`}
                     </div>
                   </div>
                 </div>
@@ -253,10 +264,10 @@ function DevelopmentTab({ s, onFlash }: any) {
   const handleStart = async (itemId: string) => {
     const result = startProject(s, selectedCat, itemId);
     if (result.ok) {
-      onFlash(`✅ ${result.project.label} started. Completion: Round ${result.project.completionRound}.`);
+      onFlash(`${result.project.label} started, completes in round ${result.project.completionRound}`);
       await syncGame();
     } else {
-      onFlash(`❌ ${result.reason}`);
+      onFlash(`${result.reason}`);
     }
     setConfirming(null);
   };
@@ -270,16 +281,13 @@ function DevelopmentTab({ s, onFlash }: any) {
             key={id}
             onClick={() => { setSelectedCat(id); setSelectedItem(null); setConfirming(null); }}
             style={{
-              padding: '14px 16px', textAlign: 'left', borderRadius: '8px', cursor: 'pointer',
-              background: selectedCat === id ? `${c.color}18` : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${selectedCat === id ? c.color : 'rgba(255,255,255,0.06)'}`,
-              color: selectedCat === id ? '#fff' : HUB.textMuted, transition: 'all 0.15s',
-              fontFamily: HUB.fontBold, fontSize: '13px',
+              padding: '12px 16px', textAlign: 'left', borderRadius: '8px', cursor: 'pointer',
+              background: selectedCat === id ? HUB.accentSoft : HUB.surface,
+              border: `1px solid ${selectedCat === id ? 'rgba(225,6,0,0.4)' : HUB.border}`,
+              color: selectedCat === id ? HUB.textPrimary : HUB.textMuted, transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`,
+              fontFamily: HUB.fontBold, fontSize: '13px'
             }}
           >
-            <span style={{ display: 'block', color: selectedCat === id ? c.color : HUB.textMuted, fontSize: '10px', marginBottom: '2px', letterSpacing: '0.1em' }}>
-              {id.toUpperCase()}
-            </span>
             {c.label}
           </button>
         ))}
@@ -288,8 +296,8 @@ function DevelopmentTab({ s, onFlash }: any) {
       {/* Item Grid */}
       <div>
         <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: 0 }}>{cat.label}</h3>
-          <p style={{ fontSize: '12px', color: HUB.textMuted, margin: '4px 0 0' }}>Select an upgrade area to launch a development project.</p>
+          <h3 style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: 0 }}>{cat.label}</h3>
+          <p style={{ fontSize: '12px', color: HUB.textMuted, margin: '4px 0 0' }}>Select an upgrade area to launch a development project</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
           {Object.entries(cat.items).map(([itemId, item]: any) => {
@@ -303,36 +311,36 @@ function DevelopmentTab({ s, onFlash }: any) {
                 onClick={() => { setSelectedItem(isSelected ? null : itemId); setConfirming(null); }}
                 style={{
                   ...glassCard({ padding: '20px' }),
-                  cursor: 'pointer', transition: 'all 0.2s',
-                  borderColor: isSelected ? cat.color : running ? '#10b981' : 'rgba(255,255,255,0.06)',
-                  background: isSelected ? `${cat.color}10` : running ? 'rgba(16,185,129,0.04)' : 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer', transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}`,
+                  borderColor: isSelected ? 'rgba(225,6,0,0.4)' : HUB.border,
+                  background: isSelected ? HUB.accentSoft : HUB.surface
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div>
-                    <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: 0 }}>{item.label}</h4>
+                    <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: 0 }}>{item.label}</h4>
                     <p style={{ fontSize: '11px', color: HUB.textMuted, margin: '4px 0 0', lineHeight: 1.4 }}>{item.description}</p>
                   </div>
-                  {running && <span style={{ fontSize: '10px', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: '999px', whiteSpace: 'nowrap', marginLeft: '8px', flexShrink: 0 }}>IN PROGRESS</span>}
+                  {running && <span style={{ ...pill(), fontSize: '11px', whiteSpace: 'nowrap', marginLeft: '8px', flexShrink: 0 }}>In progress</span>}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
                   <div>
-                    <span style={{ fontSize: '9px', color: HUB.textMuted, display: 'block' }}>COST</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: canAfford ? '#fff' : '#ef4444', fontFamily: HUB.fontMono }}>{money(item.baseCost)}</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Cost</span>
+                    <span style={{ fontSize: '13px', fontWeight: 400, color: canAfford ? HUB.textPrimary : HUB.negative, fontFamily: HUB.fontMono }}>{money(item.baseCost)}</span>
                   </div>
                   <div>
-                    <span style={{ fontSize: '9px', color: HUB.textMuted, display: 'block' }}>TIME</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', fontFamily: HUB.fontMono }}>{item.baseRaces}R</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Time</span>
+                    <span style={{ fontSize: '13px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{item.baseRaces}R</span>
                   </div>
                   <div>
-                    <span style={{ fontSize: '9px', color: HUB.textMuted, display: 'block' }}>RISK</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: riskColor[item.risk] }}>{item.risk}</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Risk</span>
+                    <span style={{ fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold, color: riskColor[item.risk] }}>{item.risk}</span>
                   </div>
                 </div>
 
                 <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '12px' }}>
-                  <span style={{ fontWeight: 700, color: '#fff' }}>Expected:</span>{' '}
+                  <span style={{ fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Expected:</span>{' '}
                   {Object.entries(item.statBonuses).map(([k, v]: any) => `${v > 0 ? '+' : ''}${v} ${k}`).join(', ')}
                 </div>
 
@@ -342,19 +350,22 @@ function DevelopmentTab({ s, onFlash }: any) {
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={(e) => { e.stopPropagation(); handleStart(itemId); }}
                           disabled={!canAfford}
-                          style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px', flex: 1, backgroundColor: canAfford ? HUB.accent : 'rgba(255,255,255,0.05)' }), opacity: canAfford ? 1 : 0.5 }}>
-                          Confirm & Spend {money(item.baseCost)}
+                          className={btnClass('primary')}
+                          style={btn('primary', 'sm', { flex: 1 })}>
+                          Confirm and spend {money(item.baseCost)}
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); setConfirming(null); }}
-                          style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px', backgroundColor: 'rgba(255,255,255,0.05)', border: `1px solid ${HUB.border}` }) }}>
+                          className={btnClass('secondary')}
+                          style={btn('secondary', 'sm')}>
                           Cancel
                         </button>
                       </div>
                     ) : (
                       <button onClick={(e) => { e.stopPropagation(); setConfirming(itemId); }}
                         disabled={!canAfford}
-                        style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px', width: '100%', backgroundColor: canAfford ? `${cat.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${canAfford ? cat.color : HUB.border}` }), color: canAfford ? cat.color : HUB.textMuted, opacity: canAfford ? 1 : 0.6 }}>
-                        {canAfford ? `Launch Project` : `Cannot Afford`}
+                        className={btnClass('primary')}
+                        style={btn('primary', 'sm', { width: '100%' })}>
+                        {canAfford ? `Launch project` : `Cannot afford`}
                       </button>
                     )}
                   </div>
@@ -381,7 +392,7 @@ function ProjectsTab({ s, onFlash }: any) {
     if (!eng) return;
     const clamped = Math.max(0, Math.min(100, currentCarPct));
     eng.devAllocation = { currentCar: clamped, nextCar: 100 - clamped };
-    onFlash(`Wind Tunnel allocation updated: ${clamped}% current car, ${100 - clamped}% next year's car.`);
+    onFlash(`Wind tunnel allocation updated: ${clamped}% current car, ${100 - clamped}% next year's car`);
     await syncGame();
   };
 
@@ -389,34 +400,34 @@ function ProjectsTab({ s, onFlash }: any) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Allocation slider */}
       <div style={{ ...glassCard({ padding: '24px' }) }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Wind size={16} color="#3b82f6" /> Wind Tunnel & CFD Resource Allocation
+        <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Wind size={16} strokeWidth={1.5} color={HUB.textMuted} /> Wind tunnel and CFD allocation
         </h3>
         <p style={{ fontSize: '12px', color: HUB.textMuted, margin: '0 0 16px' }}>
           Distribute development resources between current championship push and next year's car concept.
         </p>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#fff', minWidth: '100px' }}>Current Car: <strong style={{ color: HUB.accent }}>{devAlloc.currentCar}%</strong></span>
+          <span style={{ fontSize: '12px', color: HUB.textPrimary, minWidth: '100px' }}>Current car: <strong style={{ color: HUB.accentInk, fontWeight: 400, fontFamily: HUB.fontBold }}>{devAlloc.currentCar}%</strong></span>
           <input
             type="range" min={0} max={100} step={5}
             value={devAlloc.currentCar}
             onChange={(e) => handleAllocChange(parseInt(e.target.value))}
             style={{ flex: 1, accentColor: HUB.accent }}
           />
-          <span style={{ fontSize: '12px', color: '#fff', minWidth: '100px', textAlign: 'right' }}>Next Car: <strong style={{ color: '#3b82f6' }}>{devAlloc.nextCar}%</strong></span>
+          <span style={{ fontSize: '12px', color: HUB.textPrimary, minWidth: '100px', textAlign: 'right' }}>Next car: <strong style={{ color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{devAlloc.nextCar}%</strong></span>
         </div>
         <p style={{ fontSize: '11px', color: HUB.textMuted, margin: '12px 0 0' }}>
-          ⚡ Higher current car allocation = faster project completion. Lower allocation = better prepared for next season's regulation changes.
+          Higher current car allocation finishes projects sooner. Lower allocation prepares the car for next season's regulation changes.
         </p>
       </div>
 
       {/* Active Projects */}
       <div>
-        <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: '0 0 16px' }}>Active Projects</h3>
+        <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px' }}>Active projects</h3>
         {active.length === 0 && (
           <div style={{ ...glassCard({ padding: '32px' }), textAlign: 'center' }}>
-            <FlaskConical size={40} color={HUB.textMuted} style={{ opacity: 0.3, marginBottom: '12px' }} />
-            <p style={{ fontSize: '14px', color: HUB.textMuted }}>No active projects. Start one in the Development tab.</p>
+            <FlaskConical size={24} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: '12px' }} />
+            <p style={{ fontSize: '14px', color: HUB.textMuted }}>No active projects. Start one in the Development tab</p>
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
@@ -425,25 +436,25 @@ function ProjectsTab({ s, onFlash }: any) {
             const racesLeft = Math.max(0, p.completionRound - currentRound);
             const cat = DEVELOPMENT_CATALOG[p.categoryId];
             return (
-              <div key={i} style={{ ...glassCard({ padding: '20px' }), borderLeft: `3px solid ${cat?.color || HUB.accent}` }}>
+              <div key={i} style={{ ...glassCard({ padding: '20px' }) }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div>
-                    <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 2px' }}>{p.label}</h4>
+                    <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 2px' }}>{p.label}</h4>
                     <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0 }}>{p.engineer}</p>
                   </div>
-                  <span style={{ fontSize: '10px', color: riskColor[p.risk], background: `${riskColor[p.risk]}15`, padding: '3px 8px', borderRadius: '999px' }}>{p.risk}</span>
+                  <span style={{ fontSize: '12px', color: riskColor[p.risk] }}>{p.risk} risk</span>
                 </div>
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11px', color: HUB.textMuted }}>Progress</span>
-                    <span style={{ fontSize: '11px', color: '#fff', fontFamily: HUB.fontMono }}>{racesLeft === 0 ? 'Complete this race!' : `${racesLeft}R remaining`}</span>
+                    <span style={{ fontSize: '11px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{racesLeft === 0 ? 'Completes this race' : `${racesLeft}R remaining`}</span>
                   </div>
-                  {statBar(progress, 100, cat?.color || HUB.accent)}
+                  {statBar(progress, 100, NEUTRAL)}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  <div><span style={{ fontSize: '9px', color: HUB.textMuted, display: 'block' }}>CONFIDENCE</span><span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{p.confidence}%</span></div>
-                  <div><span style={{ fontSize: '9px', color: HUB.textMuted, display: 'block' }}>COST</span><span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', fontFamily: HUB.fontMono }}>{money(p.cost)}</span></div>
-                  <div><span style={{ fontSize: '9px', color: HUB.textMuted, display: 'block' }}>DONE R</span><span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', fontFamily: HUB.fontMono }}>R{p.completionRound}</span></div>
+                  <div><span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Confidence</span><span style={{ fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{p.confidence}%</span></div>
+                  <div><span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Cost</span><span style={{ fontSize: '13px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{money(p.cost)}</span></div>
+                  <div><span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Due</span><span style={{ fontSize: '13px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>R{p.completionRound}</span></div>
                 </div>
               </div>
             );
@@ -454,15 +465,15 @@ function ProjectsTab({ s, onFlash }: any) {
       {/* Completed Projects */}
       {completed.length > 0 && (
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: '0 0 16px' }}>Completed Projects</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px' }}>Completed projects</h3>
           <div style={{ ...glassCard({ padding: '0' }), overflow: 'hidden' }}>
             {completed.slice(0, 10).map((p: any, i: number) => {
-              const outColor = p.outcome === 'success' ? '#10b981' : p.outcome === 'overperform' ? '#3b82f6' : p.outcome === 'underperform' ? '#f59e0b' : '#ef4444';
+              const outColor = outcomeColor(p.outcome);
               return (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 80px', gap: '16px', alignItems: 'center', padding: '14px 20px', borderBottom: i < completed.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 80px', gap: '16px', alignItems: 'center', padding: '12px 20px', borderBottom: i < completed.length - 1 ? `1px solid ${HUB.border}` : 'none' }}>
                   <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>R{p.completedRound || p.startRound}</span>
-                  <span style={{ fontSize: '13px', color: '#fff' }}>{p.label}</span>
-                  <span style={{ fontSize: '11px', color: outColor, textTransform: 'uppercase', fontWeight: 700 }}>{p.outcome}</span>
+                  <span style={{ fontSize: '13px', color: HUB.textPrimary }}>{p.label}</span>
+                  <span style={{ fontSize: '11px', color: outColor, fontWeight: 400, fontFamily: HUB.fontBold }}>{p.outcome}</span>
                   <span style={{ fontSize: '11px', color: HUB.textMuted, textAlign: 'right' }}>{money(p.cost)}</span>
                 </div>
               );
@@ -484,7 +495,7 @@ function ComponentsTab({ s, onFlash }: any) {
     const activeIndex = pool.findIndex((c: any) => c.active);
     const nextIndex = (activeIndex + 1) % pool.length;
     if (swapComponent(s, selectedDriver, compKey, nextIndex)) {
-      onFlash(`Swapped to ${compKey}-${nextIndex + 1} for ${selectedDriver}.`);
+      onFlash(`Swapped to ${compKey}-${nextIndex + 1} for ${selectedDriver}`);
       await syncGame();
     }
   };
@@ -492,7 +503,7 @@ function ComponentsTab({ s, onFlash }: any) {
     if (confirm(`Fit a new ${compKey}? Exceeding allocation incurs grid penalties.`)) {
       const res = fitNewComponent(s, selectedDriver, compKey);
       if (res?.ok) {
-        onFlash(`Fitted new ${res.newId} for ${selectedDriver}. ${res.penalty > 0 ? `PENALTY: +${res.penalty} Grid Places applied.` : ''}`);
+        onFlash(`Fitted new ${res.newId} for ${selectedDriver}${res.penalty > 0 ? `. Penalty: +${res.penalty} grid places` : ''}`);
         await syncGame();
       }
     }
@@ -506,16 +517,16 @@ function ComponentsTab({ s, onFlash }: any) {
         <div style={{ display: 'flex', gap: '12px' }}>
           {roster.map((driver: any) => (
             <button key={driver.name} onClick={() => setSelectedDriver(driver.name)}
-              style={{ padding: '12px 20px', background: selectedDriver === driver.name ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${selectedDriver === driver.name ? HUB.accent : HUB.border}`, borderRadius: '8px', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontFamily: HUB.fontBold }}>
+              style={{ padding: '8px 16px', background: selectedDriver === driver.name ? HUB.accentSoft : HUB.surface, border: `1px solid ${selectedDriver === driver.name ? 'rgba(225,6,0,0.4)' : HUB.border}`, borderRadius: '8px', color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontFamily: HUB.fontBold }}>
               <img src={getDriverHeadshotUrl(driver)} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
               {driver.name}
             </button>
           ))}
         </div>
         {pendingPenalty > 0 && (
-          <div style={{ ...glassCard({ padding: '10px 16px' }), borderColor: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertTriangle size={16} color="#ef4444" />
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>+{pendingPenalty} Grid Penalty</span>
+          <div style={{ ...glassCard({ padding: '10px 16px' }), borderColor: 'rgba(229,72,77,0.4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={16} strokeWidth={1.5} color={HUB.negative} />
+            <span style={{ fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.negative }}>+{pendingPenalty} grid penalty</span>
           </div>
         )}
       </div>
@@ -532,29 +543,29 @@ function ComponentsTab({ s, onFlash }: any) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <span style={{ fontSize: '12px', color: HUB.textMuted, fontFamily: HUB.fontBold }}>{catalog.name}</span>
-                    <h4 style={{ fontSize: '18px', color: '#fff', margin: '2px 0 0', fontFamily: HUB.fontMono }}>{active.id}</h4>
+                    <h4 style={{ fontSize: '18px', color: HUB.textPrimary, margin: '2px 0 0', fontFamily: HUB.fontMono }}>{active.id}</h4>
                   </div>
                   <span style={{ fontSize: '12px', color: HUB.textMuted }}>{pool.length}/{catalog.allocation}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <div>
-                    <span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Condition</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Condition</span>
                     {statBar(Math.max(0, 100 - active.wear), 100, healthColor)}
                     <span style={{ fontSize: '12px', color: healthColor, fontFamily: HUB.fontMono, display: 'block', marginTop: '4px' }}>{Math.max(0, 100 - active.wear).toFixed(0)}%</span>
                   </div>
                   <div>
-                    <span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Performance</span>
-                    <span style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontMono }}>{active.performance.toFixed(1)}%</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Performance</span>
+                    <span style={{ fontSize: '14px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{active.performance.toFixed(1)}%</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {pool.length > 1 && (
-                    <button onClick={() => handleSwap(key)} style={{ ...actionBtn({ padding: '6px 10px', fontSize: '11px', flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: `1px solid ${HUB.border}` }) }}>
-                      <RefreshCw size={12} style={{ marginRight: '4px' }} /> Swap
+                    <button onClick={() => handleSwap(key)} className={btnClass('secondary')} style={btn('secondary', 'sm', { flex: 1 })}>
+                      <RefreshCw size={14} strokeWidth={1.5} /> Swap component
                     </button>
                   )}
-                  <button onClick={() => handleFit(key)} style={{ ...actionBtn({ padding: '6px 10px', fontSize: '11px', flex: 1, backgroundColor: pool.length >= catalog.allocation ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)' }) }}>
-                    <Zap size={12} style={{ marginRight: '4px' }} /> Fit New
+                  <button onClick={() => handleFit(key)} className={btnClass(pool.length >= catalog.allocation ? 'danger' : 'secondary')} style={btn(pool.length >= catalog.allocation ? 'danger' : 'secondary', 'sm', { flex: 1 })}>
+                    <Zap size={14} strokeWidth={1.5} /> Fit new
                   </button>
                 </div>
               </div>
@@ -564,14 +575,14 @@ function ComponentsTab({ s, onFlash }: any) {
       </div>
 
       <div style={{ ...glassCard({ padding: '24px' }), marginTop: '24px' }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ShieldAlert size={16} /> Chief Engineer Notes
+        <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShieldAlert size={16} strokeWidth={1.5} color={HUB.textMuted} /> Chief engineer notes
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {driverNotes.map((note: string, idx: number) => (
             <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '999px', background: note.includes('CRITICAL') ? '#ef4444' : note.includes('Warning') ? '#eab308' : HUB.accent, marginTop: '7px', flexShrink: 0 }} />
-              <p style={{ fontSize: '13px', color: '#ddd', margin: 0, lineHeight: 1.45 }}>{note}</p>
+              <span style={{ width: '6px', height: '6px', borderRadius: '999px', background: note.includes('CRITICAL') ? HUB.negative : note.includes('Warning') ? HUB.warning : HUB.textFaint, marginTop: '7px', flexShrink: 0 }} />
+              <p style={{ fontSize: '13px', color: HUB.textPrimary, margin: 0, lineHeight: 1.45 }}>{note}</p>
             </div>
           ))}
         </div>
@@ -591,14 +602,14 @@ function PerformanceTab({ s }: any) {
   allTeams.sort((a: any, b: any) => b.carPerformance - a.carPerformance);
 
   const performanceMetrics = [
-    { key: 'topSpeed', label: 'Top Speed', color: '#f59e0b' },
-    { key: 'cornering', label: 'Cornering', color: '#3b82f6' },
-    { key: 'downforce', label: 'Downforce', color: '#8b5cf6' },
-    { key: 'mechanicalGrip', label: 'Mechanical Grip', color: '#10b981' },
-    { key: 'acceleration', label: 'Acceleration', color: '#ef4444' },
-    { key: 'tyreWear', label: 'Tyre Management', color: '#f97316' },
-    { key: 'fuelEfficiency', label: 'Fuel Efficiency', color: '#06b6d4' },
-    { key: 'reliability', label: 'Reliability', color: '#22c55e' },
+    { key: 'topSpeed', label: 'Top speed' },
+    { key: 'cornering', label: 'Cornering' },
+    { key: 'downforce', label: 'Downforce' },
+    { key: 'mechanicalGrip', label: 'Mechanical grip' },
+    { key: 'acceleration', label: 'Acceleration' },
+    { key: 'tyreWear', label: 'Tyre management' },
+    { key: 'fuelEfficiency', label: 'Fuel efficiency' },
+    { key: 'reliability', label: 'Reliability' },
   ];
 
   // Helper to get a team's spec value
@@ -647,27 +658,27 @@ function PerformanceTab({ s }: any) {
       {/* Circuit Analysis & Development Priorities */}
       {nextRace && (
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-          <div style={{ ...glassCard({ padding: '24px' }), borderLeft: `3px solid ${HUB.accent}` }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Target size={16} color={HUB.accent} /> Circuit Analysis: {nextRace.name}
+          <div style={{ ...glassCard({ padding: '24px' }) }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Target size={16} strokeWidth={1.5} color={HUB.textMuted} /> Circuit analysis: {nextRace.name}
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               <div>
-                <span style={{ fontSize: '10px', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>Circuit Strengths</span>
+                <span style={{ fontSize: '12px', color: HUB.textFaint, display: 'block', marginBottom: '8px' }}>Circuit strengths</span>
                 {circuitProfile.strengths.map((str: string, i: number) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <CheckCircle size={12} color="#10b981" />
-                    <span style={{ fontSize: '12px', color: '#fff' }}>{str.replace('.', ': ').replace(/([A-Z])/g, ' $1')}</span>
+                    <CheckCircle size={12} color={HUB.positive} />
+                    <span style={{ fontSize: '12px', color: HUB.textPrimary }}>{str.replace('.', ': ').replace(/([A-Z])/g, ' $1')}</span>
                   </div>
                 ))}
                 {circuitProfile.strengths.length === 0 && <span style={{ fontSize: '12px', color: HUB.textMuted }}>Balanced circuit</span>}
               </div>
               <div>
-                <span style={{ fontSize: '10px', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>Circuit Weaknesses</span>
+                <span style={{ fontSize: '12px', color: HUB.textFaint, display: 'block', marginBottom: '8px' }}>Circuit weaknesses</span>
                 {circuitProfile.weaknesses.map((weak: string, i: number) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <AlertTriangle size={12} color="#ef4444" />
-                    <span style={{ fontSize: '12px', color: '#fff' }}>{weak.replace('.', ': ').replace(/([A-Z])/g, ' $1')}</span>
+                    <AlertTriangle size={12} color={HUB.negative} />
+                    <span style={{ fontSize: '12px', color: HUB.textPrimary }}>{weak.replace('.', ': ').replace(/([A-Z])/g, ' $1')}</span>
                   </div>
                 ))}
                 {circuitProfile.weaknesses.length === 0 && <span style={{ fontSize: '12px', color: HUB.textMuted }}>Balanced circuit</span>}
@@ -675,20 +686,18 @@ function PerformanceTab({ s }: any) {
             </div>
           </div>
 
-          <div style={{ ...glassCard({ padding: '24px' }), borderLeft: `3px solid #f59e0b` }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FlaskConical size={16} color="#f59e0b" /> Development Priorities
+          <div style={{ ...glassCard({ padding: '24px' }) }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FlaskConical size={16} strokeWidth={1.5} color={HUB.textMuted} /> Development priorities
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {devPriorities.map((p: any, i: number) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
-                  <span style={{ fontSize: '12px', color: '#fff' }}>{p.label}</span>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: HUB.raised, borderRadius: '8px' }}>
+                  <span style={{ fontSize: '12px', color: HUB.textPrimary }}>{p.label}</span>
                   <span style={{ 
-                    fontSize: '10px', 
-                    fontWeight: 700, 
-                    color: p.priority === 'High' ? '#ef4444' : p.priority === 'Medium' ? '#f59e0b' : '#10b981',
-                    textTransform: 'uppercase'
-                  }}>
+                    fontSize: '11px', 
+                    fontWeight: 400, fontFamily: HUB.fontBold, 
+                    color: p.priority === 'High' ? HUB.textPrimary : p.priority === 'Medium' ? HUB.textMuted : HUB.textFaint }}>
                     {p.priority}
                   </span>
                 </div>
@@ -704,9 +713,8 @@ function PerformanceTab({ s }: any) {
         const sortedByMetric = [...allTeams].sort((a: any, b: any) => getTeamSpec(b, metric.key) - getTeamSpec(a, metric.key));
         return (
           <div key={metric.key} style={{ ...glassCard({ padding: '24px' }) }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '999px', background: metric.color }} />
-              {metric.label} Comparison
+            <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {metric.label}
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {sortedByMetric.map((team: any, i: number) => {
@@ -715,13 +723,13 @@ function PerformanceTab({ s }: any) {
                 const playerVal = getTeamSpec(s.team, metric.key);
                 const delta = isPlayer ? 0 : parseFloat((val - playerVal).toFixed(1));
                 return (
-                  <div key={team.name} style={{ display: 'grid', gridTemplateColumns: '30px 200px 1fr 60px 70px', gap: '12px', alignItems: 'center', padding: '8px 0', borderBottom: i < sortedByMetric.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: isPlayer ? metric.color : '#fff', fontFamily: HUB.fontMono }}>P{i + 1}</span>
-                    <span style={{ fontSize: '12px', color: isPlayer ? metric.color : '#fff', fontWeight: isPlayer ? 800 : 400 }}>{team.name}</span>
-                    {statBar(val, 99, isPlayer ? metric.color : '#3b82f6')}
-                    <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: '#fff', textAlign: 'right' }}>{val.toFixed(0)}</span>
-                    <span style={{ fontSize: '11px', color: delta === 0 ? HUB.textMuted : delta > 0 ? '#ef4444' : '#10b981', textAlign: 'right' }}>
-                      {delta === 0 ? 'YOU' : (delta > 0 ? `+${delta}` : `${delta}`)}
+                  <div key={team.name} style={{ display: 'grid', gridTemplateColumns: '30px 200px 1fr 60px 70px', gap: '12px', alignItems: 'center', padding: '8px 0', borderBottom: i < sortedByMetric.length - 1 ? `1px solid ${HUB.border}` : 'none' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 400, color: isPlayer ? HUB.accentInk : HUB.textPrimary, fontFamily: HUB.fontMono }}>P{i + 1}</span>
+                    <span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: isPlayer ? HUB.fontBold : HUB.fontRegular }}>{team.name}</span>
+                    {statBar(val, 99, isPlayer ? HUB.accent : NEUTRAL)}
+                    <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: HUB.textPrimary, textAlign: 'right' }}>{val.toFixed(0)}</span>
+                    <span style={{ fontSize: '11px', color: delta === 0 ? HUB.textMuted : delta > 0 ? HUB.negative : HUB.positive, textAlign: 'right' }}>
+                      {delta === 0 ? 'You' : (delta > 0 ? `+${delta}` : `${delta}`)}
                     </span>
                   </div>
                 );
@@ -733,21 +741,21 @@ function PerformanceTab({ s }: any) {
 
       {/* Constructor Car Performance Rankings */}
       <div style={{ ...glassCard({ padding: '24px' }) }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <BarChart2 size={16} color="#3b82f6" /> Overall Constructor Performance Rankings
+        <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <BarChart2 size={16} strokeWidth={1.5} color={HUB.textMuted} /> Constructor car performance
         </h3>
         {allTeams.map((team: any, i: number) => {
           const isPlayer = team.name === s.team?.name;
           const perf = team.carPerformance || 80;
           const delta = isPlayer ? 0 : parseFloat((perf - (s.team?.carPerformance || 80)).toFixed(1));
           return (
-            <div key={team.name} style={{ display: 'grid', gridTemplateColumns: '30px 200px 1fr 60px 70px', gap: '12px', alignItems: 'center', padding: '10px 0', borderBottom: i < allTeams.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: isPlayer ? HUB.accent : '#fff', fontFamily: HUB.fontMono }}>P{i + 1}</span>
-              <span style={{ fontSize: '13px', color: isPlayer ? HUB.accent : '#fff', fontWeight: isPlayer ? 800 : 400 }}>{team.name}</span>
-              {statBar(perf, 99, isPlayer ? HUB.accent : '#3b82f6')}
-              <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: '#fff', textAlign: 'right' }}>{perf.toFixed(1)}</span>
-              <span style={{ fontSize: '11px', color: delta === 0 ? HUB.textMuted : delta > 0 ? '#ef4444' : '#10b981', textAlign: 'right' }}>
-                {delta === 0 ? 'YOU' : (delta > 0 ? `+${delta}` : `${delta}`)}
+            <div key={team.name} style={{ display: 'grid', gridTemplateColumns: '30px 200px 1fr 60px 70px', gap: '12px', alignItems: 'center', padding: '10px 0', borderBottom: i < allTeams.length - 1 ? `1px solid ${HUB.border}` : 'none' }}>
+              <span style={{ fontSize: '14px', fontWeight: 400, color: isPlayer ? HUB.accentInk : HUB.textPrimary, fontFamily: HUB.fontMono }}>P{i + 1}</span>
+              <span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: isPlayer ? HUB.fontBold : HUB.fontRegular }}>{team.name}</span>
+              {statBar(perf, 99, isPlayer ? HUB.accent : NEUTRAL)}
+              <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: HUB.textPrimary, textAlign: 'right' }}>{perf.toFixed(1)}</span>
+              <span style={{ fontSize: '11px', color: delta === 0 ? HUB.textMuted : delta > 0 ? HUB.negative : HUB.positive, textAlign: 'right' }}>
+                {delta === 0 ? 'You' : (delta > 0 ? `+${delta}` : `${delta}`)}
               </span>
             </div>
           );
@@ -768,12 +776,12 @@ function FacilitiesTab({ s, onFlash }: any) {
     const facility = facilities[facilityId];
     const catalog = FACILITY_CATALOG.find((f: any) => f.id === facilityId);
     if (!catalog || !facility) return;
-    if (facility.level >= catalog.maxLevel) { onFlash('Already at maximum level.'); return; }
-    if ((s.team?.budget || 0) < cost) { onFlash(`Insufficient budget. Requires ${cost.toFixed(1)}M.`); return; }
+    if (facility.level >= catalog.maxLevel) { onFlash('Already at maximum level'); return; }
+    if ((s.team?.budget || 0) < cost) { onFlash(`Insufficient budget, requires $${cost.toFixed(1)}M`); return; }
     s.team.budget = parseFloat((s.team.budget - cost).toFixed(1));
     facility.upgrading = true;
     facility.readyDay = (s.season?.currentDay || 1) + catalog.buildDays;
-    onFlash(`${catalog.name} upgrade started. Ready in ${catalog.buildDays} days.`);
+    onFlash(`${catalog.name} upgrade started, ready in ${catalog.buildDays} days`);
     await syncGame();
   };
 
@@ -795,31 +803,28 @@ function FacilitiesTab({ s, onFlash }: any) {
           <div key={catalog.id} style={{ ...glassCard({ padding: '20px' }) }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
               <div>
-                <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 4px' }}>{catalog.name}</h4>
+                <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 4px' }}>{catalog.name}</h4>
                 <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0 }}>{catalog.benefit}</p>
               </div>
-              <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: isMax ? '#10b981' : '#fff', background: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: '4px' }}>Lv{facility.level}</span>
+              <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: HUB.textPrimary, background: HUB.raised, padding: '4px 8px', borderRadius: '6px' }}>Lv{facility.level}</span>
             </div>
-            <div style={{ marginBottom: '14px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {Array.from({ length: catalog.maxLevel }).map((_, lvl) => (
-                  <div key={lvl} style={{ flex: 1, height: '6px', borderRadius: '2px', background: lvl < facility.level ? HUB.accent : 'rgba(255,255,255,0.08)' }} />
+                  <div key={lvl} style={{ flex: 1, height: '6px', borderRadius: '2px', background: lvl < facility.level ? NEUTRAL : HUB.border }} />
                 ))}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                <span style={{ fontSize: '9px', color: HUB.textMuted }}>Level {facility.level}/{catalog.maxLevel}</span>
+                <span style={{ fontSize: '11px', color: HUB.textMuted }}>Level {facility.level}/{catalog.maxLevel}</span>
               </div>
             </div>
             <button
               onClick={() => handleUpgrade(catalog.id)}
               disabled={isMax || isBuilding || !canAfford}
-              style={{
-                ...actionBtn({ padding: '10px 16px', fontSize: '12px', width: '100%', backgroundColor: isMax ? 'rgba(255,255,255,0.03)' : isBuilding ? 'rgba(255,255,255,0.03)' : canAfford ? HUB.accent : 'rgba(239,68,68,0.08)' }),
-                opacity: (isMax || isBuilding) ? 0.5 : canAfford ? 1 : 0.7,
-                cursor: (isMax || isBuilding) ? 'not-allowed' : 'pointer'
-              }}
+              className={btnClass('primary')}
+              style={btn('primary', 'md', { width: '100%' })}
             >
-              {isMax ? 'MAXED OUT' : isBuilding ? 'UPGRADING...' : !canAfford ? `Need $${cost.toFixed(1)}M` : `Upgrade → $${cost.toFixed(1)}M`}
+              {isMax ? 'Max level' : isBuilding ? 'Upgrading' : !canAfford ? `Need $${cost.toFixed(1)}M` : `Upgrade for $${cost.toFixed(1)}M`}
             </button>
           </div>
         );
@@ -835,8 +840,8 @@ function ReportsTab({ s }: any) {
   const [reportsSubTab, setReportsSubTab] = useState<'raceReports' | 'upgradeHistory'>('raceReports');
 
   const subTabs = [
-    { id: 'raceReports', label: 'Race Reports', icon: <BookOpen size={12} /> },
-    { id: 'upgradeHistory', label: 'Upgrade History', icon: <RefreshCw size={12} /> },
+    { id: 'raceReports', label: 'Race reports', icon: <BookOpen size={14} strokeWidth={1.5} /> },
+    { id: 'upgradeHistory', label: 'Upgrade history', icon: <RefreshCw size={14} strokeWidth={1.5} /> },
   ];
 
   return (
@@ -849,20 +854,19 @@ function ReportsTab({ s }: any) {
             onClick={() => setReportsSubTab(tab.id as any)}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '8px 16px',
-              background: reportsSubTab === tab.id ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${reportsSubTab === tab.id ? HUB.accent : 'rgba(255,255,255,0.06)'}`,
-              borderRadius: '6px',
-              color: reportsSubTab === tab.id ? '#fff' : HUB.textMuted,
+              height: '32px', padding: '0 16px',
+              background: reportsSubTab === tab.id ? HUB.accentSoft : HUB.surface,
+              border: `1px solid ${reportsSubTab === tab.id ? 'rgba(225,6,0,0.4)' : HUB.border}`,
+              borderRadius: '8px',
+              color: reportsSubTab === tab.id ? HUB.textPrimary : HUB.textMuted,
               cursor: 'pointer',
               fontFamily: HUB.fontBold,
-              fontSize: '11px',
-              letterSpacing: '0.05em',
-              transition: 'all 0.15s',
+              fontSize: '12px',
+              transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`
             }}
           >
             {tab.icon}
-            {tab.label.toUpperCase()}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -871,29 +875,29 @@ function ReportsTab({ s }: any) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {reports.length === 0 ? (
             <div style={{ ...glassCard({ padding: '60px' }), textAlign: 'center' }}>
-              <BookOpen size={48} color={HUB.textMuted} style={{ opacity: 0.3, marginBottom: '16px' }} />
+              <BookOpen size={24} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: '16px' }} />
               <h3 style={{ fontSize: '16px', color: HUB.textMuted, margin: 0 }}>No reports yet</h3>
-              <p style={{ fontSize: '13px', color: HUB.textMuted, margin: '8px 0 0' }}>Engineering reports are generated after each race weekend.</p>
+              <p style={{ fontSize: '13px', color: HUB.textMuted, margin: '8px 0 0' }}>Engineering reports are generated after each race weekend</p>
             </div>
           ) : (
             reports.map((report: any, i: number) => (
               <div key={i} style={{ ...glassCard({ padding: '24px' }) }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BookOpen size={16} color={HUB.accent} /> Round {report.round} Engineering Report
+                  <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BookOpen size={16} strokeWidth={1.5} color={HUB.textMuted} /> Round {report.round} engineering report
                   </h3>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {report.notes.map((note: string, ni: number) => (
-                    <div key={ni} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
-                      <ChevronRight size={14} color={HUB.accent} style={{ marginTop: '2px', flexShrink: 0 }} />
-                      <p style={{ fontSize: '13px', color: '#ddd', margin: 0, lineHeight: 1.45 }}>{note}</p>
+                    <div key={ni} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', background: HUB.raised, borderRadius: '8px' }}>
+                      <ChevronRight size={14} color={HUB.textFaint} style={{ marginTop: '2px', flexShrink: 0 }} />
+                      <p style={{ fontSize: '13px', color: HUB.textPrimary, margin: 0, lineHeight: 1.45 }}>{note}</p>
                     </div>
                   ))}
                 </div>
                 {report.completedProjects?.length > 0 && (
-                  <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '6px' }}>
-                    <p style={{ fontSize: '11px', color: '#10b981', margin: 0 }}>
+                  <div style={{ marginTop: '12px', padding: '10px 12px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
+                    <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>
                       Upgrades introduced: {report.completedProjects.join(', ')}
                     </p>
                   </div>
@@ -908,25 +912,19 @@ function ReportsTab({ s }: any) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {upgradeHistory.length === 0 ? (
             <div style={{ ...glassCard({ padding: '60px' }), textAlign: 'center' }}>
-              <RefreshCw size={48} color={HUB.textMuted} style={{ opacity: 0.3, marginBottom: '16px' }} />
+              <RefreshCw size={24} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: '16px' }} />
               <h3 style={{ fontSize: '16px', color: HUB.textMuted, margin: 0 }}>No upgrades yet</h3>
-              <p style={{ fontSize: '13px', color: HUB.textMuted, margin: '8px 0 0' }}>Upgrade history will appear here as you complete development projects.</p>
+              <p style={{ fontSize: '13px', color: HUB.textMuted, margin: '8px 0 0' }}>Upgrade history will appear here as you complete development projects</p>
             </div>
           ) : (
             <div style={{ ...glassCard({ padding: '0' }), overflow: 'hidden' }}>
               {upgradeHistory.map((upgrade: any, i: number) => {
-                const outcomeColors: any = {
-                  overperform: '#3b82f6',
-                  success: '#10b981',
-                  underperform: '#f59e0b',
-                  fail: '#ef4444',
-                };
                 return (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 120px 100px 100px', gap: '16px', alignItems: 'center', padding: '14px 20px', borderBottom: i < upgradeHistory.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 120px 100px 100px', gap: '16px', alignItems: 'center', padding: '12px 20px', borderBottom: i < upgradeHistory.length - 1 ? `1px solid ${HUB.border}` : 'none' }}>
                     <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {upgrade.round}</span>
-                    <span style={{ fontSize: '13px', color: '#fff' }}>{upgrade.label}</span>
-                    <span style={{ fontSize: '11px', color: outcomeColors[upgrade.outcome], textTransform: 'uppercase', fontWeight: 700 }}>{upgrade.outcome}</span>
-                    <span style={{ fontSize: '12px', color: '#fff', fontFamily: HUB.fontMono }}>{upgrade.expectedGain}</span>
+                    <span style={{ fontSize: '13px', color: HUB.textPrimary }}>{upgrade.label}</span>
+                    <span style={{ fontSize: '11px', color: outcomeColor(upgrade.outcome), fontWeight: 400, fontFamily: HUB.fontBold }}>{upgrade.outcome}</span>
+                    <span style={{ fontSize: '12px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{upgrade.expectedGain}</span>
                     <span style={{ fontSize: '12px', color: HUB.textMuted, textAlign: 'right', fontFamily: HUB.fontMono }}>${upgrade.cost.toFixed(1)}M</span>
                   </div>
                 );
@@ -941,13 +939,15 @@ function ReportsTab({ s }: any) {
 
 // ─── Main Engineering Screen ───────────────────────────────────────────────────
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={14} /> },
-  { id: 'development', label: 'Development', icon: <FlaskConical size={14} /> },
-  { id: 'projects', label: 'Projects', icon: <Layers size={14} /> },
-  { id: 'components', label: 'Components', icon: <Cpu size={14} /> },
-  { id: 'performance', label: 'Performance', icon: <BarChart2 size={14} /> },
-  { id: 'facilities', label: 'Facilities', icon: <Wrench size={14} /> },
-  { id: 'reports', label: 'Reports', icon: <BookOpen size={14} /> },
+  { id: 'garage', label: 'Garage', icon: <Rotate3d size={16} strokeWidth={1.5} /> },
+  { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={16} strokeWidth={1.5} /> },
+  { id: 'development', label: 'Development', icon: <FlaskConical size={16} strokeWidth={1.5} /> },
+  { id: 'projects', label: 'Projects', icon: <Layers size={16} strokeWidth={1.5} /> },
+  { id: 'components', label: 'Components', icon: <Cpu size={16} strokeWidth={1.5} /> },
+  { id: 'performance', label: 'Performance', icon: <BarChart2 size={16} strokeWidth={1.5} /> },
+  { id: 'trackfit', label: 'Track Fit AI', icon: <Target size={16} strokeWidth={1.5} /> },
+  { id: 'facilities', label: 'Facilities', icon: <Wrench size={16} strokeWidth={1.5} /> },
+  { id: 'reports', label: 'Reports', icon: <BookOpen size={16} strokeWidth={1.5} /> },
 ];
 
 function EngineeringHQ({ root }: { root: HTMLElement }) {
@@ -955,7 +955,7 @@ function EngineeringHQ({ root }: { root: HTMLElement }) {
   ensureEngineeringState(state);
   ensureFinanceState(state);
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('garage');
   const [flashMessage, setFlashMessage] = useState('');
   const s = state as any;
 
@@ -965,59 +965,58 @@ function EngineeringHQ({ root }: { root: HTMLElement }) {
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          {sectionLabel('Technical Department')}
-          {pageTitle('Engineering Headquarters')}
-          {pageSubtitle('Development programmes, component management, and performance analysis.')}
+          {pageTitle('Engineering')}
+          {pageSubtitle('Development programmes, component management and performance analysis.')}
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <div style={statCell({ minWidth: '120px' })}>
-            {statLabel('Car Rating')}
-            {statValue(overallRating.toFixed(1), overallRating > 85 ? '#10b981' : '#fff')}
+            {statLabel('Car rating')}
+            {statValue(overallRating.toFixed(1))}
           </div>
           <div style={statCell({ minWidth: '120px' })}>
             {statLabel('Budget')}
-            {statValue(`$${budget.toFixed(1)}M`, budget > 20 ? '#10b981' : '#f59e0b')}
+            {statValue(`$${budget.toFixed(1)}M`, budget > 20 ? HUB.textPrimary : HUB.warning)}
           </div>
         </div>
       </div>
 
       {/* Flash message */}
       {flashMessage && (
-        <div style={{ padding: '14px 18px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${HUB.accent}`, borderRadius: '8px', color: '#fff', fontSize: '13px', marginBottom: '24px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <Zap size={14} color={HUB.accent} />
+        <div style={{ padding: '12px 16px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', color: HUB.textPrimary, fontSize: '13px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
           {flashMessage}
-          <button onClick={() => setFlashMessage('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontSize: '16px' }}>×</button>
+          <button onClick={() => setFlashMessage('')} className={btnClass('ghost')} style={iconBtn('sm', { marginLeft: 'auto' })} aria-label="Dismiss message" title="Dismiss message"><X size={16} strokeWidth={1.5} /></button>
         </div>
       )}
 
       {/* Tab Bar */}
-      <div className="mobile-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '28px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0' }}>
+      <div className="mobile-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: `1px solid ${HUB.border}`, paddingBottom: '0' }}>
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '10px 18px', background: 'none', border: 'none', borderBottom: `2px solid ${activeTab === tab.id ? HUB.accent : 'transparent'}`,
-              color: activeTab === tab.id ? '#fff' : HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: '12px',
-              letterSpacing: '0.05em', transition: 'all 0.15s', marginBottom: '-1px',
+              padding: '10px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${activeTab === tab.id ? HUB.accent : 'transparent'}`,
+              color: activeTab === tab.id ? HUB.textPrimary : HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: '13px', transition: `border-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`, marginBottom: '-1px'
             }}
           >
             {tab.icon}
-            {tab.label.toUpperCase()}
+            {tab.label}
           </button>
         ))}
       </div>
 
       {/* Tab Content */}
       <div>
+        {activeTab === 'garage'       && <GarageView s={s} onFlash={setFlashMessage} />}
         {activeTab === 'overview'     && <OverviewTab s={s} />}
         {activeTab === 'development'  && <DevelopmentTab s={s} onFlash={setFlashMessage} />}
         {activeTab === 'projects'     && <ProjectsTab s={s} onFlash={setFlashMessage} />}
         {activeTab === 'components'   && <ComponentsTab s={s} onFlash={setFlashMessage} />}
         {activeTab === 'performance'  && <PerformanceTab s={s} />}
+        {activeTab === 'trackfit'     && <TrackFitPanel s={s} />}
         {activeTab === 'facilities'   && <FacilitiesTab s={s} onFlash={setFlashMessage} />}
         {activeTab === 'reports'      && <ReportsTab s={s} />}
       </div>

@@ -1,22 +1,26 @@
 import React from 'react';
-import { HUB, glassCard } from '../HubLayout.tsx';
+import { HUB, glassCard, tyreDot } from '../HubLayout.tsx';
+
+const th = { padding: '8px 4px', color: HUB.textFaint, fontWeight: 400, fontFamily: HUB.fontRegular, whiteSpace: 'nowrap' as const };
+const td = { padding: '6px 4px', color: HUB.textPrimary, whiteSpace: 'nowrap' as const };
+const fig = { ...td, fontFamily: HUB.fontMono };
 
 export function TelemetryCenter({ engine }) {
   // We'll show all cars, but highlight player
   return (
-    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: 'rgba(10,10,10,0.8)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
-      <table style={{ width: '100%', fontSize: '10px', textAlign: 'left', borderCollapse: 'collapse' }}>
-        <thead style={{ position: 'sticky', top: 0, backgroundColor: '#111', zIndex: 10, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: HUB.surface, borderRadius: '8px', border: `1px solid ${HUB.border}` }}>
+      <table style={{ width: '100%', fontSize: '11px', textAlign: 'left', borderCollapse: 'collapse' }}>
+        <thead style={{ position: 'sticky', top: 0, backgroundColor: HUB.surface, zIndex: 10, borderBottom: `1px solid ${HUB.borderMid}` }}>
           <tr>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>P</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>DRIVER</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>LAST LAP</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>BEST LAP</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>TYRE (WEAR)</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>FUEL</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>ERS</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>TEMP</th>
-            <th style={{ padding: '8px 4px', color: HUB.textMuted }}>HEALTH</th>
+            <th style={th}>P</th>
+            <th style={th}>Driver</th>
+            <th style={th}>Last lap</th>
+            <th style={th}>Best lap</th>
+            <th style={th}>Tyre (wear)</th>
+            <th style={th}>Fuel</th>
+            <th style={th}>ERS</th>
+            <th style={th}>Temp</th>
+            <th style={th}>Health</th>
           </tr>
         </thead>
         <tbody>
@@ -24,25 +28,26 @@ export function TelemetryCenter({ engine }) {
             if (car.retired) return null;
             const isPlayer = car.isPlayer;
             const formatTime = (t) => t > 0 && t < 999 ? `${Math.floor(t/60)}:${(t%60).toFixed(3).padStart(6, '0')}` : '—';
-            
+
             return (
-              <tr key={car.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: isPlayer ? 'rgba(225,6,0,0.1)' : 'transparent' }}>
-                <td style={{ padding: '4px', fontWeight: 'bold' }}>{i + 1}</td>
-                <td style={{ padding: '4px', fontWeight: 'bold' }}>{car.driver.name.split(' ').pop()}</td>
-                <td style={{ padding: '4px', fontFamily: HUB.fontMono }}>{formatTime(car.lastLapTime)}</td>
-                <td style={{ padding: '4px', fontFamily: HUB.fontMono, color: '#10b981' }}>{formatTime(car.bestLapTime)}</td>
-                <td style={{ padding: '4px' }}>
-                  <span style={{ color: car.tireCompound === 'Soft' ? '#ef4444' : car.tireCompound === 'Medium' ? '#facc15' : '#fff' }}>
+              <tr key={car.id} style={{ borderBottom: `1px solid ${HUB.border}`, backgroundColor: isPlayer ? HUB.accentSoft : 'transparent' }}>
+                <td style={fig}>{i + 1}</td>
+                <td style={{ ...td, fontFamily: HUB.fontBold }}>{car.driver.name.split(' ').pop()}</td>
+                <td style={fig}>{formatTime(car.lastLapTime)}</td>
+                <td style={fig}>{formatTime(car.bestLapTime)}</td>
+                <td style={td}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }} title={car.tireCompound}>
+                    {tyreDot(car.tireCompound === 'Intermediate' ? 'inter' : car.tireCompound)}
                     {car.tireCompound.substring(0,1)}
                   </span>
-                  <span style={{ marginLeft: '4px', color: car.tireWear > 75 ? '#ef4444' : HUB.textMuted }}>
+                  <span style={{ marginLeft: '4px', color: car.tireWear > 75 ? HUB.negative : HUB.textMuted }}>
                     ({Math.floor(car.tireWear)}%)
                   </span>
                 </td>
-                <td style={{ padding: '4px', color: car.fuel < 10 ? '#ef4444' : '#fff' }}>{Math.floor(car.fuel)}kg</td>
-                <td style={{ padding: '4px', color: car.ers < 20 ? '#ef4444' : car.ers > 80 ? '#10b981' : '#fff' }}>{Math.floor(car.ers)}%</td>
-                <td style={{ padding: '4px', color: car.engineTemp > 110 ? '#ef4444' : '#fff' }}>{Math.floor(car.engineTemp)}°C</td>
-                <td style={{ padding: '4px', color: car.reliability < 50 ? '#ef4444' : '#fff' }}>{Math.floor(car.reliability)}%</td>
+                <td style={{ ...td, color: car.fuel < 10 ? HUB.negative : HUB.textPrimary }}>{Math.floor(car.fuel)}kg</td>
+                <td style={{ ...td, color: car.ers < 20 ? HUB.negative : HUB.textPrimary }}>{Math.floor(car.ers)}%</td>
+                <td style={{ ...td, color: car.engineTemp > 110 ? HUB.negative : HUB.textPrimary }}>{Math.floor(car.engineTemp)}°C</td>
+                <td style={{ ...td, color: car.reliability < 50 ? HUB.negative : HUB.textPrimary }}>{Math.floor(car.reliability)}%</td>
               </tr>
             );
           })}

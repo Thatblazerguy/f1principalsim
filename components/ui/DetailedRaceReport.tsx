@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { HUB, glassCard, pill } from '../HubLayout.tsx';
-import { Target, Flag, Clock, Zap, Activity, Users, ChevronRight, BarChart3, AlertCircle } from 'lucide-react';
+import { Target, Flag, Clock, Zap, Activity, Users, ChevronRight, BarChart3, AlertCircle, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { getDriverHeadshotUrl } from '../../data/drivers.js';
 import { RACE_OBJECTIVES, evaluateObjective } from '../../utils/raceObjectives.js';
+import { analyseRace, detectPitLaps, pitLapsFromEvents, neutralisedLapSet } from '../../utils/racePace.js';
+import { RacePaceDeepDive } from './RacePaceDeepDive.tsx';
 
 import {
   Chart as ChartJS,
@@ -17,6 +19,14 @@ import {
   Filler
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+
+// One line colour per driver so series stay distinguishable on dark. The player's
+// drivers always draw in HUB.accent and lead; nothing else uses red.
+const DRIVER_PALETTE = [
+  '#ededed', '#d9a43a', '#4cc38a', '#8fb3d9', '#c98a5a', '#a1a1a6', '#e8c547', '#7fb3b3',
+  '#d4a5a5', '#b8c78a', '#c6b38e', '#9fb0c4', '#e0c3a0', '#8fbf9f', '#bfbfbf', '#d9b38c',
+  '#9dbfa8', '#c9c08f', '#a8b8a0', '#cfa9a0', '#b0b7c9', '#dcd3b0', '#8f8f94', '#c2d1c0'
+];
 
 ChartJS.register(
   CategoryScale,
@@ -33,8 +43,8 @@ const LapTimeChart = ({ results }) => {
   // If there are no results or no lapTimes, fallback
   if (!results || results.length === 0 || !results[0].lapTimes || results[0].lapTimes.length === 0) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
-        <p style={{ color: HUB.textMuted, fontSize: '13px' }}>Lap-by-lap telemetry unavailable for this session.</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', backgroundColor: HUB.raised, borderRadius: '8px' }}>
+        <p style={{ color: HUB.textMuted, fontSize: '13px' }}>No lap-by-lap times recorded for this session</p>
       </div>
     );
   }
@@ -43,12 +53,7 @@ const LapTimeChart = ({ results }) => {
   const maxLaps = Math.max(...results.map(r => r.lapTimes ? r.lapTimes.length : 0));
   const labels = Array.from({ length: maxLaps }, (_, i) => `L${i + 1}`);
 
-  // Distinct color palette for 24 drivers
-  const palette = [
-    '#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6',
-    '#bfef45', '#fabed4', '#469990', '#dcbeff', '#9A6324', '#fffac8', '#800000', '#aaffc3',
-    '#808000', '#ffd8b1', '#000075', '#a9a9a9', '#ffffff', '#000000', '#10b981', '#3b82f6'
-  ];
+  const palette = DRIVER_PALETTE;
 
   const datasets = results.map((res, idx) => {
     // Some drivers might have retired early
@@ -66,7 +71,8 @@ const LapTimeChart = ({ results }) => {
       data,
       borderColor: isPlayer ? HUB.accent : palette[idx % palette.length],
       backgroundColor: 'transparent',
-      borderWidth: isPlayer ? 3 : 1.5,
+      borderWidth: isPlayer ? 2.5 : 1.25,
+      order: isPlayer ? 0 : 1,
       pointRadius: 0, 
       pointHoverRadius: 4,
       tension: 0.2,
@@ -74,7 +80,8 @@ const LapTimeChart = ({ results }) => {
     };
   });
 
-  const data = { labels, datasets };
+  // Player's drivers lead the legend
+  const data = { labels, datasets: [...datasets].sort((a, b) => a.order - b.order) };
   
   const options = {
     responsive: true,
@@ -87,8 +94,8 @@ const LapTimeChart = ({ results }) => {
       legend: {
         position: 'bottom',
         labels: {
-          color: '#ccc',
-          font: { size: 10 },
+          color: HUB.textMuted,
+          font: { size: 11 },
           boxWidth: 12,
           usePointStyle: true
         }
@@ -103,19 +110,19 @@ const LapTimeChart = ({ results }) => {
     },
     scales: {
       y: {
-        title: { display: true, text: 'Lap Time (s)', color: '#888' },
-        ticks: { color: '#888' },
-        grid: { color: 'rgba(255,255,255,0.05)' },
+        title: { display: true, text: 'Lap time (s)', color: HUB.textFaint },
+        ticks: { color: HUB.textFaint },
+        grid: { color: HUB.border },
       },
       x: {
-        ticks: { color: '#888', maxTicksLimit: 20 },
-        grid: { color: 'rgba(255,255,255,0.05)' }
+        ticks: { color: HUB.textFaint, maxTicksLimit: 20 },
+        grid: { color: HUB.border }
       }
     }
   };
 
   return (
-    <div style={{ height: '500px', width: '100%', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '16px' }}>
+    <div style={{ height: '500px', width: '100%', backgroundColor: HUB.bg, borderRadius: '8px', padding: '16px' }}>
       <Line data={data} options={options as any} />
     </div>
   );
@@ -192,53 +199,6 @@ function generateSyntheticLapTimes(
   return { lapTimes, cleanLapTimes, pitLaps: pitLapsSet, outLaps: outLapsSet };
 }
 
-// ── True Race Pace Calculation ──────────────────────────────────────────────
-// Mirrors real F1 analyst methodology:
-//   1. Filter out lap 1 (standing start), in-laps, out-laps, SC/VSC laps (outliers)
-//   2. Take the median of clean laps (robust vs mean to extreme values)
-//   3. Apply a small tyre-normalisation factor per stint
-function calculateTrueRacePace(lapTimes: number[] | undefined, stops: number, totalLaps: number) {
-  if (!lapTimes || lapTimes.length < 3) return null;
-
-  // 1. Exclude lap 1 (formation / standing start — always very slow)
-  let cleanLaps = lapTimes.slice(1);
-
-  // 2. Identify in-laps & out-laps around pit stops (approx: every 1/stops+1 of race)
-  if (stops > 0) {
-    const stintLen = Math.floor(cleanLaps.length / (stops + 1));
-    const pitLaps = Array.from({ length: stops }, (_, i) => ((i + 1) * stintLen - 1));
-    cleanLaps = cleanLaps.filter((_, i) => {
-      return !pitLaps.some(pl => Math.abs(i - pl) <= 1); // exclude 1 lap either side
-    });
-  }
-
-  if (cleanLaps.length === 0) return null;
-
-  // 3. Remove statistical outliers: any lap > 107% of rolling mean is an SC/VSC/yellow flag lap
-  const mean = cleanLaps.reduce((a, b) => a + b, 0) / cleanLaps.length;
-  const threshold = mean * 1.07;
-  const filteredLaps = cleanLaps.filter(l => l <= threshold);
-  if (filteredLaps.length === 0) return null;
-
-  // 4. Median of remaining laps
-  const sorted = [...filteredLaps].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-
-  // 5. Tyre normalisation: adjust pace upward slightly for multi-stop drivers
-  const normalised = median - (Math.max(0, stops - 1) * 0.08);
-
-  return {
-    median,
-    normalised,
-    cleanLapCount: filteredLaps.length,
-    filteredLapCount: lapTimes.length - filteredLaps.length,
-    fastestClean: Math.min(...filteredLaps),
-    slowestClean: Math.max(...filteredLaps),
-    consistencyScore: Math.max(0, 100 - (Math.max(...filteredLaps) - Math.min(...filteredLaps)) * 8)
-  };
-}
-
 // ─── Race Pace Analytics Panel ──────────────────────────────────────────────
 const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) => {
   const [filterMode, setFilterMode] = useState<string>('My Team');
@@ -254,18 +214,13 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
   const enrichedResults = results.map((r, idx) => {
     const hasRealLaps = r.lapTimes && r.lapTimes.length >= 3 && r.lapTimes[0] > 30;
     if (hasRealLaps) {
-      // For real laps, derive clean times by stripping approx pit delta
-      const pitLaps = new Set<number>();
-      const outLaps = new Set<number>();
-      const stops = r.stops || 1;
-      const len = r.lapTimes.length;
-      if (stops > 0) {
-        for (let s = 1; s <= stops; s++) {
-          const pl = Math.round(len * (s / (stops + 1)));
-          pitLaps.add(pl);
-          outLaps.add(pl + 1);
-        }
-      }
+      // Real laps: find the actual stop laps (recorded events + lap-time outliers)
+      const detected = detectPitLaps(r.lapTimes, {
+        knownPitLaps: pitLapsFromEvents(r.driver.name, replayData),
+        neutralLaps: neutralisedLapSet(replayData),
+      });
+      const pitLaps = new Set<number>(detected);
+      const outLaps = new Set<number>(detected.map(l => l + 1));
       const cleanLapTimes = r.lapTimes.map((t: number, i: number) => {
         const lap = i + 1;
         if (pitLaps.has(lap)) return Math.max(t - 22, t * 0.82); // strip pit delta
@@ -290,13 +245,24 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
 
   const totalLaps = Math.max(...enrichedResults.map(r => r.cleanLapTimes ? r.cleanLapTimes.length : (r.lapTimes ? r.lapTimes.length : 0)));
 
-  // 3. Compute race pace using clean lap times (no pit deltas)
-  const paceData = enrichedResults.map((r, finishPos) => {
-    const lapsToAnalyse = r.cleanLapTimes && r.cleanLapTimes.length > 0 ? r.cleanLapTimes : r.lapTimes;
-    const pace = calculateTrueRacePace(lapsToAnalyse, r.stops || 0, totalLaps);
-    const isPlayer = playerResults.some(({ r: pr }) => pr.driver.name === r.driver.name);
-    return { r, finishPos: finishPos + 1, pace, isPlayer };
-  }).filter(d => d.pace !== null);
+  // 3. Race pace: shared analyser (real stop laps, SC/VSC removed, stint trends)
+  const raceAnalysis = analyseRace(enrichedResults, replayData, { grid });
+  const paceData = raceAnalysis.ranked.map(a => {
+    const idx = enrichedResults.findIndex(r => r.driver.name === a.name);
+    const r = enrichedResults[idx];
+    const isPlayer = playerResults.some(({ r: pr }) => pr.driver.name === a.name);
+    const pace = {
+      median: a.analysis.median,
+      normalised: a.analysis.median,
+      cleanLapCount: a.analysis.cleanLapCount,
+      filteredLapCount: a.analysis.excludedLapCount,
+      fastestClean: a.analysis.best,
+      slowestClean: a.analysis.worst,
+      consistencyScore: a.analysis.consistency,
+      trend: a.analysis.trend,
+    };
+    return { r, finishPos: idx + 1, pace, isPlayer };
+  });
 
   const paceSorted = [...paceData].sort((a, b) => (a.pace!.normalised) - (b.pace!.normalised));
   const fastestPace = paceSorted[0]?.pace?.normalised ?? 90;
@@ -361,12 +327,13 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
 
   // 4. Build Chart.js datasets
   const labels = Array.from({ length: totalLaps }, (_, i) => `L${i + 1}`);
-  const palette = [
-    '#e6194B','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6',
-    '#bfef45','#469990','#dcbeff','#9A6324','#800000','#aaffc3',
-    '#808000','#ffd8b1','#000075','#a9a9a9','#ff6b6b','#ffa94d','#69db7c',
-    '#74c0fc','#e599f7','#a9e34b','#ffec99'
-  ];
+  const palette = DRIVER_PALETTE;
+  // Stable colour per driver (by finishing order), player's drivers in accent
+  const colorFor = (driverName: string) => {
+    if (playerResults.some(({ r }) => r.driver.name === driverName)) return HUB.accent;
+    const idx = enrichedResults.findIndex(r => r.driver.name === driverName);
+    return palette[Math.max(0, idx) % palette.length];
+  };
 
   const datasets = enrichedResults.map((res, idx) => {
     const isPlayer = playerResults.some(({ r }) => r.driver.name === res.driver.name);
@@ -374,12 +341,12 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
     
     // Legend hover effect
     let alpha = isSelected ? 1.0 : 0.2;
-    let borderWidth = isPlayer ? 3 : 1.5;
+    let borderWidth = isPlayer ? 2.5 : 1.25;
     
     if (hoveredDriver) {
       if (hoveredDriver === res.driver.name) {
         alpha = 1.0;
-        borderWidth = 4;
+        borderWidth = 3;
       } else {
         alpha = 0.1;
       }
@@ -425,7 +392,7 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
       pointHoverRadius: 5,
       pointBackgroundColor: (ctx) => {
         const lapNum = ctx.dataIndex + 1;
-        if (res.retired && cleanData && lapNum === cleanData.length) return '#ef4444';
+        if (res.retired && cleanData && lapNum === cleanData.length) return HUB.negative;
         return rgbaColor;
       },
       spanGaps: false, // CRITICAL: false = real gap at pit laps, no interpolation
@@ -441,7 +408,7 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         datasets.push({
           label: `${driverName} Median`,
           data: Array.from({ length: totalLaps }, () => driverPace.pace!.median),
-          borderColor: 'rgba(255,255,255,0.3)',
+          borderColor: 'rgba(237,237,237,0.3)',
           borderWidth: 1,
           borderDash: [5, 5],
           pointRadius: 0,
@@ -489,17 +456,17 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         ctx.fillRect(s0, top, Math.max(s1 - s0, 2), bottom - top);
         // Top label
         ctx.fillStyle = textColor;
-        ctx.font = 'bold 9px "Inter", sans-serif';
+        ctx.font = '11px "Formula1-Bold", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText(label, s0 + (s1 - s0) / 2, top + 4);
         ctx.restore();
       };
       if (replayData?.scLaps?.length === 2) {
-        drawBand(replayData.scLaps[0], replayData.scLaps[1], 'rgba(234,179,8,0.13)', 'SC', 'rgba(234,179,8,0.9)');
+        drawBand(replayData.scLaps[0], replayData.scLaps[1], 'rgba(217,164,58,0.12)', 'SC', HUB.warning);
       }
       if (replayData?.vscLaps?.length === 2) {
-        drawBand(replayData.vscLaps[0], replayData.vscLaps[1], 'rgba(234,179,8,0.07)', 'VSC', 'rgba(234,179,8,0.55)');
+        drawBand(replayData.vscLaps[0], replayData.vscLaps[1], 'rgba(217,164,58,0.06)', 'VSC', 'rgba(217,164,58,0.7)');
       }
     },
     afterDraw: (chart) => {
@@ -523,13 +490,13 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         ctx.save();
 
         // Subtle gap-fill shading
-        ctx.fillStyle = 'rgba(255,255,255,0.02)';
+        ctx.fillStyle = 'rgba(237,237,237,0.02)';
         ctx.fillRect(xPre, top, gapWidth, bottom - top);
 
         // Vertical dashed boundary lines at gap edges
         ctx.setLineDash([3, 4]);
         ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.strokeStyle = 'rgba(237,237,237,0.18)';
         [xPre, xPost].forEach(xp => {
           ctx.beginPath();
           ctx.moveTo(xp, top);
@@ -538,14 +505,14 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         });
         ctx.setLineDash([]);
 
-        // Tyre icon pill centered in the gap
-        const pillW = Math.max(28, Math.min(gapWidth - 4, 36));
+        // "Pit" label centred in the gap
+        const pillW = Math.max(28, Math.min(gapWidth - 4, 32));
         const pillH = 18;
         const pillX = gapMid - pillW / 2;
         const pillY = midY - pillH / 2;
 
-        ctx.fillStyle = 'rgba(15,15,25,0.92)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = HUB.raised;
+        ctx.strokeStyle = HUB.borderMid;
         ctx.lineWidth = 1;
         ctx.beginPath();
         if (ctx.roundRect) {
@@ -556,12 +523,11 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         ctx.fill();
         ctx.stroke();
 
-        // Tyre emoji + PIT text
-        ctx.fillStyle = '#e0e0e0';
-        ctx.font = 'bold 9px "Inter", sans-serif';
+        ctx.fillStyle = HUB.textPrimary;
+        ctx.font = '11px "Formula1-Bold", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('🛞 PIT', gapMid, midY);
+        ctx.fillText('Pit', gapMid, midY);
 
         ctx.restore();
       });
@@ -576,13 +542,13 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'rgba(15,15,20,0.95)',
-        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: HUB.sidebar,
+        borderColor: HUB.borderMid,
         borderWidth: 1,
-        titleColor: '#fff',
-        bodyColor: '#ccc',
+        titleColor: HUB.textPrimary,
+        bodyColor: HUB.textMuted,
         padding: 12,
-        titleFont: { size: 13, family: HUB.fontWide },
+        titleFont: { size: 13, family: HUB.fontBold },
         bodyFont: { size: 12, family: HUB.fontMono },
         callbacks: {
           title: (items) => `Lap ${items[0].label.replace('L', '')}`,
@@ -600,11 +566,11 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
               const isPit = res.pitLaps instanceof Set ? res.pitLaps.has(lapNum) : (res.plannedPitLap === lapNum || res.secondPitLap === lapNum);
               const isOut = res.outLaps instanceof Set ? res.outLaps.has(lapNum) : false;
               if (isPit) {
-                info += '  ·  🛞 Pitted this lap';
+                info += '  ·  Pitted this lap';
               } else if (isOut) {
                 info += '  ·  Out-lap (cold tyres)';
               } else if (res.retired && res.cleanLapTimes && lapNum === res.cleanLapTimes.length) {
-                info += `  ·  ❌ DNF${res.dnfReason ? ': ' + res.dnfReason : ''}`;
+                info += `  ·  DNF${res.dnfReason ? ': ' + res.dnfReason : ''}`;
               }
             }
             return info;
@@ -613,10 +579,10 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
             const lapNum = items[0].dataIndex + 1;
             const lines: string[] = [];
             if (replayData?.scLaps?.length === 2 && lapNum >= replayData.scLaps[0] && lapNum <= replayData.scLaps[1]) {
-              lines.push('🚗 Safety Car period');
+              lines.push('Safety car period');
             }
             if (replayData?.vscLaps?.length === 2 && lapNum >= replayData.vscLaps[0] && lapNum <= replayData.vscLaps[1]) {
-              lines.push('🟨 Virtual Safety Car');
+              lines.push('Virtual safety car');
             }
             return lines;
           }
@@ -627,20 +593,20 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
       y: {
         min: yAxisMin,
         max: yAxisMax,
-        title: { display: true, text: 'Lap Time (s)', color: '#666', font: { size: 11 } },
+        title: { display: true, text: 'Lap time (s)', color: HUB.textFaint, font: { size: 11 } },
         ticks: {
-          color: '#888',
+          color: HUB.textFaint,
           callback: (val) => {
             const m = Math.floor(Number(val) / 60);
             const s = (Number(val) % 60).toFixed(1);
             return `${m}:${Number(s) < 10 ? '0' : ''}${s}`;
           }
         },
-        grid: { color: 'rgba(255,255,255,0.05)' }
+        grid: { color: HUB.border }
       },
       x: {
-        ticks: { color: '#666', maxTicksLimit: 20, font: { size: 10 } },
-        grid: { color: 'rgba(255,255,255,0.04)' }
+        ticks: { color: HUB.textFaint, maxTicksLimit: 20, font: { size: 11 } },
+        grid: { color: HUB.border }
       }
     }
   };
@@ -660,78 +626,82 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* KPI Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px 12px' }}>
-          <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Fastest Race Pace</div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#10b981', fontFamily: HUB.fontMono }}>{fmtTime(fastestPace)}</div>
-          <div style={{ fontSize: '10px', color: HUB.textMuted, marginTop: '4px' }}>{paceSorted[0]?.r.driver.name}</div>
+        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Fastest race pace</div>
+          <div style={{ fontSize: '22px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums' }}>{fmtTime(fastestPace)}</div>
+          <div style={{ fontSize: '12px', color: HUB.textMuted, marginTop: '4px' }}>{paceSorted[0]?.r.driver.name}</div>
         </div>
-        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px 12px', border: playerPaceRank > 0 && playerPaceRank <= 5 ? `1px solid ${HUB.accent}44` : undefined }}>
-          <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Your Pace Rank</div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: playerPaceRank <= 5 ? '#10b981' : playerPaceRank <= 10 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>
+        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Your pace rank</div>
+          <div style={{ fontSize: '22px', fontWeight: 400, color: HUB.accentInk, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums' }}>
             {playerPaceRank > 0 ? `P${playerPaceRank}` : '–'}
           </div>
-          <div style={{ fontSize: '10px', color: HUB.textMuted, marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', color: HUB.textMuted, marginTop: '4px' }}>
             {playerBestPaceEntry ? `+${(playerBestPaceEntry.pace!.normalised - fastestPace).toFixed(3)}s vs fastest` : 'No data'}
           </div>
         </div>
-        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px 12px' }}>
-          <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Positions Gained</div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: posGained > 0 ? '#10b981' : posGained < 0 ? '#ef4444' : '#fff', fontFamily: HUB.fontMono }}>
+        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Positions gained</div>
+          <div style={{ fontSize: '22px', fontWeight: 400, color: posGained > 0 ? HUB.positive : posGained < 0 ? HUB.negative : HUB.textPrimary, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums' }}>
             {posGained > 0 ? '+' : ''}{posGained}
           </div>
-          <div style={{ fontSize: '10px', color: HUB.textMuted, marginTop: '4px' }}>vs Qualifying Grid</div>
+          <div style={{ fontSize: '12px', color: HUB.textMuted, marginTop: '4px' }}>vs qualifying grid</div>
         </div>
-        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px 12px' }}>
-          <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Clean Laps Analysed</div>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>
+        <div style={{ ...glassCard(), textAlign: 'center', padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Clean laps analysed</div>
+          <div style={{ fontSize: '22px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums' }}>
             {playerBestPaceEntry?.pace?.cleanLapCount ?? totalLaps}
           </div>
-          <div style={{ fontSize: '10px', color: HUB.textMuted, marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', color: HUB.textMuted, marginTop: '4px' }}>
             {playerBestPaceEntry ? `${playerBestPaceEntry.pace!.filteredLapCount} outliers removed` : '(your driver)'}
           </div>
         </div>
       </div>
 
       {/* Main Chart.js Chart */}
-      <div style={{ ...glassCard(), padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <div style={{ ...glassCard() }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Activity size={20} color={HUB.accent} />
+            <Activity size={16} strokeWidth={1.5} color={HUB.textMuted} />
             <div>
-              <h3 style={{ margin: 0, fontSize: '15px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: HUB.fontWide }}>
-                Telemetry & Pace
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontBold }}>
+                Lap times
               </h3>
-              <p style={{ margin: '2px 0 0', fontSize: '11px', color: HUB.textMuted }}>
-                Auto-zoom Y-axis · SC/VSC shaded · Pit gaps show 🛞 marker
+              <p style={{ margin: '4px 0 0', fontSize: '12px', color: HUB.textFaint }}>
+                SC and VSC laps shaded · pit laps marked "Pit"
               </p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <label style={{ fontSize: '10px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginRight: '8px' }}>
-              <input type="checkbox" checked={showMedian} onChange={e => setShowMedian(e.target.checked)} />
-              Show Median Pace
+            <label style={{ fontSize: '12px', color: HUB.textMuted, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginRight: '8px' }}>
+              <input type="checkbox" checked={showMedian} onChange={e => setShowMedian(e.target.checked)} style={{ accentColor: HUB.accent }} />
+              Show median pace
             </label>
             {['My Team', 'Top 10', 'Podium Battle', 'All Drivers'].map(fm => (
               <button
                 key={fm}
                 onClick={() => setFilterMode(fm)}
+                aria-pressed={filterMode === fm}
+                className="hub-btn"
                 style={{
-                  padding: '6px 12px',
-                  fontSize: '11px',
-                  background: filterMode === fm ? 'rgba(225,6,0,0.15)' : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${filterMode === fm ? HUB.accent : 'rgba(255,255,255,0.1)'}`,
-                  borderRadius: '4px',
-                  color: filterMode === fm ? '#fff' : '#aaa',
+                  height: '28px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  background: filterMode === fm ? HUB.accentSoft : HUB.raised,
+                  border: `1px solid ${filterMode === fm ? 'rgba(225,6,0,0.4)' : HUB.border}`,
+                  borderRadius: '8px',
+                  color: filterMode === fm ? HUB.textPrimary : HUB.textMuted,
                   cursor: 'pointer',
-                  fontWeight: filterMode === fm ? 'bold' : 'normal',
-                  transition: 'all 0.2s'
+                  fontWeight: 400,
+                  fontFamily: HUB.fontRegular,
+                  transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`
                 }}
               >
-                {fm}
+                {fm === 'My Team' ? 'My team' : fm === 'Podium Battle' ? 'Podium' : fm === 'All Drivers' ? 'All drivers' : fm}
               </button>
             ))}
           </div>
@@ -742,11 +712,13 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         </div>
 
         {/* Custom Interactive Legend */}
-        <div style={{ marginTop: '20px', display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-           {enrichedResults.filter(r => filterMode === 'All Drivers' || activeDrivers.includes(r.driver.name)).map((res, idx) => {
+        <div style={{ marginTop: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '12px', background: HUB.bg, borderRadius: '8px' }}>
+           {enrichedResults.filter(r => filterMode === 'All Drivers' || activeDrivers.includes(r.driver.name))
+             .sort((a, b) => Number(playerResults.some(({ r }) => r.driver.name === b.driver.name)) - Number(playerResults.some(({ r }) => r.driver.name === a.driver.name)))
+             .map((res, idx) => {
              const isHovered = hoveredDriver === res.driver.name;
              const isPlayer = playerResults.some(({ r }) => r.driver.name === res.driver.name);
-             const baseColor = isPlayer ? HUB.accent : palette[idx % palette.length];
+             const baseColor = colorFor(res.driver.name);
              return (
                <div
                  key={res.driver.name}
@@ -755,15 +727,15 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
                  style={{
                    display: 'flex', alignItems: 'center', gap: '6px',
                    padding: '4px 10px',
-                   borderRadius: '12px',
-                   background: isHovered ? 'rgba(255,255,255,0.1)' : 'transparent',
+                   borderRadius: '6px',
+                   background: isHovered ? HUB.raised : 'transparent',
                    cursor: 'pointer',
-                   border: `1px solid ${isHovered ? baseColor : 'transparent'}`,
-                   transition: 'all 0.2s'
+                   border: `1px solid ${isHovered ? HUB.borderMid : 'transparent'}`,
+                   transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}`
                  }}
                >
-                 <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: baseColor }} />
-                 <span style={{ fontSize: '11px', color: isHovered || isPlayer ? '#fff' : '#aaa', fontWeight: isPlayer ? 'bold' : 'normal' }}>
+                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: baseColor }} />
+                 <span style={{ fontSize: '12px', color: isHovered || isPlayer ? HUB.textPrimary : HUB.textMuted, fontWeight: 400, fontFamily: isPlayer ? HUB.fontBold : HUB.fontRegular }}>
                    {res.driver.name}
                  </span>
                </div>
@@ -776,14 +748,15 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
       {(() => {
         // Build a unified timeline of events sorted by lap
         const timelineEvents: Array<{ lap: number; type: string; label: string; detail: string; color: string; icon: string }> = [];
+        // icon is a short plain-text tag shown on each event chip
 
         // Safety Car
         if (replayData?.scLaps?.length === 2) {
-          timelineEvents.push({ lap: replayData.scLaps[0], type: 'SC', label: 'Safety Car', detail: `Laps ${replayData.scLaps[0]}–${replayData.scLaps[1]}`, color: 'rgba(234,179,8,0.9)', icon: '🚗' });
+          timelineEvents.push({ lap: replayData.scLaps[0], type: 'SC', label: 'Safety car', detail: `Laps ${replayData.scLaps[0]}–${replayData.scLaps[1]}`, color: HUB.warning, icon: 'SC' });
         }
         // VSC
         if (replayData?.vscLaps?.length === 2) {
-          timelineEvents.push({ lap: replayData.vscLaps[0], type: 'VSC', label: 'Virtual SC', detail: `Laps ${replayData.vscLaps[0]}–${replayData.vscLaps[1]}`, color: 'rgba(234,179,8,0.6)', icon: '🟨' });
+          timelineEvents.push({ lap: replayData.vscLaps[0], type: 'VSC', label: 'Virtual SC', detail: `Laps ${replayData.vscLaps[0]}–${replayData.vscLaps[1]}`, color: HUB.warning, icon: 'VSC' });
         }
         // Pit stops
         if (replayData?.events) {
@@ -796,8 +769,8 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
               type: 'PIT',
               label: ev.driver,
               detail: `${ev.strategy} · ${ev.time}s${posLabel ? ' · ' + posLabel : ''}`,
-              color: isPlayer ? HUB.accent : 'rgba(255,255,255,0.6)',
-              icon: '🛞'
+              color: isPlayer ? HUB.accent : HUB.textFaint,
+              icon: 'Pit'
             });
           });
         }
@@ -810,8 +783,8 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
               type: 'DNF',
               label: r.driver.name,
               detail: r.dnfReason || 'Retirement',
-              color: '#ef4444',
-              icon: '❌'
+              color: HUB.negative,
+              icon: 'DNF'
             });
           }
         });
@@ -820,17 +793,17 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         if (timelineEvents.length === 0) return null;
 
         return (
-          <div style={{ ...glassCard(), padding: '16px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <Flag size={16} color={HUB.accent} />
-              <h3 style={{ margin: 0, fontSize: '12px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Race Events Timeline</h3>
-              <span style={{ marginLeft: 'auto', fontSize: '10px', color: HUB.textMuted }}>{timelineEvents.length} events</span>
+          <div style={{ ...glassCard() }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Flag size={16} strokeWidth={1.5} color={HUB.textMuted} />
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Race events</h3>
+              <span style={{ marginLeft: 'auto', fontSize: '12px', color: HUB.textFaint }}>{timelineEvents.length} events</span>
             </div>
             {/* Timeline track */}
             <div style={{ position: 'relative', paddingBottom: '8px' }}>
               {/* Lap axis */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0', marginBottom: '12px', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'rgba(255,255,255,0.08)', transform: 'translateY(-50%)' }} />
+                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: HUB.border, transform: 'translateY(-50%)' }} />
                 {timelineEvents.map((ev, i) => {
                   const leftPct = totalLaps > 0 ? Math.max(0, Math.min(100, ((ev.lap - 1) / totalLaps) * 100)) : i * 4;
                   return (
@@ -851,12 +824,10 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
                     >
                       {/* Event dot */}
                       <div style={{
-                        width: '10px',
-                        height: '10px',
+                        width: '8px',
+                        height: '8px',
                         borderRadius: '50%',
-                        background: ev.type === 'SC' ? '#eab308' : ev.type === 'VSC' ? '#ca8a04' : ev.type === 'DNF' ? '#ef4444' : ev.type === 'PIT' ? 'rgba(255,255,255,0.7)' : '#fff',
-                        border: `2px solid ${ev.color}`,
-                        boxShadow: `0 0 6px ${ev.color}`,
+                        background: ev.color,
                         flexShrink: 0
                       }} />
                     </div>
@@ -865,7 +836,7 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
               </div>
 
               {/* Event cards row */}
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
                 {timelineEvents.map((ev, i) => (
                   <div
                     key={i}
@@ -873,32 +844,20 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
-                      padding: '5px 10px',
-                      borderRadius: '20px',
-                      border: `1px solid ${
-                        ev.type === 'SC' ? 'rgba(234,179,8,0.5)' :
-                        ev.type === 'VSC' ? 'rgba(234,179,8,0.3)' :
-                        ev.type === 'DNF' ? 'rgba(239,68,68,0.4)' :
-                        ev.type === 'PIT' && playerResults.some(({ r }) => r.driver.name === ev.label) ? `${HUB.accent}55` :
-                        'rgba(255,255,255,0.1)'
-                      }`,
-                      background: `${
-                        ev.type === 'SC' ? 'rgba(234,179,8,0.08)' :
-                        ev.type === 'VSC' ? 'rgba(234,179,8,0.04)' :
-                        ev.type === 'DNF' ? 'rgba(239,68,68,0.08)' :
-                        ev.type === 'PIT' && playerResults.some(({ r }) => r.driver.name === ev.label) ? 'rgba(225,6,0,0.08)' :
-                        'rgba(255,255,255,0.03)'
-                      }`,
-                      fontSize: '11px',
-                      color: '#ccc',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: `1px solid ${HUB.border}`,
+                      background: ev.type === 'PIT' && playerResults.some(({ r }) => r.driver.name === ev.label) ? HUB.accentSoft : HUB.raised,
+                      fontSize: '12px',
+                      color: HUB.textMuted,
                       whiteSpace: 'nowrap' as const
                     }}
                   >
-                    <span>{ev.icon}</span>
-                    <span style={{ fontFamily: HUB.fontMono, fontSize: '10px', color: ev.type === 'SC' || ev.type === 'VSC' ? '#eab308' : '#888' }}>L{ev.lap}</span>
-                    <span style={{ fontWeight: 600, color: ev.type === 'DNF' ? '#ef4444' : playerResults.some(({ r }) => r.driver.name === ev.label) ? HUB.accent : '#ddd' }}>{ev.label}</span>
-                    <span style={{ color: '#666', fontSize: '10px' }}>·</span>
-                    <span style={{ color: '#999', fontSize: '10px' }}>{ev.detail}</span>
+                    <span style={{ fontFamily: HUB.fontBold, fontSize: '11px', color: ev.type === 'SC' || ev.type === 'VSC' ? HUB.warning : ev.type === 'DNF' ? HUB.negative : HUB.textFaint }}>{ev.icon}</span>
+                    <span style={{ fontFamily: HUB.fontMono, fontSize: '11px', color: HUB.textFaint }}>L{ev.lap}</span>
+                    <span style={{ fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: playerResults.some(({ r }) => r.driver.name === ev.label) ? HUB.accentInk : HUB.textPrimary }}>{ev.label}</span>
+                    <span style={{ color: HUB.textFaint, fontSize: '11px' }}>·</span>
+                    <span style={{ color: HUB.textMuted, fontSize: '11px' }}>{ev.detail}</span>
                   </div>
                 ))}
               </div>
@@ -912,45 +871,45 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
 
         {/* Per-Driver Pace Ranking Table */}
         <div style={{ ...glassCard(), padding: '0' }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Activity size={14} color={HUB.accent} />
-            <h3 style={{ margin: 0, fontSize: '12px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Race Pace Rankings</h3>
-            <span style={{ marginLeft: 'auto', fontSize: '10px', color: HUB.textMuted }}>Median · Tyre-Normalised · Outliers Removed</span>
+          <div style={{ padding: '16px', borderBottom: `1px solid ${HUB.border}`, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Activity size={16} strokeWidth={1.5} color={HUB.textMuted} />
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Race pace ranking</h3>
+            <span style={{ marginLeft: 'auto', fontSize: '12px', color: HUB.textFaint }}>Median of clean laps · stops, SC and slow laps removed</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '36px 36px 2fr 1fr 1fr 1fr 1fr', gap: '12px', padding: '8px 16px', fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '36px 36px 2fr 1fr 1fr 1fr 1fr', gap: '12px', padding: '8px 16px', fontSize: '12px', color: HUB.textFaint, backgroundColor: HUB.bg }}>
             <div>Rank</div>
             <div>Fin</div>
             <div>Driver</div>
-            <div>True Pace</div>
+            <div>True pace</div>
             <div>Gap</div>
             <div>Consistency</div>
-            <div>Clean Laps</div>
+            <div>Clean laps</div>
           </div>
           {paceSorted.map((d, rankIdx) => {
             const gap = d.pace!.normalised - fastestPace;
             const isPlayer = d.isPlayer;
             const cs = d.pace!.consistencyScore;
-            const consistColor = cs >= 80 ? '#10b981' : cs >= 60 ? '#f59e0b' : '#ef4444';
+            const consistColor = cs >= 80 ? HUB.positive : cs >= 60 ? HUB.warning : HUB.negative;
             return (
-              <div key={d.r.driver.name} style={{ display: 'grid', gridTemplateColumns: '36px 36px 2fr 1fr 1fr 1fr 1fr', gap: '12px', padding: '10px 16px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.02)', background: isPlayer ? 'rgba(225,6,0,0.08)' : 'transparent', transition: 'background 0.2s' }}>
-                <div style={{ fontSize: '13px', fontWeight: 800, color: rankIdx === 0 ? '#10b981' : '#fff' }}>P{rankIdx + 1}</div>
+              <div key={d.r.driver.name} style={{ display: 'grid', gridTemplateColumns: '36px 36px 2fr 1fr 1fr 1fr 1fr', gap: '12px', padding: '8px 16px', alignItems: 'center', borderBottom: `1px solid ${HUB.border}`, background: isPlayer ? HUB.accentSoft : 'transparent' }}>
+                <div style={{ fontSize: '13px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: HUB.textPrimary }}>P{rankIdx + 1}</div>
                 <div style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>P{d.finishPos}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <img src={getDriverHeadshotUrl(d.r.driver)} alt={d.r.driver.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
                   <div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: isPlayer ? HUB.accent : '#fff' }}>{d.r.driver.name}</div>
-                    <div style={{ fontSize: '10px', color: HUB.textMuted }}>{d.r.team.name}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: isPlayer ? HUB.accentInk : HUB.textPrimary }}>{d.r.driver.name}</div>
+                    <div style={{ fontSize: '11px', color: HUB.textMuted }}>{d.r.team.name}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: rankIdx === 0 ? '#10b981' : '#fff' }}>{fmtTime(d.pace!.normalised)}</div>
-                <div style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: gap < 0.05 ? '#10b981' : gap < 0.5 ? '#f59e0b' : '#ef4444' }}>
+                <div style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: HUB.textPrimary }}>{fmtTime(d.pace!.normalised)}</div>
+                <div style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: HUB.textMuted }}>
                   {gap < 0.001 ? '—' : `+${gap.toFixed(3)}s`}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ flex: 1, height: '4px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '2px' }}>
-                    <div style={{ width: `${cs}%`, height: '100%', backgroundColor: consistColor, borderRadius: '2px', transition: 'width 0.4s ease' }} />
+                  <div style={{ flex: 1, height: '4px', backgroundColor: HUB.raised, borderRadius: '2px' }}>
+                    <div style={{ width: `${cs}%`, height: '100%', backgroundColor: consistColor, borderRadius: '2px', transition: `width 400ms ${HUB.ease}` }} />
                   </div>
-                  <span style={{ fontSize: '10px', color: consistColor, fontFamily: HUB.fontMono, minWidth: '30px' }}>{Math.round(cs)}%</span>
+                  <span style={{ fontSize: '11px', color: consistColor, fontFamily: HUB.fontMono, minWidth: '30px' }}>{Math.round(cs)}%</span>
                 </div>
                 <div style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>{d.pace!.cleanLapCount} / {d.r.lapTimes?.length ?? 0}</div>
               </div>
@@ -961,29 +920,28 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
         {/* Pit Events Panel */}
         {replayData?.events?.filter(e => e.type === 'PIT_STOP').length > 0 && (
           <div style={{ ...glassCard(), padding: '0', position: 'sticky', top: '80px' }}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '16px' }}>🛞</span>
-              <h3 style={{ margin: 0, fontSize: '12px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pit Events</h3>
-              <span style={{ marginLeft: 'auto', fontSize: '10px', color: HUB.textMuted }}>{replayData.events.filter(e => e.type === 'PIT_STOP').length} stops</span>
+            <div style={{ padding: '16px', borderBottom: `1px solid ${HUB.border}`, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Pit stops</h3>
+              <span style={{ marginLeft: 'auto', fontSize: '12px', color: HUB.textFaint }}>{replayData.events.filter(e => e.type === 'PIT_STOP').length} stops</span>
             </div>
             <div style={{ maxHeight: '520px', overflowY: 'auto' }}>
               {replayData.events.filter(e => e.type === 'PIT_STOP').map((ev, i) => {
                 const isPlayer = playerResults.some(({ r }) => r.driver.name === ev.driver);
                 const posDiff = (ev.newPos ?? 0) - (ev.oldPos ?? 0);
                 return (
-                  <div key={i} style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: isPlayer ? 'rgba(225,6,0,0.06)' : 'transparent' }}>
+                  <div key={i} style={{ padding: '12px 16px', borderBottom: `1px solid ${HUB.border}`, background: isPlayer ? HUB.accentSoft : 'transparent' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: isPlayer ? HUB.accent : '#ddd' }}>{ev.driver}</span>
-                      <span style={{ fontSize: '10px', fontFamily: HUB.fontMono, color: HUB.textMuted, background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>Lap {ev.lap}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: isPlayer ? HUB.accentInk : HUB.textPrimary }}>{ev.driver}</span>
+                      <span style={{ fontSize: '11px', fontFamily: HUB.fontMono, color: HUB.textMuted }}>Lap {ev.lap}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '10px', color: '#a78bfa', background: 'rgba(167,139,250,0.1)', padding: '2px 8px', borderRadius: '4px' }}>🛞 {ev.strategy}</span>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: HUB.textMuted }}>{ev.strategy}</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                      <div style={{ fontSize: '10px', color: HUB.textMuted }}>Stationary time</div>
-                      <div style={{ fontSize: '11px', fontFamily: HUB.fontMono, color: '#fff' }}>{ev.time}s</div>
-                      <div style={{ fontSize: '10px', color: HUB.textMuted }}>Position</div>
-                      <div style={{ fontSize: '11px', fontFamily: HUB.fontMono, color: posDiff > 3 ? '#ef4444' : posDiff > 0 ? '#f59e0b' : '#10b981' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
+                      <div style={{ fontSize: '12px', color: HUB.textFaint }}>Stationary time</div>
+                      <div style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: HUB.textPrimary }}>{ev.time}s</div>
+                      <div style={{ fontSize: '12px', color: HUB.textFaint }}>Position</div>
+                      <div style={{ fontSize: '12px', fontFamily: HUB.fontMono, color: posDiff > 0 ? HUB.negative : posDiff < 0 ? HUB.positive : HUB.textPrimary }}>
                         P{ev.oldPos} → P{ev.newPos} {posDiff > 0 ? `(-${posDiff})` : posDiff < 0 ? `(+${Math.abs(posDiff)})` : ''}
                       </div>
                     </div>
@@ -994,6 +952,15 @@ const RacePaceAnalytics = ({ results, grid, playerResults, track, replayData }) 
           </div>
         )}
       </div>
+
+      <RacePaceDeepDive
+        results={enrichedResults}
+        analysis={raceAnalysis}
+        playerNames={playerResults.map(({ r }) => r.driver.name)}
+        activeDrivers={activeDrivers}
+        colorFor={colorFor}
+        replayData={replayData}
+      />
     </div>
   );
 };
@@ -1022,15 +989,15 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
   const evaluation = evaluateObjective(objectiveDef, results, grid, state.team, track, replayData);
   const { status, successScore, aiPredictionAccuracy, keyEvents, driverRating, engineeringRating, actualPosition } = evaluation;
 
-  const statusColor = status === 'Achieved' ? '#10b981' : status === 'Partially Achieved' ? '#f59e0b' : '#ef4444';
-  const statusEmoji = status === 'Achieved' ? '✅' : status === 'Partially Achieved' ? '⚠️' : '❌';
+  const statusColor = status === 'Achieved' ? HUB.positive : status === 'Partially Achieved' ? HUB.warning : HUB.negative;
+  const StatusIcon = status === 'Achieved' ? CheckCircle2 : status === 'Partially Achieved' ? AlertTriangle : XCircle;
 
   const playerResults = results.map((r, i) => ({ r, pos: i+1 })).filter(x => x.r.team?.name === state.team?.name);
 
   const tabs = [
-    { id: 'summary', label: 'Race Summary' },
-    { id: 'classification', label: 'Final Classification' },
-    { id: 'analytics', label: 'Pace & Analytics' }
+    { id: 'summary', label: 'Summary' },
+    { id: 'classification', label: 'Classification' },
+    { id: 'analytics', label: 'Pace' }
   ];
 
   return (
@@ -1039,15 +1006,15 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
       {/* Header */}
       <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
          <div>
-            <h2 style={{ margin: 0, fontSize: '20px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Detailed Race Report
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>
+              Race report
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '12px', color: HUB.textMuted }}>{track?.name} — Post-Race Analysis & Evaluation</p>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: HUB.textMuted }}>{track?.name}</p>
          </div>
          <div style={{ display: 'flex', gap: '16px' }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Race Rating</div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: successScore >= 80 ? '#10b981' : successScore >= 50 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>
+              <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Race rating</div>
+              <div style={{ fontSize: '22px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums' }}>
                 {(successScore / 10).toFixed(1)} <span style={{ fontSize: '12px', color: HUB.textMuted }}>/ 10</span>
               </div>
             </div>
@@ -1055,23 +1022,20 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${HUB.border}` }}>
         {tabs.map(t => (
           <button 
              key={t.id} 
              onClick={() => setActiveTab(t.id)}
              style={{
-               padding: '8px 16px',
-               backgroundColor: activeTab === t.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+               padding: '12px 16px',
+               backgroundColor: 'transparent',
                border: 'none',
-               borderRadius: '4px',
-               color: activeTab === t.id ? '#fff' : HUB.textMuted,
-               fontSize: '12px',
-               fontWeight: 'bold',
-               cursor: 'pointer',
-               textTransform: 'uppercase',
-               letterSpacing: '0.05em'
-             }}
+               borderBottom: activeTab === t.id ? `2px solid ${HUB.accent}` : '2px solid transparent',
+               color: activeTab === t.id ? HUB.textPrimary : HUB.textMuted,
+               fontSize: '13px',
+               fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif",
+               cursor: 'pointer' }}
           >
             {t.label}
           </button>
@@ -1089,37 +1053,29 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
              
              {/* ── Objective Review Card ── */}
-             <div style={{
-               backgroundColor: 'rgba(10,10,10,0.85)',
-               border: `1px solid ${statusColor}40`,
-               borderRadius: '10px', padding: '24px',
-               position: 'relative', overflow: 'hidden'
-             }}>
-               {/* Accent line */}
-               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${statusColor}, transparent)` }} />
-
+             <div style={{ ...glassCard(), position: 'relative', overflow: 'hidden' }}>
                {/* Selected objective header */}
-               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                 <Target size={16} color={HUB.accent} />
-                 <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Selected Objective — Post-Race Evaluation</span>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                 <Target size={16} strokeWidth={1.5} color={HUB.textMuted} />
+                 <span style={{ fontSize: '12px', color: HUB.textFaint }}>Race objective</span>
                </div>
 
                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                  {/* Left: objective info */}
                  <div style={{ flex: 1, minWidth: '200px' }}>
-                   <div style={{ fontSize: '22px', fontWeight: 900, color: '#fff', marginBottom: '6px', fontFamily: HUB.fontBold }}>
-                     {objectiveDef.emoji || ''} {objectiveDef.label}
+                   <div style={{ fontSize: '22px', fontWeight: 400, color: HUB.textPrimary, marginBottom: '8px', fontFamily: HUB.fontBold }}>
+                     {objectiveDef.label}
                    </div>
-                   <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#aaa', lineHeight: '1.5', fontStyle: 'italic' }}>
-                     "{objectiveDef.rationale || 'Pre-race strategic target.'}"
+                   <p style={{ margin: '0 0 12px', fontSize: '13px', color: HUB.textMuted, lineHeight: '1.5' }}>
+                     {objectiveDef.rationale || 'Pre-race strategic target.'}
                    </p>
                    {/* Key Events */}
                    {keyEvents.length > 0 && (
                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                        {keyEvents.map((evt, i) => (
-                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                           <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: HUB.accent, flexShrink: 0 }} />
-                           <span style={{ fontSize: '11px', color: '#ccc' }}>{evt}</span>
+                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                           <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: HUB.textFaint, flexShrink: 0 }} />
+                           <span style={{ fontSize: '12px', color: HUB.textMuted }}>{evt}</span>
                          </div>
                        ))}
                      </div>
@@ -1128,43 +1084,43 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
 
                  {/* Right: evaluation metrics */}
                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
-                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Status</div>
-                     <div style={{ fontSize: '14px', fontWeight: 900, color: statusColor }}>{statusEmoji} {status}</div>
+                   <div style={{ textAlign: 'center', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', padding: '12px 16px' }}>
+                     <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Status</div>
+                     <div style={{ fontSize: '14px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: statusColor, display: 'inline-flex', alignItems: 'center', gap: '6px' }}><StatusIcon size={16} strokeWidth={1.5} /> {status}</div>
                    </div>
-                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
-                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Expected</div>
-                     <div style={{ fontSize: '14px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono }}>{objectiveDef.expectedFinishRange || `P${objectiveDef.targetPosition || '?'}`}</div>
+                   <div style={{ textAlign: 'center', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', padding: '12px 16px' }}>
+                     <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Expected</div>
+                     <div style={{ fontSize: '14px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{objectiveDef.expectedFinishRange || `P${objectiveDef.targetPosition || '?'}`}</div>
                    </div>
-                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
-                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Actual</div>
-                     <div style={{ fontSize: '14px', fontWeight: 900, color: statusColor, fontFamily: HUB.fontMono }}>P{actualPosition}</div>
+                   <div style={{ textAlign: 'center', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', padding: '12px 16px' }}>
+                     <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Actual</div>
+                     <div style={{ fontSize: '14px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>P{actualPosition}</div>
                    </div>
-                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
-                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>Success</div>
-                     <div style={{ fontSize: '14px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono }}>{successScore}%</div>
+                   <div style={{ textAlign: 'center', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', padding: '12px 16px' }}>
+                     <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Success</div>
+                     <div style={{ fontSize: '14px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{successScore}%</div>
                    </div>
-                   <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '14px 18px' }}>
-                     <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '6px' }}>AI Accuracy</div>
-                     <div style={{ fontSize: '14px', fontWeight: 900, color: '#3b82f6', fontFamily: HUB.fontMono }}>{aiPredictionAccuracy}%</div>
+                   <div style={{ textAlign: 'center', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', padding: '12px 16px' }}>
+                     <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>Prediction accuracy</div>
+                     <div style={{ fontSize: '14px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{aiPredictionAccuracy}%</div>
                    </div>
                  </div>
                </div>
 
                {/* Driver & Engineering ratings */}
-               <div style={{ display: 'flex', gap: '16px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+               <div style={{ display: 'flex', gap: '16px', marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${HUB.border}`, flexWrap: 'wrap' }}>
                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                   <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Driver Rating</span>
-                   <span style={{ fontSize: '18px', fontWeight: 900, color: driverRating >= 8 ? '#10b981' : driverRating >= 6 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>{driverRating}<span style={{ fontSize: '11px', color: HUB.textMuted }}>/10</span></span>
+                   <span style={{ fontSize: '12px', color: HUB.textFaint }}>Driver rating</span>
+                   <span style={{ fontSize: '18px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{driverRating}<span style={{ fontSize: '11px', color: HUB.textMuted }}>/10</span></span>
                  </div>
                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                   <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Engineering Rating</span>
-                   <span style={{ fontSize: '18px', fontWeight: 900, color: engineeringRating >= 8 ? '#10b981' : engineeringRating >= 6 ? '#f59e0b' : '#ef4444', fontFamily: HUB.fontMono }}>{engineeringRating}<span style={{ fontSize: '11px', color: HUB.textMuted }}>/10</span></span>
+                   <span style={{ fontSize: '12px', color: HUB.textFaint }}>Engineering rating</span>
+                   <span style={{ fontSize: '18px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{engineeringRating}<span style={{ fontSize: '11px', color: HUB.textMuted }}>/10</span></span>
                  </div>
                  {objectiveDef.sponsorRewardM && (
                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Sponsor Reward</span>
-                     <span style={{ fontSize: '14px', fontWeight: 800, color: '#10b981', fontFamily: HUB.fontMono }}>{status !== 'Not Achieved' ? `+$${objectiveDef.sponsorRewardM}M` : '$0M'}</span>
+                     <span style={{ fontSize: '12px', color: HUB.textFaint }}>Sponsor reward</span>
+                     <span style={{ fontSize: '14px', fontWeight: 400, color: status !== 'Not Achieved' ? HUB.positive : HUB.textMuted, fontFamily: HUB.fontMono }}>{status !== 'Not Achieved' ? `+$${objectiveDef.sponsorRewardM}M` : '$0M'}</span>
                    </div>
                  )}
                </div>
@@ -1173,24 +1129,24 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
              {/* Engineer Report */}
              <div style={{ ...glassCard(), display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Activity size={16} color={HUB.accent} />
-                  <h3 style={{ margin: 0, fontSize: '12px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Race Engineer Summary</h3>
+                  <Activity size={16} strokeWidth={1.5} color={HUB.textMuted} />
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Race engineer summary</h3>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                    {playerResults.map(({r, pos}, i) => (
-                     <div key={i} style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                     <div key={i} style={{ padding: '16px', backgroundColor: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                          <img src={getDriverHeadshotUrl(r.driver)} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} alt={r.driver.name} />
                          <div>
-                           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{r.driver.name}</div>
-                           <div style={{ fontSize: '11px', color: HUB.textMuted }}>Finished P{pos}</div>
+                           <div style={{ fontSize: '14px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: HUB.textPrimary }}>{r.driver.name}</div>
+                           <div style={{ fontSize: '12px', color: HUB.textMuted }}>Finished P{pos}</div>
                          </div>
                        </div>
-                       <p style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.5', margin: 0 }}>
+                       <p style={{ fontSize: '13px', color: HUB.textPrimary, lineHeight: '1.5', margin: 0 }}>
                          {r.retired 
                            ? `Unfortunately we had to retire the car. Reliability cost us heavily today.` 
                            : (status === 'Achieved' 
-                                ? `Excellent drive. Managed the pace perfectly and executed the strategy flawlessly to hit our target.` : status === 'Partially Achieved' ? `A solid effort — close to the target. Tyre management in the final stint was key.` 
+                                ? `Good drive. Managed the pace and executed the strategy to hit our target.` : status === 'Partially Achieved' ? `A solid effort — close to the target. Tyre management in the final stint was key.` 
                                 : `Struggled to maintain the required delta. Tyre deg was slightly higher than expected, leaving us exposed.`)}
                        </p>
                      </div>
@@ -1203,7 +1159,7 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
         {activeTab === 'classification' && (
           <div style={{ ...glassCard(), padding: '0' }}>
              {/* Simple Table */}
-             <div style={{ display: 'grid', gridTemplateColumns: '40px 40px 2fr 2fr 1fr 1fr 1fr 2fr', gap: '16px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+             <div style={{ display: 'grid', gridTemplateColumns: '40px 40px 2fr 2fr 1fr 1fr 1fr 2fr', gap: '16px', padding: '12px 16px', borderBottom: `1px solid ${HUB.border}`, backgroundColor: HUB.bg, fontSize: '12px', color: HUB.textFaint }}>
                <div>Pos</div>
                <div style={{ textAlign: 'center' }}>+/-</div>
                <div>Driver</div>
@@ -1226,33 +1182,33 @@ export const DetailedRaceReport = ({ results, grid, objectiveId, state, track, r
                       const diff = (qIdx + 1) - (i + 1);
                       if (diff > 0) {
                          diffStr = `+${diff}`;
-                         diffColor = '#10b981';
+                         diffColor = HUB.positive;
                       } else if (diff < 0) {
                          diffStr = `${diff}`;
-                         diffColor = '#ef4444';
+                         diffColor = HUB.negative;
                       }
                    }
                 }
 
                 return (
-                  <div key={r.driver.name} style={{ display: 'grid', gridTemplateColumns: '40px 40px 2fr 2fr 1fr 1fr 1fr 2fr', gap: '16px', padding: '12px 16px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.02)', background: isPlayerDriver ? 'rgba(225,6,0,0.1)' : 'transparent' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>{i + 1}</div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: diffColor, fontFamily: HUB.fontMono, textAlign: 'center' }}>{diffStr}</div>
+                  <div key={r.driver.name} style={{ display: 'grid', gridTemplateColumns: '40px 40px 2fr 2fr 1fr 1fr 1fr 2fr', gap: '16px', padding: '12px 16px', alignItems: 'center', borderBottom: `1px solid ${HUB.border}`, background: isPlayerDriver ? HUB.accentSoft : 'transparent' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: HUB.textPrimary }}>{i + 1}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 400, color: diffColor, fontFamily: HUB.fontMono, textAlign: 'center' }}>{diffStr}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                        <img src={getDriverHeadshotUrl(r.driver)} alt={r.driver.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
-                       <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{r.driver.name}</span>
+                       <span style={{ fontSize: '13px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: HUB.textPrimary }}>{r.driver.name}</span>
                     </div>
                     <div style={{ fontSize: '12px', color: HUB.textMuted }}>{r.team.name}</div>
-                    <div style={{ fontSize: '13px', fontFamily: HUB.fontMono, color: r.retired ? '#ef4444' : '#fff' }}>{status}</div>
-                    <div style={{ fontSize: '13px', fontFamily: HUB.fontMono, color: '#fff' }}>{r.stops || (r.retired ? '-' : '1')}</div>
+                    <div style={{ fontSize: '13px', fontFamily: HUB.fontMono, color: r.retired ? HUB.negative : HUB.textPrimary }}>{status}</div>
+                    <div style={{ fontSize: '13px', fontFamily: HUB.fontMono, color: HUB.textPrimary }}>{r.stops || (r.retired ? '-' : '1')}</div>
                     <div>
                       {r.retired ? (
-                        <span style={{ ...pill(false), backgroundColor: 'rgba(239,68,68,0.1)', color: '#ef4444', borderColor: '#ef4444' }}>RETIRED</span>
+                        <span style={{ ...pill(false), color: HUB.negative }}>Retired</span>
                       ) : (
-                        <span style={{ ...pill(false), color: HUB.textMuted }}>FINISHED</span>
+                        <span style={{ ...pill(false), color: HUB.textMuted }}>Finished</span>
                       )}
                     </div>
-                    <div style={{ fontSize: '11px', color: HUB.textMuted }}>
+                    <div style={{ fontSize: '12px', color: HUB.textMuted }}>
                       {r.explanation || (r.dnfReason ? r.dnfReason : '-')}
                     </div>
                   </div>

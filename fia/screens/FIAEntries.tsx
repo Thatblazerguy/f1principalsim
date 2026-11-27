@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Users, CheckCircle, X, Plus } from 'lucide-react';
+import { Users, CheckCircle, X, Plus, ArrowLeft } from 'lucide-react';
 import { renderToAppRoot } from '../../utils/reactRoot.tsx';
-import { HUB, glassCard, actionBtn } from '../../components/HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass, pageTitle, sectionLabel } from '../../components/HubLayout.tsx';
 import { fiaCareer, saveFIACareer, setFIACareer } from '../fiaState.js';
 import { FIA } from '../FIADashboard.tsx';
 import { renderFIADashboard } from '../FIADashboard.tsx';
@@ -15,35 +15,35 @@ const ENTRY_APPLICATIONS = [
 function TeamCard({ team, isPlayer = false }) {
   return (
     <div style={{ ...glassCard({ padding: '16px' }), display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 8, background: isPlayer ? 'rgba(225,6,0,0.15)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Users size={16} color={isPlayer ? FIA.accent : HUB.textMuted} />
+      <div style={{ width: 36, height: 36, borderRadius: 8, background: isPlayer ? HUB.accentSoft : HUB.raised, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Users size={16} strokeWidth={1.5} color={isPlayer ? HUB.accentInk : HUB.textMuted} />
       </div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: HUB.fontBold, fontSize: 13, color: '#fff' }}>{team.name}</div>
-        <div style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted }}>{team.powerUnit || 'Power Unit TBC'}</div>
+        <div style={{ fontFamily: HUB.fontBold, fontSize: 14, color: HUB.textPrimary }}>{team.name}</div>
+        <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{team.powerUnit || 'Power unit TBC'}</div>
       </div>
-      <span style={{ fontFamily: HUB.fontBold, fontSize: 9, color: FIA.green, padding: '2px 8px', borderRadius: 4, background: 'rgba(16,185,129,0.1)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: HUB.positive }} />Active</span>
     </div>
   );
 }
 
 function ApplicationCard({ app, onApprove, onReject }) {
   return (
-    <div style={{ ...glassCard({ padding: '20px' }), border: '1px solid rgba(245,158,11,0.15)', background: 'rgba(245,158,11,0.04)' }}>
+    <div style={{ ...glassCard({ padding: '24px' }) }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
-          <h4 style={{ fontFamily: HUB.fontBold, fontSize: 15, color: '#fff', margin: '0 0 4px' }}>{app.name}</h4>
-          <p style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, margin: 0 }}>{app.country} · {app.powerUnit} · Budget: ${app.budget}M</p>
+          <h4 style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary, margin: '0 0 4px' }}>{app.name}</h4>
+          <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0 }}>{app.country} · {app.powerUnit} · Budget: ${app.budget}M</p>
         </div>
-        <span style={{ fontFamily: HUB.fontBold, fontSize: 9, color: '#F59E0B', padding: '2px 8px', borderRadius: 4, background: 'rgba(245,158,11,0.1)', textTransform: 'uppercase' }}>Pending</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: HUB.warning }} />Pending</span>
       </div>
-      <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, marginBottom: 16, lineHeight: 1.5 }}>{app.description}</p>
+      <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, marginBottom: 16, lineHeight: 1.5 }}>{app.description}</p>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => onApprove(app.id)} style={{ ...actionBtn({ padding: '8px 18px', fontSize: 11 }), display: 'flex', alignItems: 'center', gap: 6 }}>
-          <CheckCircle size={13} /> Approve
+        <button onClick={() => onApprove(app.id)} className={btnClass('secondary')} style={btn('secondary', 'sm')}>
+          <CheckCircle size={14} strokeWidth={1.5} />Approve entry
         </button>
-        <button onClick={() => onReject(app.id)} style={{ padding: '8px 18px', borderRadius: 8, background: 'rgba(225,6,0,0.08)', border: '1px solid rgba(225,6,0,0.2)', color: FIA.accent, cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <X size={13} /> Reject
+        <button onClick={() => onReject(app.id)} className={btnClass('danger')} style={btn('danger', 'sm')}>
+          <X size={14} strokeWidth={1.5} />Reject entry
         </button>
       </div>
     </div>
@@ -64,49 +64,48 @@ function FIAEntriesScreen({ appRoot }) {
     setApplications(prev => prev.map(a => a.id === id ? { ...a, status: 'approved' } : a));
     const updated = { ...career, entryApplications: applications.map(a => a.id === id ? { ...a, status: 'approved' } : a) };
     setFIACareer(updated); saveFIACareer();
-    showNotif('Team entry approved for next season.');
+    showNotif('Team entry approved for next season');
   };
 
   const handleReject = (id: string) => {
     setApplications(prev => prev.map(a => a.id === id ? { ...a, status: 'rejected' } : a));
     const updated = { ...career, entryApplications: applications.map(a => a.id === id ? { ...a, status: 'rejected' } : a) };
     setFIACareer(updated); saveFIACareer();
-    showNotif('Team entry rejected.');
+    showNotif('Team entry rejected');
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#060911', color: '#fff', fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 1000, margin: '0 auto' }}>
       {notification && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', padding: '12px 20px', borderRadius: 10, fontFamily: HUB.fontBold, fontSize: 12, color: FIA.green }}>
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>
           {notification}
         </div>
       )}
 
-      <button onClick={() => renderFIADashboard(appRoot)} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontRegular, fontSize: 12, marginBottom: 12, padding: 0 }}>← FIA Dashboard</button>
-      <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>Grid Management</div>
+      <button onClick={() => renderFIADashboard(appRoot)} className={btnClass('ghost')} style={btn('ghost', 'sm', { marginBottom: 12, marginLeft: -12 })}><ArrowLeft size={14} strokeWidth={1.5} />Back to FIA dashboard</button>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 }}>
-        <h1 style={{ fontFamily: HUB.fontWide, fontSize: 26, color: '#fff', margin: 0, textTransform: 'uppercase' }}>Team Entries</h1>
+        {pageTitle('Team entries')}
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: '#fff' }}>{currentTeams.length * 2} / {maxGrid}</div>
-          <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>Grid cars · Max {maxGrid}</div>
+          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: HUB.textPrimary }}>{currentTeams.length * 2} / {maxGrid}</div>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint }}>Grid cars · max {maxGrid}</div>
         </div>
       </div>
 
       {/* Grid Usage Bar */}
-      <div style={{ ...glassCard({ padding: '20px' }), marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-          <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Grid Utilization</span>
-          <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>{currentTeams.length} teams · {currentTeams.length * 2} cars</span>
+      <div style={{ ...glassCard({ padding: '24px' }), marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>Grid utilization</span>
+          <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: HUB.textPrimary }}>{currentTeams.length} teams · {currentTeams.length * 2} cars</span>
         </div>
-        <div style={{ height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 999 }}>
-          <div style={{ height: '100%', width: `${Math.min(100, (currentTeams.length * 2 / maxGrid) * 100)}%`, background: FIA.accent, borderRadius: 999, transition: 'width 0.4s ease' }} />
+        <div style={{ height: 8, background: HUB.raised, borderRadius: 4 }}>
+          <div style={{ height: '100%', width: `${Math.min(100, (currentTeams.length * 2 / maxGrid) * 100)}%`, background: HUB.textMuted, borderRadius: 4, transition: `width 400ms ${HUB.ease}` }} />
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         {/* Current Teams */}
         <div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>Active Teams ({currentTeams.length})</div>
+          <div style={{ marginBottom: 8 }}>{sectionLabel(`Active teams (${currentTeams.length})`)}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {currentTeams.map((team: any, i) => (
               <TeamCard key={team.name} team={team} />
@@ -116,25 +115,23 @@ function FIAEntriesScreen({ appRoot }) {
 
         {/* Applications */}
         <div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-            Entry Applications ({applications.filter(a => a.status === 'pending').length})
-          </div>
+          <div style={{ marginBottom: 8 }}>{sectionLabel(`Entry applications (${applications.filter(a => a.status === 'pending').length})`)}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {applications.filter(a => a.status === 'pending').map(app => (
               <ApplicationCard key={app.id} app={app} onApprove={handleApprove} onReject={handleReject} />
             ))}
             {applications.filter(a => a.status !== 'pending').map(app => (
-              <div key={app.id} style={{ ...glassCard({ padding: '14px' }), opacity: 0.6 }}>
+              <div key={app.id} style={{ ...glassCard({ padding: '16px' }) }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>{app.name}</span>
-                  <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: app.status === 'approved' ? FIA.green : FIA.accent, textTransform: 'uppercase' }}>{app.status}</span>
+                  <span style={{ fontFamily: HUB.fontBold, fontSize: 13, color: HUB.textMuted }}>{app.name}</span>
+                  <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: app.status === 'approved' ? HUB.positive : HUB.negative, textTransform: 'capitalize' }}>{app.status}</span>
                 </div>
               </div>
             ))}
             {applications.filter(a => a.status === 'pending').length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 0', color: HUB.textMuted }}>
-                <Plus size={28} color="rgba(255,255,255,0.1)" style={{ marginBottom: 8 }} />
-                <p style={{ fontFamily: HUB.fontRegular, fontSize: 12 }}>No pending applications.</p>
+                <Plus size={28} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: 8 }} />
+                <p style={{ fontFamily: HUB.fontRegular, fontSize: 13 }}>No pending applications</p>
               </div>
             )}
           </div>

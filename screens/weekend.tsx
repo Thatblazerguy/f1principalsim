@@ -25,13 +25,16 @@ import {
   getPendingUpgradeForPart,
   getNextUpgradeAvailability
 } from "../utils/seasonTimeline.js";
-import { startWeekendProgress, generateWeekendContext } from "../utils/weekendForm.js";
+import { generateWeekendContext, refreshPlayerSetupInContext } from "../utils/weekendForm.js";
+import { lockWeekendSetup } from "../game/setup/setupLab.js";
+import { SetupLab } from "../components/ui/SetupLab.tsx";
+import { StrategyBuilder } from "../components/ui/StrategyBuilder.tsx";
 import { ensureEngineeringState, getActiveComponent, COMPONENT_CATALOG, applyGridPenalties } from "../utils/engineeringSystem.js";
 import { RACE_OBJECTIVES, generateUnifiedRaceWeekend, evaluateObjective } from "../utils/raceObjectives.js";
 export { RACE_OBJECTIVES };
 import { ObjectiveCardsList, FinishDistributionBar } from '../components/ui/ObjectiveCards.tsx';
 
-import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, actionBtn, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
+import { mountLayout, HUB, glassCard, statCell, statLabel, statValue, btn, btnClass, sectionLabel, pageTitle, pageSubtitle, pill } from '../components/HubLayout.tsx';
 import { CloudRain, Sun, Wind, ChevronRight, Activity, Award, ShieldAlert, Cpu, CheckCircle, AlertTriangle, MessageSquare, Flag, ArrowUpRight, ArrowDownRight, Minus, Timer, Zap, DollarSign } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { SlideUp, PageTransition } from '../components/ui/motion.tsx';
@@ -215,7 +218,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     if (!tick.advanced) return;
     await syncGame();
     const completedText = tick.completedUpgrades.length
-      ? ` Upgrade complete: ${tick.completedUpgrades.map((entry: any) => entry.part.toUpperCase()).join(", ")}.`
+      ? ` Upgrade complete: ${tick.completedUpgrades.map((entry: any) => entry.part).join(", ")}.`
       : "";
     const completedFacilities = processFacilityProjects(state);
     const facilityText = completedFacilities.length
@@ -233,6 +236,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     setTimeout(() => {
       try {
         gainTeamCarXP(s.team!, 5);
+        refreshPlayerSetupInContext(weekendProgress?.weekendContext, round, s);
         setResultsData({ metric: 'bestLap', res: simulatePractice(teams, round!, weekendProgress?.weekendContext), grid: null });
         setStatusMessage(`Practice complete. Car XP increased to ${s.team!.carXP}/100.`);
         syncGame();
@@ -252,6 +256,9 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     setTimeout(() => {
       try {
         gainTeamCarXP(s.team!, 8);
+        // Parc fermé: the setup sheet is final from qualifying onwards.
+        refreshPlayerSetupInContext(weekendProgress?.weekendContext, round, s);
+        lockWeekendSetup(s);
         const { grid, isWet } = simulateQualifying(teams, round!, weekendProgress?.weekendContext);
         
         // Process penalties
@@ -287,7 +294,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       return;
     }
     if (!weekendProgress?.qualifyingComplete) {
-      setStatusMessage("Qualifying must be completed before launching the Pre-Race Briefing.");
+      setStatusMessage("Qualifying must be completed before opening the pre-race briefing.");
       return;
     }
     setShowBriefingModal(mode);
@@ -330,7 +337,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
           
           const historyRecord = s.raceHistory[s.raceHistory.length - 1];
           const financeReport = processRaceFinance(state, historyRecord, round);
-          setStatusMessage(`${round!.name} Quick Sim complete. Net finance result: ${financeReport.netProfit >= 0 ? "+" : ""}$${financeReport.netProfit}M. Car XP is now ${s.team!.carXP}/100.`);
+          setStatusMessage(`${round!.name} Quick sim complete. Net finance result: ${financeReport.netProfit >= 0 ? "+" : ""}$${financeReport.netProfit}M. Car XP is now ${s.team!.carXP}/100.`);
           await syncGame();
         } catch(e: any) {
            setStatusMessage(`Race failed to simulate. ${e.message}`);
@@ -395,7 +402,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
            animate={{ opacity: 1, scale: 1 }}
            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
            style={{ ...glassCard({ padding: '24px' }), marginTop: '24px' }}>
-           <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, margin: '0 0 16px', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{title}</h3>
+           <h3 style={{ fontSize: '14px', fontFamily: HUB.fontBold, margin: '0 0 16px', color: HUB.textPrimary }}>{title}</h3>
 
            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {res.map((r, i) => {
@@ -411,7 +418,7 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
                     const finishPos = i + 1;
                     const delta = qualiPos - finishPos;
                     deltaHtml = (
-                      <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', color: delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : HUB.textMuted, marginRight: '16px' }}>
+                      <span style={{ fontSize: '12px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', color: delta > 0 ? HUB.positive : delta < 0 ? HUB.negative : HUB.textMuted, marginRight: '16px' }}>
                          Q{qualiPos} {delta > 0 ? `(+${delta})` : delta < 0 ? `(${delta})` : '(±0)'}
                       </span>
                     );
@@ -423,18 +430,18 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
                      initial={{ opacity: 0, y: 5 }}
                      animate={{ opacity: 1, y: 0 }}
                      transition={{ duration: 0.2, delay: i * 0.02 }}
-                     key={r.driver.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: isPlayerDriver ? 'rgba(225,6,0,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isPlayerDriver ? HUB.accent : 'transparent'}`, borderRadius: '8px' }}>
+                     key={r.driver.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: isPlayerDriver ? HUB.accentSoft : HUB.raised, border: `1px solid ${isPlayerDriver ? 'rgba(225,6,0,0.4)' : HUB.border}`, borderRadius: '8px' }}>
                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff', width: '30px' }}>P{i + 1}</span>
+                        <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, width: '30px' }}>P{i + 1}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                            <img src={getDriverHeadshotUrl(r.driver)} alt={r.driver.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} loading="lazy" />
-                           <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{r.driver.name}</span>
+                           <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{r.driver.name}</span>
                         </div>
                         <span style={{ fontSize: '12px', color: HUB.textMuted }}>{r.team.name}</span>
                      </div>
                      <div style={{ display: 'flex', alignItems: 'center' }}>
                         {deltaHtml}
-                        <span style={{ fontSize: '13px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', color: '#fff' }}>{status}</span>
+                        <span style={{ fontSize: '13px', fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums', color: HUB.textPrimary }}>{status}</span>
                      </div>
                   </motion.div>
                 );
@@ -464,11 +471,11 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
     return (
       <div>
         <div style={{ marginBottom: '32px' }}>
-          {sectionLabel('End of Calendar')}
+          {sectionLabel('End of calendar')}
           {pageTitle('Season Complete')}
           {pageSubtitle('The championship is over. Head into the offseason to review results and confirm your lineup.')}
         </div>
-        <button onClick={() => { import('./offseason.tsx').then(m => m.renderOffseason(root)) }} style={actionBtn({ padding: '12px 24px' })}>Open Offseason</button>
+        <button onClick={() => { import('./offseason.tsx').then(m => m.renderOffseason(root)) }} className={btnClass('primary')} style={btn('primary', 'md')}>Open offseason</button>
       </div>
     );
   }
@@ -507,35 +514,34 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       {/* Title Header */}
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          {sectionLabel('Race Operations Hub')}
           {pageTitle(round!.name)}
           {pageSubtitle('Monitor track conditions, factory readiness, and rival developments before the race.')}
         </div>
         <div style={{ display: 'flex', gap: '16px' }}>
-          <div style={statCell()}>{statLabel('Current Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color:'#fff', fontWeight:700, fontSize:'16px'}}>{round.round} / {totalRounds}</span></div>
-          <div style={statCell()}>{statLabel('Car Level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color:'#fff', fontWeight:700, fontSize:'16px'}}>Lv {s.team!.carLevel}</span></div>
+          <div style={statCell()}>{statLabel('Round')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', color:HUB.textPrimary, fontWeight: 400, fontSize:'16px'}}>{round.round} / {totalRounds}</span></div>
+          <div style={statCell()}>{statLabel('Car level')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', color:HUB.textPrimary, fontWeight: 400, fontSize:'16px'}}>Lv {s.team!.carLevel}</span></div>
         </div>
       </div>
 
       <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '24px' }}>
         
         {/* Section 1: Weekend Overview (Span 4) */}
-        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={14} /> Weekend Overview</h4>
+        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} strokeWidth={1.5} color={HUB.textMuted} /> Weekend overview</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.circuit}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit Type</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.circuitType}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Weather Forecast</span><span style={{ fontSize: '12px', color: raceWeekend?.weather.isWet ? '#60a5fa' : '#fbbf24', fontWeight: 700 }}>{raceWeekend?.weather.isWet ? '🌧️ Wet Race' : '☀️ Dry Race'}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Rain Probability</span><span style={{ fontSize: '12px', color: raceWeekend?.weather.rainProbability > 30 ? '#ef4444' : raceWeekend?.weather.rainProbability > 10 ? '#f59e0b' : '#10b981', fontWeight: 700 }}>{raceWeekend?.weather.rainProbability}%</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Track Temp</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.weather.trackTemperature}°C</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Race Status</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.raceStatus}</span></div>
-             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Countdown</span><span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.countdown}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.circuit}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Circuit type</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.circuitType}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Forecast</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>{raceWeekend?.weather.isWet ? <CloudRain size={16} strokeWidth={1.5} color={HUB.textMuted} /> : <Sun size={16} strokeWidth={1.5} color={HUB.textMuted} />}{raceWeekend?.weather.isWet ? 'Wet race' : 'Dry race'}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Rain probability</span><span style={{ fontSize: '12px', color: raceWeekend?.weather.rainProbability > 30 ? HUB.warning : HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.weather.rainProbability}%</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Track temp</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.weather.trackTemperature}°C</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Race status</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.raceStatus}</span></div>
+             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '12px', color: HUB.textMuted }}>Countdown</span><span style={{ fontSize: '12px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.countdown}</span></div>
           </div>
         </div>
 
         {/* Section 2: Power Unit Status (Span 4) */}
-        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldAlert size={14} /> Power Unit Status</h4>
+        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldAlert size={16} strokeWidth={1.5} color={HUB.textMuted} /> Power unit status</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {(() => {
               ensureEngineeringState(s);
@@ -549,88 +555,88 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
                 const h = 100 - active.wear;
                 return (
                   <div key={comp}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: HUB.textMuted, marginBottom: '4px', textTransform: 'uppercase' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: HUB.textMuted, marginBottom: '4px' }}>
                       <span>{COMPONENT_CATALOG[comp].name}</span>
-                      <span style={{ color: '#fff', fontWeight: 700 }}>{h.toFixed(0)}%</span>
+                      <span style={{ color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{h.toFixed(0)}%</span>
                     </div>
-                    <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}>
-                      <div style={{ width: `${h}%`, height: '100%', background: h > 85 ? '#10b981' : h > 60 ? '#f59e0b' : '#ef4444', borderRadius: '2px' }} />
+                    <div style={{ width: '100%', height: '4px', background: HUB.raised, borderRadius: '2px' }}>
+                      <div style={{ width: `${h}%`, height: '100%', background: h > 85 ? HUB.positive : h > 60 ? HUB.warning : HUB.negative, borderRadius: '2px' }} />
                     </div>
                   </div>
                 );
               });
             })()}
-            <button onClick={() => import('./engineering.tsx').then(m => m.renderEngineering(root))} style={{...actionBtn({padding:'8px', fontSize:'11px', marginTop:'8px', backgroundColor:'rgba(255,255,255,0.05)'})}}>Manage Engineering Centre</button>
+            <button onClick={() => import('./engineering.tsx').then(m => m.renderEngineering(root))} className={btnClass('secondary')} style={btn('secondary', 'md', { marginTop: '8px' })}>Manage engineering</button>
           </div>
         </div>
 
         {/* Section 3: Engineering Status (Span 4) */}
-        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Cpu size={14} /> Engineering Status</h4>
+        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Cpu size={16} strokeWidth={1.5} color={HUB.textMuted} /> Engineering status</h4>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
-              <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Latest Upgrade</span>
+            <div style={{ padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
+              <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Latest upgrade</span>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{lastUpgrade?.part || 'None'}</span>
-                {lastUpgrade && <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>+{lastUpgrade.expectedGain} OVR</span>}
+                <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{lastUpgrade?.part || 'None'}</span>
+                {lastUpgrade && <span style={{ fontSize: '12px', color: HUB.positive, fontWeight: 400, fontFamily: HUB.fontBold }}>+{lastUpgrade.expectedGain} OVR</span>}
               </div>
             </div>
 
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
-              <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Manufacturing Queue</span>
+            <div style={{ padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
+              <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>Manufacturing queue</span>
               {pendingUpg ? (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{pendingUpg.part}</span>
-                    <span style={{ fontSize: '11px', color: HUB.textMuted }}>ETA Round {Math.floor((Math.max(1, pendingUpg.readyDay) - 1) / 14) + 1}</span>
+                    <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{pendingUpg.part}</span>
+                    <span style={{ fontSize: '11px', color: HUB.textMuted }}>ETA round {Math.floor((Math.max(1, pendingUpg.readyDay) - 1) / 14) + 1}</span>
                   </div>
-                  <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px' }}>
-                    <div style={{ width: '60%', height: '100%', background: '#3b82f6', borderRadius: '2px', animation: 'pulse 2s infinite' }} />
+                  <div style={{ width: '100%', height: '4px', background: HUB.bg, borderRadius: '2px' }}>
+                    <div style={{ width: '60%', height: '100%', background: HUB.textFaint, borderRadius: '2px' }} />
                   </div>
                 </div>
               ) : (
-                <span style={{ fontSize: '13px', color: HUB.textMuted }}>No active development projects.</span>
+                <span style={{ fontSize: '13px', color: HUB.textMuted }}>No active development projects</span>
               )}
             </div>
           </div>
         </div>
 
         {/* Section 4: Championship Snapshot (Span 4) */}
-        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Award size={14} /> Championship Snapshot</h4>
+        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Award size={16} strokeWidth={1.5} color={HUB.textMuted} /> Championship snapshot</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
-               <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Constructors</span>
-               <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>P{raceWeekend?.standingsImpact.currentConstructorPosition}</span>
+            <div style={{ background: HUB.raised, padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+               <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Constructors</span>
+               <span style={{ fontSize: '24px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>P{raceWeekend?.standingsImpact.currentConstructorPosition}</span>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
-               <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Lead Driver</span>
-               <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>P{d1Pos}</span>
+            <div style={{ background: HUB.raised, padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+               <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Lead driver</span>
+               <span style={{ fontSize: '24px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>P{d1Pos}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Nearest Rival:</span>
-            <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700 }}>{raceWeekend?.standingsImpact.nearestRival}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${HUB.border}`, paddingTop: '12px' }}>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Nearest rival</span>
+            <span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{raceWeekend?.standingsImpact.nearestRival}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to Rival:</span>
-            <span style={{ fontSize: '13px', color: raceWeekend?.standingsImpact.gapToRival > 0 ? '#ef4444' : raceWeekend?.standingsImpact.gapToRival < 0 ? '#10b981' : HUB.textMuted, fontWeight: 700, fontFamily: HUB.fontMono }}>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>Gap to rival</span>
+            <span style={{ fontSize: '13px', color: raceWeekend?.standingsImpact.gapToRival > 0 ? HUB.negative : raceWeekend?.standingsImpact.gapToRival < 0 ? HUB.positive : HUB.textMuted, fontWeight: 400, fontFamily: HUB.fontMono }}>
               {Math.abs(raceWeekend?.standingsImpact.gapToRival) > 0 ? `${raceWeekend?.standingsImpact.gapToRival > 0 ? '-' : '+'}${Math.abs(raceWeekend?.standingsImpact.gapToRival)} pts` : '—'}
             </span>
           </div>
         </div>
 
         {/* Section 5: AI Race Objectives (Span 4) */}
-        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <h4 style={{ margin: 0, fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Flag size={14} /> AI Race Objectives
+        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h4 style={{ margin: 0, fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Flag size={16} strokeWidth={1.5} color={HUB.textMuted} /> Race objectives
             </h4>
-            <span style={{ fontSize: '10px', color: HUB.textMuted }}>{raceWeekend?.tier.label}</span>
+            <span style={{ fontSize: '11px', color: HUB.textMuted }}>{raceWeekend?.tier.label}</span>
           </div>
           {raceWeekend?.finishDistribution && (
-            <div style={{ marginBottom: '14px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+            <div style={{ marginBottom: '16px', padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
               <FinishDistributionBar finishDist={raceWeekend.finishDistribution} compact={true} />
             </div>
           )}
@@ -644,33 +650,33 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
         </div>
 
         {/* Section 6: Track Insights (Span 4) */}
-        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={14} /> AI Track Insights</h4>
+        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} strokeWidth={1.5} color={HUB.textMuted} /> Track insights</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {generateTrackInsights(round.circuit, raceWeekend?.weather.isWet ?? null, trackProfile).map((msg, i) => (
                <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <ChevronRight size={14} color={HUB.accent} style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <p style={{ fontSize: '12px', color: '#ccc', margin: 0, lineHeight: '1.4' }}>{msg}</p>
+                  <ChevronRight size={16} strokeWidth={1.5} color={HUB.textFaint} style={{ marginTop: '1px', flexShrink: 0 }} />
+                  <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0, lineHeight: '1.4' }}>{msg}</p>
                </div>
             ))}
           </div>
         </div>
 
         {/* Section 6: Rival Watch (Span 4) */}
-        <div style={{ ...glassCard({ padding: '20px' }), gridColumn: 'span 4' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><Timer size={14} /> Rival Watch</h4>
+        <div style={{ ...glassCard(), gridColumn: 'span 4' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><Timer size={16} strokeWidth={1.5} color={HUB.textMuted} /> Rival watch</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {rivals.map((rival, i) => (
-              <div key={rival.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+              <div key={rival.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
                 <div>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', display: 'block' }}>{rival.name}</span>
-                  <span style={{ fontSize: '10px', color: HUB.textMuted }}>{rival.points} pts</span>
+                  <span style={{ fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, display: 'block' }}>{rival.name}</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>{rival.points} pts</span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 700, display: 'block' }}>Car Lv {rival.carLevel}</span>
-                  <span style={{ fontSize: '10px', color: HUB.textMuted, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', marginTop: '2px' }}>
+                  <span style={{ fontSize: '11px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold, display: 'block' }}>Car Lv {rival.carLevel}</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', marginTop: '2px' }}>
                     Pace: {rival.perf}
-                    {rival.perf > s.team!.carPerformance ? <ArrowUpRight size={10} color="#ef4444" /> : <ArrowDownRight size={10} color="#10b981" />}
+                    {rival.perf > s.team!.carPerformance ? <ArrowUpRight size={12} strokeWidth={1.5} color={HUB.negative} /> : <ArrowDownRight size={12} strokeWidth={1.5} color={HUB.positive} />}
                   </span>
                 </div>
               </div>
@@ -679,17 +685,17 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
         </div>
       </div>
 
-      <div style={{ ...glassCard({ padding: '20px' }), marginBottom: '24px' }}>
-        <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={14} /> Race Bonus Challenges</h4>
+      <div style={{ ...glassCard(), marginBottom: '24px' }}>
+        <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={16} strokeWidth={1.5} color={HUB.textMuted} /> Race bonus challenges</h4>
         <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {raceBonusChallenges.map((challenge) => (
-            <div key={challenge.id} style={{ padding: '16px', background: 'rgba(255,255,255,0.025)', border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
-              <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional Objective</span>
-              <h4 style={{ fontSize: '14px', color: '#fff', margin: '6px 0 12px', fontFamily: HUB.fontBold }}>{challenge.label}</h4>
+            <div key={challenge.id} style={{ padding: '16px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
+              <span style={{ fontSize: '11px', color: HUB.textMuted }}>Optional objective</span>
+              <h4 style={{ fontSize: '14px', color: HUB.textPrimary, margin: '6px 0 12px', fontFamily: HUB.fontBold }}>{challenge.label}</h4>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '11px', color: HUB.textMuted }}>
-                <span>Cash <strong style={{ color: '#10b981' }}>+${challenge.cash}M</strong></span>
-                <span>Board <strong style={{ color: '#fff' }}>+{challenge.boardConfidence}</strong></span>
-                <span>Rep <strong style={{ color: '#fff' }}>+{challenge.reputation}</strong></span>
+                <span>Cash <strong style={{ color: HUB.positive }}>+${challenge.cash}M</strong></span>
+                <span>Board <strong style={{ color: HUB.textPrimary }}>+{challenge.boardConfidence}</strong></span>
+                <span>Rep <strong style={{ color: HUB.textPrimary }}>+{challenge.reputation}</strong></span>
               </div>
             </div>
           ))}
@@ -697,13 +703,13 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
       </div>
 
       {/* Section 7: Engineer Notes Feed */}
-      <div style={{ ...glassCard({ padding: '20px' }), marginBottom: '32px' }}>
-         <h4 style={{ margin: '0 0 16px', fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={14} /> Comms Feed</h4>
+      <div style={{ ...glassCard(), marginBottom: '32px' }}>
+         <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={16} strokeWidth={1.5} color={HUB.textMuted} /> Comms feed</h4>
          <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
            {getEngineerNotes(s.team, weekendProgress, raceIsWet).map((note, i) => (
-             <div key={i} style={{ minWidth: '250px', borderLeft: `2px solid ${i === 0 ? HUB.accent : 'rgba(255,255,255,0.1)'}`, paddingLeft: '12px' }}>
-               <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono, display: 'block', marginBottom: '4px' }}>{note.time}</span>
-               <p style={{ fontSize: '13px', color: i === 0 ? '#fff' : '#ccc', margin: 0 }}>{note.msg}</p>
+             <div key={i} style={{ minWidth: '250px', borderLeft: `1px solid ${HUB.borderMid}`, paddingLeft: '12px' }}>
+               <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono, display: 'block', marginBottom: '4px' }}>{note.time}</span>
+               <p style={{ fontSize: '13px', color: i === 0 ? HUB.textPrimary : HUB.textMuted, margin: 0 }}>{note.msg}</p>
              </div>
            ))}
          </div>
@@ -711,55 +717,93 @@ export const WeekendPage = ({ root, initialFlashMessage }: { root: HTMLElement, 
 
       {/* Advance Day Bar (if not open) */}
       {!raceWindowOpen && (
-        <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderLeft: `4px solid ${HUB.accent}` }}>
+        <div style={{ ...glassCard(), display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
-            <p style={{ fontSize: '14px', color: '#fff', fontWeight: 700, margin: '0 0 4px' }}>Race Weekend Closed</p>
+            <p style={{ fontSize: '14px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold, margin: '0 0 4px' }}>Race weekend closed</p>
             <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>Simulate {daysUntilRace} more day{daysUntilRace === 1 ? "" : "s"} until {raceDateLabel} to unlock track sessions.</p>
           </div>
-          <button onClick={advanceDay} disabled={!canAdvanceDay || loading} style={{ ...actionBtn({ padding: '12px 32px' }), opacity: (!canAdvanceDay || loading) ? 0.5 : 1 }}>
-            Simulate 1 Day
+          <button onClick={advanceDay} disabled={!canAdvanceDay || loading} className={btnClass('secondary')} style={btn('secondary', 'md')}>
+            Simulate 1 day
           </button>
         </div>
       )}
 
+      {/* Setup Lab — car setup + learned track correlation */}
+      {raceWindowOpen && round && !raceAlreadyRun && (
+        <SetupLab
+          appState={s}
+          track={round}
+          drivers={activeDrivers}
+          locked={Boolean(weekendProgress?.qualifyingComplete)}
+          onSetupChanged={(message?: string) => {
+            refreshPlayerSetupInContext(weekendProgress?.weekendContext, round, s);
+            if (message) {
+              setStatusMessage(message);
+              syncGame();
+            }
+          }}
+        />
+      )}
+
+      {/* Strategy builder — writes weekendProgress.selectedStrategies, which quick sim and Race control read */}
+      {round && weekendProgress && !raceAlreadyRun && activeDrivers.length > 0 && (
+        <StrategyBuilder
+          key={round.round}
+          appState={s}
+          track={round}
+          totalLaps={round.laps}
+          playerTeam={teams[0]}
+          drivers={activeDrivers}
+          teams={teams}
+          grid={weekendProgress.grid}
+          weekendContext={weekendProgress.weekendContext}
+          selectedStrategies={weekendProgress.selectedStrategies}
+          rainProbability={rainProb}
+          onLock={(labels: Record<string, string>) => {
+            Object.assign(weekendProgress.selectedStrategies, labels);
+            setStatusMessage(`Strategy locked: ${Object.entries(labels).map(([n, l]) => `${String(n).split(' ').pop()} ${String(l).replace(/\s*->\s*/g, '–').replace('(Custom: pit ', '(pit ')}`).join(' · ')}.`);
+            syncGame();
+          }}
+        />
+      )}
+
       {/* Bottom Actions Console */}
-      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-        <button 
-          onClick={handlePractice} 
-          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', border: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)' }}
-        >
-          {weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? <CheckCircle size={20} color="#10b981" style={{ marginBottom: '8px' }} /> : <Activity size={20} color="#fff" style={{ marginBottom: '8px' }} />}
-          <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em', color: weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete ? '#10b981' : '#fff' }}>RUN PRACTICE</span>
-        </button>
-        
-        <button 
-          onClick={handleQuali} 
-          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: weekendProgress?.qualifyingComplete ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)', border: weekendProgress?.qualifyingComplete ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)' }}
-        >
-          {weekendProgress?.qualifyingComplete ? <CheckCircle size={20} color="#10b981" style={{ marginBottom: '8px' }} /> : <Timer size={20} color="#fff" style={{ marginBottom: '8px' }} />}
-          <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em', color: weekendProgress?.qualifyingComplete ? '#10b981' : '#fff' }}>RUN QUALIFYING</span>
-        </button>
+      <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+        {(() => {
+          // Exactly one primary: the next session the player has to run.
+          const nextSession = !raceWindowOpen || weekendProgress?.raceComplete ? null : !weekendProgress?.qualifyingComplete ? 'qualifying' : 'race_control';
+          const sessionVariant = (id: string) => (nextSession === id ? 'primary' : 'secondary') as 'primary' | 'secondary';
+          const practiceDone = Boolean(weekendProgress?.qualifyingComplete || weekendProgress?.raceComplete);
+          const qualiDone = Boolean(weekendProgress?.qualifyingComplete);
+          return (
+            <>
+              <button onClick={handlePractice} className={btnClass('secondary')} style={btn('secondary', 'md', { width: '100%' })}>
+                {practiceDone ? <CheckCircle size={16} strokeWidth={1.5} color={HUB.positive} /> : <Activity size={16} strokeWidth={1.5} />}
+                <span style={practiceDone ? { color: HUB.positive } : undefined}>Run practice</span>
+              </button>
 
-        <button 
-          onClick={() => openBriefingModal('quick_sim')} 
-          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-        >
-          <Zap size={20} color="#fff" style={{ marginBottom: '8px' }} />
-          <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em' }}>QUICK SIM</span>
-        </button>
+              <button onClick={handleQuali} className={btnClass(sessionVariant('qualifying'))} style={btn(sessionVariant('qualifying'), 'md', { width: '100%' })}>
+                {qualiDone ? <CheckCircle size={16} strokeWidth={1.5} color={HUB.positive} /> : <Timer size={16} strokeWidth={1.5} />}
+                <span style={qualiDone ? { color: HUB.positive } : undefined}>Run qualifying</span>
+              </button>
 
-        <button 
-          onClick={() => openBriefingModal('race_control')} 
-          style={{ ...actionBtn({ padding: '24px' }) as any, height: '100px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: HUB.accent, border: 'none' }}
-        >
-          <Flag size={20} color="#fff" style={{ marginBottom: '8px' }} />
-          <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.1em', color: '#fff' }}>RACE CONTROL</span>
-        </button>
+              <button onClick={() => openBriefingModal('quick_sim')} className={btnClass('secondary')} style={btn('secondary', 'md', { width: '100%' })}>
+                <Zap size={16} strokeWidth={1.5} />
+                Quick sim
+              </button>
+
+              <button onClick={() => openBriefingModal('race_control')} className={btnClass(sessionVariant('race_control'))} style={btn(sessionVariant('race_control'), 'md', { width: '100%' })}>
+                <Flag size={16} strokeWidth={1.5} />
+                Race control
+              </button>
+            </>
+          );
+        })()}
       </div>
 
       {statusMessage && (
-        <div style={{ ...glassCard({ padding: '16px' }), borderLeft: `4px solid ${HUB.accent}`, marginTop: '24px' }}>
-          <p style={{ fontSize: '14px', color: '#fff', margin: 0 }}>{statusMessage}</p>
+        <div style={{ ...glassCard({ padding: '16px' }), marginTop: '24px' }}>
+          <p style={{ fontSize: '14px', color: HUB.textPrimary, margin: 0 }}>{statusMessage}</p>
         </div>
       )}
 

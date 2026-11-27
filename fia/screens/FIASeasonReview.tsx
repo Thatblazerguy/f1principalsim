@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Trophy, TrendingUp, DollarSign, CalendarDays, Award, Flag, ArrowRight, RotateCcw, CheckCircle, Download, FileText, ChevronRight } from 'lucide-react';
+import { Trophy, TrendingUp, DollarSign, CalendarDays, Award, Flag, RotateCcw, CheckCircle, Download, FileText, ChevronRight, ArrowLeft } from 'lucide-react';
 import { renderToAppRoot } from '../../utils/reactRoot.tsx';
-import { HUB, glassCard, actionBtn } from '../../components/HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass, pageTitle, pageSubtitle, pill, sectionLabel } from '../../components/HubLayout.tsx';
 import { fiaCareer, saveFIACareer, setFIACareer, generateRandomEvent } from '../fiaState.js';
 import { FIA } from '../FIADashboard.tsx';
 import { renderFIADashboard } from '../FIADashboard.tsx';
@@ -57,7 +57,7 @@ function FIASeasonReviewScreen({ appRoot }) {
       seasonHistory: newHistory,
       pendingDecisions: [...(career.pendingDecisions || []), ...newDecisions],
       notifications: [
-        { id: `adv-${Date.now()}`, message: `Season ${currentYear} concluded. Welcoming Season ${nextYear}!`, time: Date.now() },
+        { id: `adv-${Date.now()}`, message: `Season ${currentYear} concluded · season ${nextYear} begins`, time: Date.now() },
         ...(career.notifications || [])
       ]
     };
@@ -66,7 +66,7 @@ function FIASeasonReviewScreen({ appRoot }) {
     saveFIACareer();
     setCurrentYear(nextYear);
     setHistory(newHistory);
-    showNotif(`Successfully advanced to Season ${nextYear}! Budget increased by $${Math.round(totalRevenue * 0.4)}M.`);
+    showNotif(`Advanced to season ${nextYear} · budget +$${Math.round(totalRevenue * 0.4)}M vs last season`);
   };
 
   const handleExportReport = () => {
@@ -89,13 +89,13 @@ function FIASeasonReviewScreen({ appRoot }) {
     a.download = `FIA_Championship_Report_${currentYear}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showNotif('Exported season report.');
+    showNotif('Season report exported');
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#060911', color: '#fff', fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 1000, margin: '0 auto' }}>
       {notification && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', padding: '12px 20px', borderRadius: 10, fontFamily: HUB.fontBold, fontSize: 12, color: FIA.green }}>
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>
           {notification}
         </div>
       )}
@@ -105,89 +105,72 @@ function FIASeasonReviewScreen({ appRoot }) {
         <div>
           <button
             onClick={() => renderFIADashboard(appRoot)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11, letterSpacing: '0.1em', marginBottom: 8 }}
+            className={btnClass('ghost')}
+            style={btn('ghost', 'sm', { marginBottom: 12, marginLeft: -12 })}
           >
-            ← BACK TO FIA DASHBOARD
+            <ArrowLeft size={14} strokeWidth={1.5} />Back to FIA dashboard
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h1 style={{ fontFamily: HUB.fontWide, fontSize: 26, color: '#fff', margin: 0, textTransform: 'uppercase' }}>
-              Season {currentYear} Governance & Review
-            </h1>
-            <span style={{ background: 'rgba(225,6,0,0.15)', border: '1px solid rgba(225,6,0,0.4)', color: FIA.accent, padding: '4px 10px', borderRadius: 6, fontFamily: HUB.fontBold, fontSize: 11 }}>
-              FIA RATIFIED
-            </span>
+            {pageTitle(`Season ${currentYear} review`)}
+            <span style={{ ...pill(), marginBottom: 8 }}>Ratified</span>
           </div>
-          <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, margin: '6px 0 0' }}>
-            Review approved championship specifications, financials, and transition to the next governance cycle.
-          </p>
+          {pageSubtitle('Review the approved calendar, finances and regulations, then advance to the next season.')}
         </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
           <button
             onClick={handleExportReport}
-            style={{
-              ...actionBtn({ padding: '10px 18px', fontSize: 11 }),
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
+            className={btnClass('secondary')}
+            style={btn('secondary', 'md')}
           >
-            <Download size={14} /> EXPORT REPORT
+            <Download size={16} strokeWidth={1.5} />Export report
           </button>
           <button
             onClick={handleAdvanceYear}
-            style={{
-              ...actionBtn({ padding: '10px 20px', fontSize: 11 }),
-              background: 'linear-gradient(135deg, #E10600, #FF3B30)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
+            className={btnClass('primary')}
+            style={btn('primary', 'md')}
           >
-            ADVANCE TO {currentYear + 1} <ArrowRight size={14} />
+            Advance to {currentYear + 1}
           </button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
-        <div style={{ ...glassCard({ padding: '20px' }) }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: FIA.accent, marginBottom: 6 }}>
-            <CalendarDays size={16} />
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textTransform: 'uppercase' }}>Rounds Approved</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        <div style={{ ...glassCard({ padding: '24px' }) }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: HUB.textFaint, marginBottom: 8 }}>
+            <CalendarDays size={16} strokeWidth={1.5} />
+            <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>Rounds approved</span>
           </div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: '#fff' }}>{calendarRaces.length} Grands Prix</div>
-          <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, marginTop: 4 }}>Full World Championship</div>
+          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: HUB.textPrimary }}>{calendarRaces.length} Grands Prix</div>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginTop: 4 }}>Full world championship</div>
         </div>
 
-        <div style={{ ...glassCard({ padding: '20px' }) }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: FIA.gold, marginBottom: 6 }}>
-            <DollarSign size={16} />
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textTransform: 'uppercase' }}>Promoter Revenue</span>
+        <div style={{ ...glassCard({ padding: '24px' }) }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: HUB.textFaint, marginBottom: 8 }}>
+            <DollarSign size={16} strokeWidth={1.5} />
+            <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>Promoter revenue</span>
           </div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: FIA.gold }}>${totalRevenue}M</div>
-          <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, marginTop: 4 }}>Estimated hosting contracts</div>
+          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: HUB.textPrimary }}>${totalRevenue}M</div>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginTop: 4 }}>Estimated hosting contracts</div>
         </div>
 
-        <div style={{ ...glassCard({ padding: '20px' }) }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: FIA.green, marginBottom: 6 }}>
-            <TrendingUp size={16} />
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textTransform: 'uppercase' }}>Approval Rating</span>
+        <div style={{ ...glassCard({ padding: '24px' }) }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: HUB.textFaint, marginBottom: 8 }}>
+            <TrendingUp size={16} strokeWidth={1.5} />
+            <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>Approval rating</span>
           </div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: FIA.green }}>{career.approvalRating}%</div>
-          <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, marginTop: 4 }}>Paddock & public confidence</div>
+          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: HUB.textPrimary }}>{career.approvalRating}%</div>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginTop: 4 }}>Paddock & public confidence</div>
         </div>
 
-        <div style={{ ...glassCard({ padding: '20px' }) }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#60A5FA', marginBottom: 6 }}>
-            <Award size={16} />
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textTransform: 'uppercase' }}>Current FIA Treasury</span>
+        <div style={{ ...glassCard({ padding: '24px' }) }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: HUB.textFaint, marginBottom: 8 }}>
+            <Award size={16} strokeWidth={1.5} />
+            <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>FIA budget</span>
           </div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: '#60A5FA' }}>${career.finances.budget}M</div>
-          <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, marginTop: 4 }}>Operational liquidity</div>
+          <div style={{ fontFamily: HUB.fontBold, fontSize: 24, color: HUB.textPrimary }}>${career.finances.budget}M</div>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginTop: 4 }}>Operating funds</div>
         </div>
       </div>
 
@@ -196,16 +179,16 @@ function FIASeasonReviewScreen({ appRoot }) {
         {/* Left Column: Calendar Overview */}
         <div style={{ ...glassCard({ padding: '24px' }) }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-              Ratified Championship Calendar ({calendarRaces.length} Circuits)
+            <span style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>
+              Championship calendar ({calendarRaces.length} circuits)
             </span>
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: FIA.green }}>
-              <CheckCircle size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-              VALIDATED
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>
+              <CheckCircle size={14} strokeWidth={1.5} color={HUB.positive} />
+              Validated
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto', paddingRight: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto', paddingRight: 4 }}>
             {calendarRaces.map((r: any, idx: number) => {
               const contract = career.hostingContracts?.[r.circuitId || r.circuit];
               return (
@@ -215,32 +198,32 @@ function FIASeasonReviewScreen({ appRoot }) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 14px',
+                    padding: '10px 12px',
                     borderRadius: 8,
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.05)',
+                    background: HUB.raised,
+                    border: `1px solid ${HUB.border}`
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: FIA.accent, width: 24 }}>
-                      #{idx + 1}
+                    <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: HUB.textFaint, width: 24 }}>
+                      {idx + 1}
                     </span>
                     <div>
-                      <div style={{ fontFamily: HUB.fontBold, fontSize: 13, color: '#fff' }}>
+                      <div style={{ fontFamily: HUB.fontBold, fontSize: 13, color: HUB.textPrimary }}>
                         {r.name || r.circuit}
                       </div>
-                      <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>
-                        {r.country || 'International'} · {r.laps || 55} Laps
+                      <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>
+                        {r.country || 'International'} · {r.laps || 55} laps
                       </div>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: FIA.gold }}>
+                    <span style={{ fontFamily: HUB.fontBold, fontSize: 13, color: HUB.textPrimary }}>
                       ${contract?.hostingFee || 35}M
                     </span>
                     {r.sprint && (
-                      <span style={{ marginLeft: 8, background: 'rgba(139,92,246,0.2)', color: '#A78BFA', padding: '2px 6px', borderRadius: 4, fontSize: 9, fontFamily: HUB.fontBold }}>
-                        SPRINT
+                      <span style={{ ...pill(), marginLeft: 8, padding: '2px 6px', fontSize: 11 }}>
+                        Sprint
                       </span>
                     )}
                   </div>
@@ -254,55 +237,55 @@ function FIASeasonReviewScreen({ appRoot }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Active Regulations snapshot */}
           <div style={{ ...glassCard({ padding: '24px' }) }}>
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 14 }}>
-              Enforced Regulatory Directives
+            <span style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary, display: 'block', marginBottom: 12 }}>
+              Regulations in force
             </span>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 6 }}>
-                <span style={{ color: HUB.textMuted }}>Cost Cap:</span>
-                <span style={{ fontFamily: HUB.fontBold, color: '#fff' }}>${career.regulations.technical.costCap.value}M</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: `1px solid ${HUB.border}`, paddingBottom: 8 }}>
+                <span style={{ color: HUB.textMuted }}>Cost cap</span>
+                <span style={{ fontFamily: HUB.fontBold, color: HUB.textPrimary }}>${career.regulations.technical.costCap.value}M</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 6 }}>
-                <span style={{ color: HUB.textMuted }}>Minimum Car Weight:</span>
-                <span style={{ fontFamily: HUB.fontBold, color: '#fff' }}>{career.regulations.technical.minCarWeight.value} kg</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: `1px solid ${HUB.border}`, paddingBottom: 8 }}>
+                <span style={{ color: HUB.textMuted }}>Minimum car weight</span>
+                <span style={{ fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{career.regulations.technical.minCarWeight.value} kg</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 6 }}>
-                <span style={{ color: HUB.textMuted }}>Points Winner Allocation:</span>
-                <span style={{ fontFamily: HUB.fontBold, color: '#fff' }}>{career.regulations.sporting.pointsSystem.value[0]} pts (P1)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: `1px solid ${HUB.border}`, paddingBottom: 8 }}>
+                <span style={{ color: HUB.textMuted }}>Points for a win</span>
+                <span style={{ fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{career.regulations.sporting.pointsSystem.value[0]} pts (P1)</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 6 }}>
-                <span style={{ color: HUB.textMuted }}>Fastest Lap Bonus:</span>
-                <span style={{ fontFamily: HUB.fontBold, color: FIA.green }}>{career.regulations.sporting.fastestLapPoint.value ? 'Awarded (1 pt)' : 'Disabled'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderBottom: `1px solid ${HUB.border}`, paddingBottom: 8 }}>
+                <span style={{ color: HUB.textMuted }}>Fastest lap bonus</span>
+                <span style={{ fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{career.regulations.sporting.fastestLapPoint.value ? 'Awarded (1 pt)' : 'Disabled'}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: HUB.textMuted }}>Max Grid Allowance:</span>
-                <span style={{ fontFamily: HUB.fontBold, color: '#fff' }}>{career.regulations.sporting.maxGridSize.value} Cars</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: HUB.textMuted }}>Max grid size</span>
+                <span style={{ fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{career.regulations.sporting.maxGridSize.value} cars</span>
               </div>
             </div>
           </div>
 
           {/* Past Seasons History */}
           <div style={{ ...glassCard({ padding: '24px' }) }}>
-            <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 14 }}>
-              Archived FIA Seasons History
+            <span style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary, display: 'block', marginBottom: 12 }}>
+              Past seasons
             </span>
 
             {history.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: HUB.textMuted, fontSize: 12 }}>
-                No prior seasons archived yet. Advance Season {currentYear} to record your legacy.
+              <div style={{ textAlign: 'center', padding: '20px 0', color: HUB.textMuted, fontSize: 13 }}>
+                No past seasons yet. Advance season {currentYear} to record it.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
                 {history.map((h: any, idx: number) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, fontSize: 12 }}>
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: HUB.raised, borderRadius: 8, fontSize: 13 }}>
                     <div>
-                      <span style={{ fontFamily: HUB.fontBold, color: '#fff' }}>Season {h.year}</span>
+                      <span style={{ fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Season {h.year}</span>
                       <span style={{ color: HUB.textMuted, marginLeft: 8 }}>({h.racesCount} GPs)</span>
                     </div>
                     <div style={{ display: 'flex', gap: 12 }}>
-                      <span style={{ color: FIA.gold }}>${h.revenue}M</span>
-                      <span style={{ color: FIA.green }}>{h.finalApproval}% approval</span>
+                      <span style={{ color: HUB.textPrimary }}>${h.revenue}M</span>
+                      <span style={{ color: HUB.textMuted }}>{h.finalApproval}% approval</span>
                     </div>
                   </div>
                 ))}

@@ -1,5 +1,6 @@
-# 🏎️ F1 Principal Simulator: Championship Hub & FIA Suite
+# F1P: Championship Hub & FIA Suite
 
+[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Demo-black?style=for-the-badge&logo=vercel&logoColor=white)](https://f1principalsim.vercel.app)
 [![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Demo-black?style=for-the-badge&logo=vercel&logoColor=white)](https://f1principalsim-orpin.vercel.app/)
 [![Deploy with Vercel](https://img.shields.io/badge/Deploy%20with-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FThatblazerguy%2Ff1principalsim&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY&envDescription=Supabase%20API%20Credentials&project-name=f1principalsim)
 [![React 19](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)](https://react.dev/)
@@ -9,8 +10,9 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-red?style=for-the-badge)](./LICENSE)
 
+> **Live Deployment:** [https://f1principalsim.vercel.app](https://f1principalsim.vercel.app)  
 > **Live Deployment:** [https://f1principalsim-orpin.vercel.app/](https://f1principalsim-orpin.vercel.app/)  
-> *An authentic Formula 1 team principal and FIA regulatory management simulator. Manage drivers, engineering R&D, real-time pit wall strategies, and World Motor Sport Council governance across an entire 24-race championship.*
+> *A motorsport team principal and FIA regulatory management game. Manage drivers, engineering R&D, real-time pit wall strategies, and World Motor Sport Council governance across an entire 24-race championship.*
 
 ---
 
@@ -42,6 +44,7 @@
 
 The application is deployed live on Vercel with automatic CI/CD and production asset optimization:
 
+- **Production URL:** [https://f1principalsim.vercel.app](https://f1principalsim.vercel.app)
 - **Production URL:** [https://f1principalsim-orpin.vercel.app/](https://f1principalsim-orpin.vercel.app/)
 - **Deployment Platform:** Vercel (Edge Network + Global CDN)
 - **SPA Routing:** Configured with zero-config `vercel.json` URL rewrites
@@ -153,7 +156,7 @@ The application is deployed live on Vercel with automatic CI/CD and production a
 ---
 
 ### 5. FIA Governance & Circuit Designer Suite
-- **World Motor Sport Council Dashboard (`fia/FIADashboard.tsx`):** Step into the shoes of the FIA governing body to steer the future of Formula 1.
+- **World Motor Sport Council Dashboard (`fia/FIADashboard.tsx`):** Step into the shoes of the FIA governing body to steer the future of the championship.
 - **Sporting & Technical Regulations Editor (`fia/screens/FIARegulations.tsx`):**
   - Adjust the **Cost Cap** ($80M to $250M limit).
   - Set **Minimum Car Weight** (750kg to 900kg).
@@ -218,7 +221,7 @@ The application is deployed live on Vercel with automatic CI/CD and production a
 ```
 f1manager/
 ├── assets/                          # Static brand assets & typography
-│   ├── fonts/                       # Official Formula 1 typeface family
+│   ├── fonts/                       # Display typeface family
 │   └── screenshots/                 # High-resolution screenshots captured from the app
 │       ├── pitwall-dashboard.png    # Live pit wall command center
 │       ├── championship-hub.png     # Championship hub dashboard
@@ -310,7 +313,7 @@ f1manager/
 
 ## 🚀 Vercel Deployment Guide
 
-Deploying F1 Principal Simulator to Vercel takes less than two minutes:
+Deploying F1P to Vercel takes less than two minutes:
 
 ### Option A: One-Click Deploy Button
 Click the button below to fork and deploy directly with pre-configured project settings:
@@ -341,6 +344,7 @@ Click the button below to fork and deploy directly with pre-configured project s
 
    > **Note on Supabase:** If you don't provide Supabase credentials, the app **automatically operates in Demo/Local Mode** using localStorage, ensuring seamless exploration with zero crashes!
 
+6. **Deploy:** Click **Deploy**. Vercel will build and assign your live URL (e.g., `https://f1principalsim.vercel.app`).
 6. **Deploy:** Click **Deploy**. Vercel will build and assign your live URL (e.g., `https://f1principalsim-orpin.vercel.app/`).
 
 ---
@@ -426,12 +430,12 @@ To initialize your own Supabase project:
 
 ## 🎨 Design System
 
-The simulator incorporates an authentic Formula 1 broadcast design system:
+The game uses a motorsport broadcast-inspired design system:
 - **Color Palette:**
   - Background: Deep Navy Obsidian (`#080B12`, `#0B0F19`)
   - F1 Brand Racing Red: `#E10600`
   - Telemetry Accents: Electric Cyan (`#38BDF8`), Emerald Green (`#4ADE80`), Amber (`#FACC15`)
-- **Typography:** Custom Formula 1 typeface family (`Formula1-Wide`, `Formula1-Bold`, `Formula1-Regular`).
+- **Typography:** Display typeface family (Wide, Bold and Regular cuts).
 - **Glassmorphism:** 12px backdrop blur cards with subtle translucent white borders (`rgba(255,255,255,0.08)`).
 
 ---
@@ -450,9 +454,10 @@ The simulator incorporates an authentic Formula 1 broadcast design system:
 ## 📄 License & Credits
 
 - **License:** Licensed under the [ISC License](./LICENSE).
-- **Formula 1 Branding & Data:** Inspired by Formula 1. Real-world driver and circuit metadata powered by the [OpenF1 API](https://openf1.org/).
+- **Data:** Driver and circuit metadata powered by the [OpenF1 API](https://openf1.org/). F1P is an independent fan-made game and is not affiliated with any racing series or governing body.
 - **Created by:** [Thatblazerguy](https://github.com/Thatblazerguy)
 
 ---
 
+*Ready to lead your team to World Championship glory? Take the pit wall at [f1principalsim.vercel.app](https://f1principalsim.vercel.app)! 🏁*
 *Ready to lead your team to World Championship glory? Take the pit wall at [f1principalsim-orpin.vercel.app](https://f1principalsim-orpin.vercel.app/)! 🏁*

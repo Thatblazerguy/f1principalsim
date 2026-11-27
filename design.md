@@ -25,7 +25,7 @@ The interface relies on a strict set of predefined tokens to ensure consistency 
 
 ## 3. Typography
 
-To separate prose from data, the system utilizes local Formula 1 fonts with a strict hierarchy:
+To separate prose from data, the system uses local display fonts with a strict hierarchy:
 
 1. **Brand / App Logo & Page Title Font (`'Formula1-Wide', sans-serif`)**
    - Used for the app logo/title, major page titles, hero headings, championship screens, race weekend headers, and landing page headings.

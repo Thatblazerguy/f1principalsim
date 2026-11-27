@@ -1,7 +1,7 @@
-import React, { useReducer } from 'react';
-import { 
-  ChevronRight,
-} from 'lucide-react';
+import React, { useReducer, useRef, useState, useLayoutEffect } from 'react';
+import { ChevronRight, CloudRain, Sun } from 'lucide-react';
+import { HUB, btn, btnClass } from '../components/HubLayout.tsx';
+import { getTrackPath } from '../data/realTrackLayouts.js';
 import { SlideUp, AnimatedNumber } from '../components/ui/motion.tsx';
 import { state } from "../state.js";
 import { ensureSeasonTimeline, getRoundRaceDay, formatSeasonDate, simulateNextDay, canSimulateNextDay } from "../utils/seasonTimeline.js";
@@ -9,6 +9,10 @@ import { ensureTeamState, getActiveDrivers } from "../utils/teamState.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { generateUnifiedRaceWeekend } from "../utils/raceObjectives.js";
 import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
+import { getChampionshipSeries, getBudgetSeries, getTeamProfile } from "../utils/dashboardModel.js";
+import { ChampionshipChart } from "../components/dashboard/ChampionshipChart.tsx";
+import { BudgetChart } from "../components/dashboard/BudgetChart.tsx";
+import { RivalDrawer } from "../components/dashboard/RivalDrawer.tsx";
 
 import { renderWeekend } from "./weekend.js";
 import { renderOffice } from "./office.tsx";
@@ -19,7 +23,7 @@ import { renderLeaderboard } from "./leaderboard.tsx";
 import { renderOffseason } from "./offseason.tsx";
 import { renderMarket } from "./market.tsx";
 import { renderSponsors } from "./sponsors.tsx";
-import { renderFinance } from "./finance.tsx"; // We will create a premium finance screen next!
+import { renderFinance } from "./finance.tsx";
 
 
 
@@ -27,6 +31,7 @@ import { renderFinance } from "./finance.tsx"; // We will create a premium finan
 
 export function ChampionshipHub({ appRoot, rerenderFn }) {
     const [, forceUpdate] = useReducer(x => x + 1, 0);
+    const [rivalName, setRivalName] = useState<string | null>(null);
 
     ensureTeamState(state.team);
     ensureSeasonTimeline(state);
@@ -39,7 +44,7 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
     const daysUntilRace = nextRound ? Math.max(0, raceDay - currentDay) : 0;
     const canAdvanceDay = canSimulateNextDay(state);
 
-    // Generate our unified race weekend object!
+    
     if (!state.raceWeekend || state.raceWeekend.round !== state.season.round) {
         state.raceWeekend = generateUnifiedRaceWeekend(state.team);
     }
@@ -68,282 +73,246 @@ export function ChampionshipHub({ appRoot, rerenderFn }) {
 
     const handleEnterPitWall = () => navigate(isSeasonOver ? renderOffseason : renderWeekend);
 
-    // Dynamic Team Color (Default to Racing Red or themed blue for custom feel)
-    const teamThemeColor = '#E10600'; 
+    const notifications = (state.notifications || []).slice(0, 5);
+    const leaderPoints = sortedTeams[0]?.points || 0;
+    const teamAhead = myTeamIndex > 0 ? sortedTeams[myTeamIndex - 1] : null;
+    const gapAhead = teamAhead ? teamAhead.points - myTeamPoints : 0;
+    const weather = raceWeekend?.weather;
+    const rivalLine = raceWeekend?.standingsImpact?.nearestRival
+        ? `${raceWeekend.standingsImpact.gapToNearest >= 0 ? 'Defend' : 'Attack'} P${myTeamPosition} against ${raceWeekend.standingsImpact.nearestRival}`
+        : 'Open fight for the title';
+
+    const championship = getChampionshipSeries(state, 4);
+    const budget = getBudgetSeries(state);
+    const rivalTeam = rivalName ? teams.find(t => t.name === rivalName) : null;
+    const youProfile = rivalTeam ? getTeamProfile(state, state.team, activeDrivers) : null;
+    const rivalProfile = rivalTeam ? getTeamProfile(state, rivalTeam, rivalTeam.drivers) : null;
+
+    const card = { background: HUB.surface, border: `1px solid ${HUB.border}`, borderRadius: '14px' } as React.CSSProperties;
+    const label = { fontSize: '12px', color: HUB.textFaint, fontFamily: HUB.fontRegular, display: 'block' } as React.CSSProperties;
+    const figure = { fontSize: '24px', color: HUB.textPrimary, fontFamily: HUB.fontBold, fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 } as React.CSSProperties;
+
+    const stats = [
+        { title: 'Constructors', value: `P${myTeamPosition}`, sub: teamAhead ? `${gapAhead} pts to P${myTeamPosition - 1}` : `of ${sortedTeams.length} teams` },
+        { title: 'Points', value: String(myTeamPoints), sub: myTeamIndex === 0 ? 'Leading' : `${leaderPoints - myTeamPoints} behind the leader` },
+        { title: 'Budget', value: null, sub: 'Available to spend' },
+        { title: 'Car performance', value: (state.team.carPerformance || 0).toFixed(1), sub: `R&D level ${state.team.carLevel || 1}` },
+    ];
 
     return (
-        <div style={{ position: 'relative' }}>
-            {/* Grid & Telemetry Overlay backgrounds */}
-            <div style={{ position: 'absolute', inset: -32, pointerEvents: 'none', zIndex: 0 }}>
-                <div style={{ 
-                    position: 'absolute', 
-                    inset: 0, 
-                    backgroundImage: 'linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px)', 
-                    backgroundSize: '40px 40px',
-                    opacity: 0.5
-                }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Key figures */}
+            <div className="top-metrics-carousel responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                {stats.map(item => (
+                    <div key={item.title} style={{ ...card, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={label}>{item.title}</span>
+                        <span style={figure}>
+                            {item.value ?? <span>$<AnimatedNumber value={state.team.budget} formatter={(v) => v.toFixed(1)} />M</span>}
+                        </span>
+                        <span style={{ fontSize: '12px', color: HUB.textMuted }}>{item.sub}</span>
+                    </div>
+                ))}
             </div>
 
-            <div style={{ position: 'relative', zIndex: 1 }}>
-                {/* Premium Snapshot Strip */}
-                <div className="top-metrics-carousel" style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(6, 1fr)',
-                    gap: '16px',
-                    marginBottom: '32px',
-                    background: 'rgba(10,13,26,0.5)',
-                    border: '1px solid rgba(255,255,255,0.03)',
-                    borderRadius: '6px',
-                    padding: '16px 24px'
-                }}>
-                    {[
-                        { title: "CONSTRUCTOR RANK", value: `P${myTeamPosition}`, sub: `${sortedTeams.length - myTeamPosition} Teams Behind` },
-                        { title: "DRIVER ROSTER", value: activeDrivers.map(d => d.name.split(' ').pop()?.toUpperCase()).join(' / '), sub: "Active Race Pair" },
-                        { title: "BUDGET BALANCE", value: `$${state.team.budget.toFixed(1)}M`, isBudget: true, sub: "$140M COST CAP LIMIT" },
-                        { title: "CAR R&D LEVEL", value: `Lv ${state.team.carLevel || 1}`, sub: `Perf: ${state.team.carPerformance.toFixed(1)}` },
-                        { title: "SPONSOR HAPPINESS", value: "94%", sub: "4 Contracts Active" },
-                        { title: "FACILITY RATING", value: `Lv ${state.team.level}`, sub: "Headquarters Status" }
-                    ].map((item, idx) => (
-                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span style={{ fontSize: '9px', color: '#94A3B8', fontFamily: "'Formula1-Bold', sans-serif", letterSpacing: '0.05em' }}>{item.title}</span>
-                            <span style={{ fontSize: '18px', fontFamily: "'Formula1-Bold', sans-serif", color: '#fff', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em' }}>
-                                {item.isBudget ? <span>$<AnimatedNumber value={state.team.budget} formatter={(v) => v.toFixed(1)} />M</span> : item.value}
-                            </span>
-                            <span style={{ fontSize: '9px', color: teamThemeColor }}>{item.sub}</span>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Main Command Center Grid */}
-                <div className="mobile-stack" style={{ display: 'flex', gap: '24px', marginBottom: '40px' }}>
-                    
-                    {/* Hero: Upcoming Grand Prix */}
-                    <div style={{ flex: 2 }}>
-                    <SlideUp delay={0.05}>
-                    <div style={{
-                        background: 'radial-gradient(ellipse at bottom left, rgba(225,6,0,0.15) 0%, rgba(10,13,26,0.95) 70%)',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                        borderLeft: `4px solid ${teamThemeColor}`,
-                        borderRadius: '8px',
-                        padding: '40px',
-                        minHeight: '340px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}>
-                        {/* Visual decorative lines */}
-                        <div style={{ position: 'absolute', top: 0, right: 0, width: '250px', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.015))', pointerEvents: 'none' }} />
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div>
-                                <span style={{ fontSize: '11px', fontWeight: 700, color: teamThemeColor, letterSpacing: '0.3em', textTransform: 'uppercase' }}>UPCOMING WEEKEND</span>
-                                <h2 style={{ fontSize: '48px', fontFamily: "'Formula1-Wide', sans-serif", fontWeight: 900, color: 'white', margin: '12px 0 8px', textTransform: 'uppercase', fontStyle: 'italic', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                                    {isSeasonOver ? 'OFFSEASON PHASE' : nextRound.name.toUpperCase().replace(' GRAND PRIX', ' GP')}
-                                </h2>
-                                <p style={{ fontSize: '15px', color: '#94A3B8', margin: 0 }}>
-                                    {isSeasonOver ? 'Prepare strategy & sign roster contracts' : `Round ${nextRound.round} of ${totalRounds} | ${nextRound.laps} Laps | ${nextRound.circuit}`}
-                                </p>
-                            </div>
-                            <span style={{ padding: '6px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', borderRadius: '4px', textTransform: 'uppercase' }}>
-                                {isSeasonOver ? 'ACTIVE PLANNING' : 'ACTIVE ROUND'}
-                            </span>
-                        </div>
-
-                        {/* Additional metadata: weather, objectives, implications */}
-                        <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', margin: '32px 0', padding: '20px 0', borderTop: '1px solid rgba(255,255,255,0.08)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div>
-                                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '6px', letterSpacing: '0.1em' }}>EXPECTED WEATHER</span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
-                                    {raceWeekend?.weather?.isWet ? '🌧️ Wet Race' : '☀️ Dry Race'} / {raceWeekend?.weather?.airTemperature}°C
-                                </span>
-                            </div>
-                            <div>
-                                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '6px', letterSpacing: '0.1em' }}>PRIMARY OBJECTIVE</span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{raceWeekend?.recommendedObjective?.label || '🎯 Balanced Race'}</span>
-                            </div>
-                            <div>
-                                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', display: 'block', marginBottom: '6px', letterSpacing: '0.1em' }}>STANDINGS IMPACT</span>
-                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>
-                                    {raceWeekend?.standingsImpact?.nearestRival ? 
-                                        `${raceWeekend.standingsImpact.gapToNearest >=0 ? '🔥 Defend' : '⚡ Attack'} P${myTeamPosition} from ${raceWeekend.standingsImpact.nearestRival}` 
-                                        : '🔥 Championship Battle'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="mobile-stack" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                            {!isSeasonOver ? (
-                                <div className="mobile-stack" style={{ display: 'flex', alignItems: 'center', gap: '24px', width: '100%' }}>
-                                    <div style={{ flexShrink: 0 }}>
-                                        <span style={{ fontSize: '10px', color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>TELEMETRY TIME REMAINING</span>
-                                        <div style={{ display: 'flex', gap: '16px', fontFamily: "'Formula1-Bold', sans-serif", fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', fontSize: '24px', color: 'white' }}>
-                                            <span>{String(daysUntilRace).padStart(2,'0')}<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>D</span></span>
-                                            <span>00<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>H</span></span>
-                                            <span>00<span style={{ fontSize: '13px', color: '#94A3B8', marginLeft: '2px' }}>M</span></span>
-                                        </div>
-                                    </div>
-                                    {daysUntilRace > 0 && (
-                                        <button 
-                                            className="full-width-btn"
-                                            onClick={handleSimulateDay} 
-                                            disabled={!canAdvanceDay}
-                                            style={{
-                                                backgroundColor: 'rgba(255,255,255,0.05)',
-                                                border: '1px solid rgba(255,255,255,0.1)',
-                                                color: '#fff',
-                                                padding: '10px 20px',
-                                                borderRadius: '4px',
-                                                fontSize: '11px',
-                                                fontWeight: 700,
-                                                letterSpacing: '0.05em',
-                                                textTransform: 'uppercase',
-                                                cursor: canAdvanceDay ? 'pointer' : 'not-allowed',
-                                                opacity: canAdvanceDay ? 1 : 0.5,
-                                                transition: 'all 0.15s',
-                                                fontFamily: "'Formula1-Bold', sans-serif",
-                                                textAlign: 'center'
-                                            }}
-                                            onMouseEnter={e => { if (canAdvanceDay) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)'; }}
-                                            onMouseLeave={e => { if (canAdvanceDay) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
-                                        >
-                                            Simulate 1 Day
-                                        </button>
-                                    )}
-                                </div>
-                            ) : <div className="hide-on-mobile" />}
-                            <button onClick={handleEnterPitWall}
-                                className="full-width-btn"
-                                style={{
-                                    backgroundColor: teamThemeColor, color: 'white', padding: '18px 48px', borderRadius: '4px',
-                                    fontSize: '14px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', border: 'none',
-                                    cursor: 'pointer', boxShadow: '0 8px 32px rgba(225,6,0,0.4)', transition: 'all 0.15s',
-                                    fontFamily: "'Formula1-Bold', sans-serif", textAlign: 'center'
-                                }}>
-                                {isSeasonOver ? 'ENTER OFFSEASON PLANNING' : 'LAUNCH PIT WALL MODULE'}
-                            </button>
-                        </div>
-                    </div>
-                    </SlideUp>
-                    </div>
-
-                    {/* Recent Activity Feed */}
-                    <div style={{ flex: 1 }}>
-                    <SlideUp delay={0.1}>
-                    <div style={{
-                        background: 'rgba(10,13,26,0.6)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255,255,255,0.04)',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        minHeight: '260px'
-                    }}>
+            <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', gap: '24px' }}>
+                {/* Next Grand Prix — the moment of this screen */}
+                <SlideUp delay={0.05}>
+                <div style={{ ...card, position: 'relative', overflow: 'hidden', minHeight: '360px', display: 'flex' }}>
+                    {!isSeasonOver && <CircuitOutline name={nextRound.name} />}
+                    <div className="gp-copy" style={{ position: 'relative', padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '32px', boxSizing: 'border-box' }}>
                         <div>
-                            <h3 style={{ fontSize: '11px', fontFamily: "'Formula1-Bold', sans-serif", color: '#94A3B8', letterSpacing: '0.15em', textTransform: 'uppercase', margin: '0 0 16px' }}>
-                                REAL-TIME LOG FEED
-                            </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {[
-                                    { time: "DAY 4", text: "New front wing aerodynamic upgrade completed", type: "success" },
-                                    { time: "DAY 3", text: "Driver Yuki Tsunoda confidence level up (+2)", type: "info" },
-                                    { time: "DAY 2", text: "Sponsor wing placement offer rotated catalog", type: "warning" },
-                                    { time: "DAY 1", text: "FIA Cost Cap allocation synchronized", type: "info" }
-                                ].map((log, idx) => (
-                                    <div key={idx} style={{ display: 'flex', gap: '12px', fontSize: '11px', lineHeight: '1.4' }}>
-                                        <span style={{ fontFamily: "'Formula1-Bold', sans-serif", color: log.type === 'success' ? '#10b981' : log.type === 'warning' ? '#f59e0b' : '#3b82f6', width: '45px', flexShrink: 0 }}>
-                                            {log.time}
-                                        </span>
-                                        <span style={{ color: '#fff' }}>{log.text}</span>
-                                    </div>
-                                ))}
-                            </div>
+                            <span style={label}>{isSeasonOver ? 'Season complete' : `Next race · Round ${nextRound.round} of ${totalRounds}${nextRound.sprint ? ' · Sprint weekend' : ''}`}</span>
+                            <h2 style={{ fontSize: '28px', fontFamily: HUB.fontWide, fontWeight: 400, color: HUB.textPrimary, margin: '12px 0 8px', textTransform: 'uppercase', lineHeight: 1.1 }}>
+                                {isSeasonOver ? 'Offseason' : nextRound.name.replace(' Grand Prix', '')}
+                                {!isSeasonOver && <span style={{ display: 'block', fontSize: '16px', color: HUB.textMuted, marginTop: '4px' }}>Grand Prix</span>}
+                            </h2>
+                            <p style={{ fontSize: '14px', color: HUB.textMuted, margin: 0 }}>
+                                {isSeasonOver ? 'Sign drivers and plan next season' : `${nextRound.circuit} · ${nextRound.laps} laps · ${nextRound.country}`}
+                            </p>
                         </div>
-                        <button onClick={() => navigate(renderCalendar)} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: teamThemeColor, background: 'none', border: 'none', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', padding: 0, marginTop: '16px' }}>
-                            View full activity log <ChevronRight size={14}/>
-                        </button>
-                    </div>
-                    </SlideUp>
-                    </div>
 
-                </div>
-
-                {/* Championship Battle Visual Comparison Section */}
-                <SlideUp delay={0.15}>
-                <section style={{ marginBottom: '48px' }}>
-                    <h3 style={{ fontSize: '11px', fontFamily: "'Formula1-Bold', sans-serif", color: '#94A3B8', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '20px' }}>
-                        CONSTRUCTORS CHAMPIONSHIP DELTA
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(10,13,26,0.3)', padding: '24px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                        {sortedTeams.slice(0, 6).map((team, idx) => {
-                            const isPlayer = team.name === state.team.name;
-                            const ptsDelta = team.points - myTeamPoints;
-                            const isAhead = ptsDelta > 0;
-                            return (
-                                <div key={team.name} className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '40px minmax(100px, 200px) 1fr minmax(100px, 140px)', alignItems: 'center', gap: '16px', padding: '10px 16px', background: isPlayer ? 'rgba(225,6,0,0.08)' : 'rgba(255,255,255,0.02)', borderRadius: '4px', border: isPlayer ? `1px solid ${teamThemeColor}` : '1px solid transparent' }}>
-                                    <span style={{ fontSize: '14px', fontFamily: "'Formula1-Bold', sans-serif", color: isPlayer ? teamThemeColor : '#94A3B8' }}>P{idx+1}</span>
-                                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{team.name.toUpperCase()}</span>
-                                    {/* Bar slider delta representation */}
-                                    <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                                        <div style={{ height: '100%', background: isPlayer ? teamThemeColor : 'rgba(255,255,255,0.3)', width: `${Math.min(100, (team.points / (sortedTeams[0].points || 1)) * 100)}%` }} />
-                                    </div>
-                                    <span style={{ fontSize: '13px', fontFamily: "'Formula1-Bold', sans-serif", fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', textAlign: 'right', color: isPlayer ? teamThemeColor : '#fff' }}>
-                                        {isPlayer ? (
-                                            <><AnimatedNumber value={team.points} /> PTS</>
-                                        ) : (
-                                            <><AnimatedNumber value={team.points} /> PTS <span style={{ color: '#94A3B8', marginLeft: '6px' }}>({isAhead ? `+${ptsDelta}` : ptsDelta})</span></>
-                                        )}
+                        {!isSeasonOver && (
+                            <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '20px' }}>
+                                <div>
+                                    <span style={{ ...label, marginBottom: '6px' }}>Forecast</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: HUB.textPrimary }}>
+                                        {weather?.isWet ? <CloudRain size={16} strokeWidth={1.5} color={HUB.textMuted} /> : <Sun size={16} strokeWidth={1.5} color={HUB.textMuted} />}
+                                        {weather?.isWet ? 'Wet' : 'Dry'}{weather?.airTemperature != null ? `, ${weather.airTemperature}°C` : ''}
                                     </span>
                                 </div>
-                            );
-                        })}
-                    </div>
-                </section>
-                </SlideUp>
-
-                {/* Driver Dossiers Quick-look Section */}
-                <SlideUp delay={0.2}>
-                <section className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                    {activeDrivers.map((driver, idx) => (
-                        <div key={driver.name} style={{
-                            background: 'rgba(10,13,26,0.6)',
-                            border: '1px solid rgba(255,255,255,0.04)',
-                            borderRadius: '8px',
-                            overflow: 'hidden'
-                        }}>
-                            <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '24px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                <img alt={driver.name} style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${teamThemeColor}` }} src={getDriverHeadshotUrl(driver)} />
                                 <div>
-                                    <span style={{ fontSize: '9px', fontWeight: 700, color: teamThemeColor, letterSpacing: '0.2em' }}>ACTIVE DRIVER 0{idx+1}</span>
-                                    <h4 style={{ fontSize: '16px', fontFamily: "'Formula1-Bold', sans-serif", margin: '4px 0 0', color: 'white' }}>#{getDriverNumber(driver)} {driver.name.toUpperCase()}</h4>
+                                    <span style={{ ...label, marginBottom: '6px' }}>Objective</span>
+                                    <span style={{ fontSize: '14px', color: HUB.textPrimary }}>{stripEmoji(raceWeekend?.recommendedObjective?.label) || 'Balanced race'}</span>
                                 </div>
-                                <button onClick={() => navigate(renderMyDrivers)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '6px 16px', fontSize: '10px', fontWeight: 700, color: '#fff', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Dossier
+                                <div>
+                                    <span style={{ ...label, marginBottom: '6px' }}>Championship</span>
+                                    <span style={{ fontSize: '14px', color: HUB.textPrimary }}>{rivalLine}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mobile-stack" style={{ display: 'flex', alignItems: 'flex-end', gap: '24px' }}>
+                            {!isSeasonOver && (
+                                <div style={{ marginRight: 'auto' }}>
+                                    <span style={{ ...label, marginBottom: '4px' }}>Lights out in</span>
+                                    <span style={{ ...figure, fontSize: '28px' }}>{daysUntilRace}<span style={{ fontSize: '14px', color: HUB.textMuted, marginLeft: '6px', fontFamily: HUB.fontRegular }}>{daysUntilRace === 1 ? 'day' : 'days'}</span></span>
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {!isSeasonOver && daysUntilRace > 0 && (
+                                    <button className={btnClass('secondary', 'full-width-btn')} onClick={handleSimulateDay} disabled={!canAdvanceDay}
+                                        style={btn('secondary', 'md')}>
+                                        Simulate 1 day
+                                    </button>
+                                )}
+                                <button className={btnClass('primary', 'full-width-btn')} onClick={handleEnterPitWall} style={btn('primary', 'md')}>
+                                    {isSeasonOver ? 'Plan offseason' : 'Go to race weekend'}
                                 </button>
                             </div>
-                            <div className="responsive-grid" style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                                {[
-                                    { label: 'Pace', val: (driver.pace||0).toFixed(1) },
-                                    { label: 'Quali', val: (driver.quali||0).toFixed(1) },
-                                    { label: 'Racecraft', val: (driver.racecraft||0).toFixed(1) },
-                                    { label: 'Consistency', val: (driver.consistency||0).toFixed(1) }
-                                ].map(s => (
-                                    <div key={s.label} style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
-                                        <span style={{ fontSize: '9px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>{s.label}</span>
-                                        <span style={{ fontSize: '16px', fontFamily: "'Formula1-Bold', sans-serif", fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em', color: '#fff' }}>{s.val}</span>
-                                    </div>
-                                ))}
-                            </div>
                         </div>
-                    ))}
+                    </div>
+                </div>
+                </SlideUp>
+
+                {/* Activity */}
+                <SlideUp delay={0.1}>
+                <div style={{ ...card, padding: '24px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+                    <h3 style={{ fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, margin: '0 0 16px' }}>Activity</h3>
+                    {notifications.length === 0 ? (
+                        <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0, lineHeight: 1.5 }}>Nothing yet. Simulate a day to start the season clock.</p>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            {notifications.map((n: any, idx: number) => (
+                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '56px 1fr', gap: '12px', padding: '10px 0', borderTop: idx ? `1px solid ${HUB.border}` : 'none', fontSize: '13px', lineHeight: 1.45 }}>
+                                    <span style={{ color: HUB.textFaint, fontFamily: HUB.fontBold, fontVariantNumeric: 'tabular-nums', fontSize: '12px' }}>Day {n.day}</span>
+                                    <span style={{ color: HUB.textMuted }}>{stripEmoji(n.message)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <button onClick={() => navigate(renderCalendar)} className={btnClass('ghost')} style={btn('ghost', 'sm', { alignSelf: 'flex-start', marginTop: 'auto', marginLeft: '-12px', position: 'relative', top: '8px' })}>
+                        Open calendar <ChevronRight size={14} strokeWidth={1.5} />
+                    </button>
+                </div>
+                </SlideUp>
+            </div>
+
+            {/* Season so far: championship fight + money */}
+            <div className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', gap: '24px' }}>
+                <SlideUp delay={0.12}>
+                <section style={{ ...card, padding: '24px', height: '100%', boxSizing: 'border-box' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '16px', marginBottom: '12px' }}>
+                        <h3 style={{ fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, margin: 0 }}>Championship fight</h3>
+                        <span style={{ fontSize: '12px', color: HUB.textFaint }}>Constructors' points by round</span>
+                    </div>
+                    <ChampionshipChart rounds={championship.rounds} series={championship.series} totalRounds={totalRounds} />
+                </section>
+                </SlideUp>
+                <SlideUp delay={0.14}>
+                <section style={{ ...card, padding: '24px', height: '100%', boxSizing: 'border-box' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '16px', marginBottom: '12px' }}>
+                        <h3 style={{ fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, margin: 0 }}>Budget</h3>
+                        <span style={{ fontSize: '12px', color: HUB.textFaint }}>After each race</span>
+                    </div>
+                    <BudgetChart points={budget.points} startBalance={budget.startBalance} />
                 </section>
                 </SlideUp>
             </div>
+
+            {/* Constructors */}
+            <SlideUp delay={0.15}>
+            <section style={{ ...card, padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary, margin: 0 }}>Constructors championship</h3>
+                    <span style={{ fontSize: '12px', color: HUB.textFaint }}>Top 6 · select a rival to compare</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {sortedTeams.slice(0, 6).map((team, idx) => {
+                        const isPlayer = team.name === state.team.name;
+                        const ptsDelta = team.points - myTeamPoints;
+                        const RowTag: any = isPlayer ? 'div' : 'button';
+                        const rowProps = isPlayer ? {} : { type: 'button', onClick: () => setRivalName(team.name), 'aria-haspopup': 'dialog', 'aria-label': `Compare with ${team.name}` };
+                        return (
+                            <RowTag key={team.name} {...rowProps} className={`mobile-stack${isPlayer ? '' : ' dbx-team-row'}`} style={{ display: 'grid', gridTemplateColumns: '32px minmax(120px, 220px) 1fr 120px 16px', alignItems: 'center', gap: '16px', height: '40px', padding: '0 12px', background: isPlayer ? HUB.raised : 'transparent', borderRadius: '8px', position: 'relative', boxSizing: 'border-box' }}>
+                                {isPlayer && <span style={{ position: 'absolute', left: 0, top: '10px', bottom: '10px', width: '2px', borderRadius: '2px', background: HUB.accent }} />}
+                                <span style={{ fontSize: '13px', fontFamily: HUB.fontBold, color: isPlayer ? HUB.textPrimary : HUB.textFaint, fontVariantNumeric: 'tabular-nums' }}>P{idx + 1}</span>
+                                <span style={{ fontSize: '14px', color: HUB.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team.name}</span>
+                                <div style={{ height: '4px', background: 'rgba(237,237,237,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', background: isPlayer ? HUB.accent : 'rgba(237,237,237,0.28)', width: `${Math.min(100, (team.points / (leaderPoints || 1)) * 100)}%` }} />
+                                </div>
+                                <span style={{ fontSize: '13px', fontFamily: HUB.fontBold, fontVariantNumeric: 'tabular-nums', textAlign: 'right', color: HUB.textPrimary }}>
+                                    <AnimatedNumber value={team.points} /> pts
+                                    {!isPlayer && <span style={{ color: HUB.textFaint, marginLeft: '8px', fontFamily: HUB.fontRegular }}>{ptsDelta > 0 ? `+${ptsDelta}` : ptsDelta}</span>}
+                                </span>
+                                {isPlayer ? <span /> : <ChevronRight className="dbx-row-cue" size={16} strokeWidth={1.5} color={HUB.textFaint} aria-hidden />}
+                            </RowTag>
+                        );
+                    })}
+                </div>
+            </section>
+            </SlideUp>
+
+            {/* Drivers */}
+            <SlideUp delay={0.2}>
+            <section className="mobile-stack" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                {activeDrivers.map((driver) => (
+                    <div key={driver.name} style={{ ...card, overflow: 'hidden' }}>
+                        <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '16px', borderBottom: `1px solid ${HUB.border}` }}>
+                            <img alt={driver.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', background: HUB.raised }} src={getDriverHeadshotUrl(driver)} />
+                            <div>
+                                <span style={{ ...label, fontVariantNumeric: 'tabular-nums' }}>#{getDriverNumber(driver)}</span>
+                                <h4 style={{ fontSize: '16px', fontFamily: HUB.fontBold, fontWeight: 400, margin: '2px 0 0', color: HUB.textPrimary }}>{driver.name}</h4>
+                            </div>
+                            <button onClick={() => navigate(renderMyDrivers)} className={btnClass('secondary')} style={btn('secondary', 'sm', { marginLeft: 'auto' })}>
+                                Profile
+                            </button>
+                        </div>
+                        <div className="responsive-grid" style={{ padding: '16px 24px 20px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                            {[
+                                { label: 'Pace', val: driver.pace },
+                                { label: 'Qualifying', val: driver.quali },
+                                { label: 'Racecraft', val: driver.racecraft },
+                                { label: 'Consistency', val: driver.consistency }
+                            ].map(s => (
+                                <div key={s.label}>
+                                    <span style={{ ...label, marginBottom: '4px' }}>{s.label}</span>
+                                    <span style={{ fontSize: '18px', fontFamily: HUB.fontBold, fontVariantNumeric: 'tabular-nums', color: HUB.textPrimary }}>{(s.val || 0).toFixed(1)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </section>
+            </SlideUp>
+
+            <RivalDrawer you={youProfile} rival={rivalProfile} onClose={() => setRivalName(null)} />
         </div>
     );
 }
 
+const stripEmoji = (text?: string) => text ? text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').replace(/!+$/, '').trim() : text;
 
+/** The real circuit drawn as a timing-screen line, start/finish in the accent. */
+function CircuitOutline({ name }: { name: string }) {
+    const pathRef = useRef<SVGPathElement>(null);
+    const [box, setBox] = useState('0 0 500 500');
+    const [start, setStart] = useState<{ x: number; y: number } | null>(null);
+    const d = getTrackPath(name);
+    useLayoutEffect(() => {
+        const el = pathRef.current;
+        if (!el) return;
+        const b = el.getBBox();
+        const pad = Math.max(b.width, b.height) * 0.08;
+        setBox(`${b.x - pad} ${b.y - pad} ${b.width + pad * 2} ${b.height + pad * 2}`);
+        const p = el.getPointAtLength(0);
+        setStart({ x: p.x, y: p.y });
+    }, [d]);
+    return (
+        <svg className="hide-on-mobile" aria-hidden viewBox={box} preserveAspectRatio="xMidYMid meet"
+            style={{ position: 'absolute', right: '32px', top: '32px', width: '38%', height: 'calc(100% - 64px)', pointerEvents: 'none' }}>
+            <path d={d} fill="none" stroke="rgba(237,237,237,0.06)" strokeWidth={14} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <path ref={pathRef} d={d} fill="none" stroke="rgba(237,237,237,0.7)" strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            {start && <circle cx={start.x} cy={start.y} r={Math.max(4, parseFloat(box.split(' ')[2]) / 90)} fill={HUB.accent} />}
+        </svg>
+    );
+}

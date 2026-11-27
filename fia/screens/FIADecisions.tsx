@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown, ArrowLeft } from 'lucide-react';
 import { renderToAppRoot } from '../../utils/reactRoot.tsx';
-import { HUB, glassCard, actionBtn } from '../../components/HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass, pageTitle } from '../../components/HubLayout.tsx';
 import { fiaCareer, saveFIACareer, setFIACareer, FIA_EVENT_TEMPLATES, generateRandomEvent } from '../fiaState.js';
 import { FIA } from '../FIADashboard.tsx';
 import { renderFIADashboard } from '../FIADashboard.tsx';
@@ -39,7 +39,7 @@ function FIADecisionsScreen({ appRoot }) {
     saveFIACareer();
     setDecisions(newPending);
     setResolved(newResolved);
-    showNotif(`Decision resolved. Approval: ${newApproval > career.approvalRating ? '+' : ''}${newApproval - career.approvalRating}%`);
+    showNotif(`Decision resolved · approval ${newApproval > career.approvalRating ? '+' : ''}${newApproval - career.approvalRating}% vs before`);
   };
 
   const handleAddEvent = () => {
@@ -52,28 +52,28 @@ function FIADecisionsScreen({ appRoot }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#060911', color: '#fff', fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px', maxWidth: 900, margin: '0 auto' }}>
       {notification && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', padding: '12px 20px', borderRadius: 10, fontFamily: HUB.fontBold, fontSize: 12, color: FIA.green }}>
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>
           {notification}
         </div>
       )}
 
-      <button onClick={() => renderFIADashboard(appRoot)} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontRegular, fontSize: 12, marginBottom: 12, padding: 0 }}>← FIA Dashboard</button>
-      <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>FIA Governance</div>
+      <button onClick={() => renderFIADashboard(appRoot)} className={btnClass('ghost')} style={btn('ghost', 'sm', { marginBottom: 12, marginLeft: -12 })}><ArrowLeft size={14} strokeWidth={1.5} />Back to FIA dashboard</button>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-        <h1 style={{ fontFamily: HUB.fontWide, fontSize: 26, color: '#fff', margin: 0, textTransform: 'uppercase' }}>FIA Decisions</h1>
-        <button onClick={handleAddEvent} style={{ ...actionBtn({ padding: '10px 20px', fontSize: 11 }) }}>+ Generate Decision</button>
+        {pageTitle('FIA decisions')}
+        <button onClick={handleAddEvent} className={btnClass('secondary')} style={btn('secondary', 'md')}>Generate decision</button>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 24, padding: 4, background: 'rgba(255,255,255,0.03)', borderRadius: 10, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 24, padding: 4, background: HUB.surface, border: `1px solid ${HUB.border}`, borderRadius: 10, width: 'fit-content' }}>
         {(['pending', 'resolved'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
-            padding: '8px 20px', borderRadius: 8, fontFamily: HUB.fontBold, fontSize: 12,
-            background: tab === t ? 'rgba(225,6,0,0.12)' : 'transparent',
-            border: tab === t ? '1px solid rgba(225,6,0,0.3)' : '1px solid transparent',
-            color: tab === t ? '#fff' : HUB.textMuted, cursor: 'pointer',
+            height: 32, padding: '0 20px', borderRadius: 8, fontFamily: HUB.fontBold, fontSize: 12,
+            background: tab === t ? HUB.raised : 'transparent',
+            border: '1px solid transparent',
+            color: tab === t ? HUB.textPrimary : HUB.textMuted, cursor: 'pointer',
+            transition: `background-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`
           }}>
             {t === 'pending' ? `Pending (${decisions.length})` : `Resolved (${resolved.length})`}
           </button>
@@ -84,39 +84,33 @@ function FIADecisionsScreen({ appRoot }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {decisions.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: HUB.textMuted }}>
-              <CheckCircle size={36} color="rgba(16,185,129,0.3)" style={{ marginBottom: 12 }} />
-              <p style={{ fontFamily: HUB.fontRegular, fontSize: 14 }}>No pending decisions — the FIA is running smoothly.</p>
+              <CheckCircle size={36} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: 12 }} />
+              <p style={{ fontFamily: HUB.fontRegular, fontSize: 14 }}>No pending decisions</p>
             </div>
           ) : decisions.map(event => (
-            <div key={event.instanceId} style={{ ...glassCard({ padding: '24px' }), border: '1px solid rgba(225,6,0,0.15)', background: 'rgba(225,6,0,0.04)' }}>
+            <div key={event.instanceId} style={{ ...glassCard({ padding: '24px' }) }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <AlertTriangle size={14} color={FIA.accent} />
-                <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Decision Required</span>
+                <AlertTriangle size={16} strokeWidth={1.5} color={HUB.warning} />
+                <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>Decision required</span>
               </div>
-              <h3 style={{ fontFamily: HUB.fontBold, fontSize: 18, color: '#fff', margin: '0 0 10px' }}>{event.title}</h3>
+              <h3 style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary, margin: '0 0 8px' }}>{event.title}</h3>
               <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, lineHeight: 1.6, margin: '0 0 20px' }}>{event.description}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {event.choices.map(choice => (
                   <button
                     key={choice.id}
                     onClick={() => handleResolve(event.instanceId, choice.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '12px 16px', borderRadius: 8, textAlign: 'left',
-                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                      color: '#fff', cursor: 'pointer', fontFamily: HUB.fontRegular, fontSize: 13,
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                    className={btnClass('secondary')}
+                    style={btn('secondary', 'md', { width: '100%', justifyContent: 'space-between' })}
+                    title={choice.label}
                   >
-                    <span>{choice.label}</span>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: choice.approvalDelta >= 0 ? FIA.green : FIA.accent }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{choice.label}</span>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+                      <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: choice.approvalDelta >= 0 ? HUB.positive : HUB.negative }}>
                         {choice.approvalDelta >= 0 ? '+' : ''}{choice.approvalDelta}% approval
                       </span>
                       {choice.budgetDelta !== 0 && (
-                        <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: choice.budgetDelta >= 0 ? FIA.green : FIA.accent }}>
+                        <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: choice.budgetDelta >= 0 ? HUB.positive : HUB.negative }}>
                           {choice.budgetDelta >= 0 ? '+' : ''}${choice.budgetDelta}M
                         </span>
                       )}
@@ -130,25 +124,25 @@ function FIADecisionsScreen({ appRoot }) {
       )}
 
       {tab === 'resolved' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {resolved.length === 0 ? (
-            <p style={{ textAlign: 'center', color: HUB.textMuted, padding: '60px 0', fontFamily: HUB.fontRegular, fontSize: 14 }}>No resolved decisions yet.</p>
+            <p style={{ textAlign: 'center', color: HUB.textMuted, padding: '60px 0', fontFamily: HUB.fontRegular, fontSize: 14 }}>No resolved decisions yet</p>
           ) : [...resolved].reverse().map((event: any, i) => {
             const choice = event.choices?.find(c => c.id === event.resolvedChoice);
             return (
-              <div key={i} style={{ ...glassCard({ padding: '16px 20px' }), opacity: 0.8 }}>
+              <div key={i} style={{ ...glassCard({ padding: '16px' }) }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <h4 style={{ fontFamily: HUB.fontBold, fontSize: 13, color: '#fff', margin: '0 0 4px' }}>{event.title}</h4>
-                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, margin: 0 }}>{choice?.label || 'Choice resolved'}</p>
+                    <h4 style={{ fontFamily: HUB.fontBold, fontSize: 14, color: HUB.textPrimary, margin: '0 0 4px' }}>{event.title}</h4>
+                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0 }}>{choice?.label || 'Choice resolved'}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     {choice?.approvalDelta !== undefined && (
-                      <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: choice.approvalDelta >= 0 ? FIA.green : FIA.accent }}>
+                      <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: choice.approvalDelta >= 0 ? HUB.positive : HUB.negative }}>
                         {choice.approvalDelta >= 0 ? '+' : ''}{choice.approvalDelta}% approval
                       </span>
                     )}
-                    <CheckCircle size={14} color={FIA.green} />
+                    <CheckCircle size={16} strokeWidth={1.5} color={HUB.textFaint} />
                   </div>
                 </div>
               </div>

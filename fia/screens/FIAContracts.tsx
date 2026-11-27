@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { DollarSign, RefreshCw, X, CheckCircle } from 'lucide-react';
+import { DollarSign, RefreshCw, X, CheckCircle, ArrowLeft } from 'lucide-react';
 import { renderToAppRoot } from '../../utils/reactRoot.tsx';
-import { HUB, glassCard, actionBtn } from '../../components/HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass, pageTitle } from '../../components/HubLayout.tsx';
 import { CIRCUIT_LIBRARY } from '../circuitLibrary.js';
 import { fiaCareer, saveFIACareer, setFIACareer } from '../fiaState.js';
 import { FIA } from '../FIADashboard.tsx';
@@ -29,53 +29,54 @@ function buildDefaultContracts(career) {
 }
 
 function ContractCard({ contract, onRenew, onTerminate }) {
-  const statusColor = contract.status === 'active' ? '#10B981' : contract.status === 'expired' ? '#EF4444' : '#F59E0B';
+  const statusColor = contract.status === 'active' ? HUB.positive : contract.status === 'expired' ? HUB.negative : HUB.warning;
   const profit = contract.annualRevenue - contract.hostingFee;
 
   return (
-    <div style={{ ...glassCard({ padding: '20px' }), border: `1px solid ${statusColor}22` }}>
+    <div style={{ ...glassCard({ padding: '24px' }) }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
-          <h4 style={{ fontFamily: HUB.fontBold, fontSize: 14, color: '#fff', margin: '0 0 4px' }}>{contract.name}</h4>
-          <p style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted, margin: 0 }}>
+          <h4 style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary, margin: '0 0 4px' }}>{contract.name}</h4>
+          <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0 }}>
             {contract.yearsRemaining} year{contract.yearsRemaining !== 1 ? 's' : ''} remaining
           </p>
         </div>
-        <span style={{ fontFamily: HUB.fontBold, fontSize: 9, color: statusColor, padding: '2px 8px', borderRadius: 4, background: `${statusColor}15`, textTransform: 'uppercase' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, textTransform: 'capitalize' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor }} />
           {contract.status}
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
         {[
-          { label: 'Hosting Fee', value: `$${contract.hostingFee}M`, color: FIA.accent },
-          { label: 'Revenue', value: `$${contract.annualRevenue}M`, color: FIA.green },
-          { label: 'Net Profit', value: `${profit >= 0 ? '+' : ''}$${profit}M`, color: profit >= 0 ? FIA.green : FIA.accent },
+          { label: 'Hosting fee', value: `$${contract.hostingFee}M`, color: HUB.textPrimary },
+          { label: 'Revenue', value: `$${contract.annualRevenue}M`, color: HUB.textPrimary },
+          { label: 'Net profit', value: `${profit >= 0 ? '+' : ''}$${profit}M`, color: profit >= 0 ? HUB.positive : HUB.negative },
         ].map((s, i) => (
-          <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '8px 10px' }}>
-            <div style={{ fontFamily: HUB.fontRegular, fontSize: 9, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{s.label}</div>
+          <div key={i} style={{ background: HUB.raised, borderRadius: 8, padding: '8px 12px' }}>
+            <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textFaint }}>{s.label}</div>
             <div style={{ fontFamily: HUB.fontBold, fontSize: 14, color: s.color, marginTop: 2 }}>{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* Promoter Relation bar */}
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted }}>Promoter Relationship</span>
-          <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: '#fff' }}>{contract.promoterRelation}%</span>
+          <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>Promoter relationship</span>
+          <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: HUB.textPrimary }}>{contract.promoterRelation}%</span>
         </div>
-        <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 999 }}>
-          <div style={{ height: '100%', width: `${contract.promoterRelation}%`, background: contract.promoterRelation >= 70 ? FIA.green : '#F59E0B', borderRadius: 999 }} />
+        <div style={{ height: 4, background: HUB.raised, borderRadius: 2 }}>
+          <div style={{ height: '100%', width: `${contract.promoterRelation}%`, background: contract.promoterRelation >= 70 ? HUB.positive : HUB.warning, borderRadius: 2 }} />
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => onRenew(contract.circuitId)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: FIA.green, cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11 }}>
-          <RefreshCw size={12} /> Renew
+        <button onClick={() => onRenew(contract.circuitId)} className={btnClass('secondary')} style={btn('secondary', 'sm', { flex: 1 })}>
+          <RefreshCw size={14} strokeWidth={1.5} />Renew contract
         </button>
-        <button onClick={() => onTerminate(contract.circuitId)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 14px', borderRadius: 6, background: 'rgba(225,6,0,0.06)', border: '1px solid rgba(225,6,0,0.15)', color: FIA.accent, cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11 }}>
-          <X size={12} /> Terminate
+        <button onClick={() => onTerminate(contract.circuitId)} className={btnClass('danger')} style={btn('danger', 'sm', { flex: 1 })}>
+          <X size={14} strokeWidth={1.5} />Terminate contract
         </button>
       </div>
     </div>
@@ -94,7 +95,7 @@ function FIAContractsScreen({ appRoot }) {
     setContracts(updated);
     const updatedCareer = { ...career, hostingContracts: updated };
     setFIACareer(updatedCareer); saveFIACareer();
-    showNotif('Contract renewed for 3 more years.');
+    showNotif('Contract renewed for 3 more years');
   };
 
   const handleTerminate = (circuitId: string) => {
@@ -102,35 +103,34 @@ function FIAContractsScreen({ appRoot }) {
     setContracts(updated);
     const updatedCareer = { ...career, hostingContracts: updated };
     setFIACareer(updatedCareer); saveFIACareer();
-    showNotif('Contract terminated.');
+    showNotif('Contract terminated');
   };
 
   const totalRevenue = Object.values(contracts).reduce((sum: number, c: any) => sum + (c.status === 'active' ? c.annualRevenue : 0), 0);
   const totalFees = Object.values(contracts).reduce((sum: number, c: any) => sum + (c.status === 'active' ? c.hostingFee : 0), 0);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#060911', color: '#fff', fontFamily: HUB.fontRegular, padding: '40px 64px' }}>
+    <div style={{ minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular, padding: '40px 64px' }}>
       {notification && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', padding: '12px 20px', borderRadius: 10, fontFamily: HUB.fontBold, fontSize: 12, color: FIA.green }}>
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>
           {notification}
         </div>
       )}
 
-      <button onClick={() => renderFIADashboard(appRoot)} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontRegular, fontSize: 12, marginBottom: 12, padding: 0 }}>← FIA Dashboard</button>
-      <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>Venue Agreements</div>
-      <h1 style={{ fontFamily: HUB.fontWide, fontSize: 26, color: '#fff', margin: '0 0 24px', textTransform: 'uppercase' }}>Hosting Contracts</h1>
+      <button onClick={() => renderFIADashboard(appRoot)} className={btnClass('ghost')} style={btn('ghost', 'sm', { marginBottom: 12, marginLeft: -12 })}><ArrowLeft size={14} strokeWidth={1.5} />Back to FIA dashboard</button>
+      <div style={{ marginBottom: 24 }}>{pageTitle('Hosting contracts')}</div>
 
       {/* Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
         {[
-          { label: 'Total Revenue', value: `$${totalRevenue}M`, color: FIA.green },
-          { label: 'Total Fees', value: `$${totalFees}M`, color: FIA.accent },
-          { label: 'Net Result', value: `${totalRevenue - totalFees >= 0 ? '+' : ''}$${totalRevenue - totalFees}M`, color: totalRevenue - totalFees >= 0 ? FIA.green : FIA.accent },
+          { label: 'Total revenue', value: `$${totalRevenue}M`, color: HUB.textPrimary },
+          { label: 'Total fees', value: `$${totalFees}M`, color: HUB.textPrimary },
+          { label: 'Net result', value: `${totalRevenue - totalFees >= 0 ? '+' : ''}$${totalRevenue - totalFees}M`, color: totalRevenue - totalFees >= 0 ? HUB.positive : HUB.negative },
         ].map((s, i) => (
-          <div key={i} style={{ ...glassCard({ padding: '20px' }) }}>
-            <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>{s.label}</div>
+          <div key={i} style={{ ...glassCard({ padding: '24px' }) }}>
+            <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, marginBottom: 8 }}>{s.label}</div>
             <div style={{ fontFamily: HUB.fontBold, fontSize: 28, color: s.color }}>{s.value}</div>
-            <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>Annual estimate</div>
+            <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginTop: 4 }}>Annual estimate</div>
           </div>
         ))}
       </div>

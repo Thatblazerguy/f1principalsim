@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { HUB, actionBtn, pill } from '../components/HubLayout.tsx';
+import { HUB, btn, btnClass, iconBtn, pill } from '../components/HubLayout.tsx';
 import { LiveRaceEngine } from '../game/LiveRaceEngine.js';
 import { TrackMap } from '../components/ui/TrackMap.tsx';
 import { TimingTower } from '../components/ui/TimingTower.tsx';
@@ -11,8 +11,8 @@ import { AnimatedTabs } from '../components/ui/animated-tabs.tsx';
 import { BattleTracker } from '../components/ui/BattleTracker.tsx';
 import { RaceEngineerPanel } from '../components/ui/RaceEngineerPanel.tsx';
 import { LiveEventFeed } from '../components/ui/LiveEventFeed.tsx';
-import { MLStrategyEngine } from '../game/MLStrategyEngine.js';
-import { Play, Pause, FastForward, SkipForward } from 'lucide-react';
+import { RaceEngineer } from '../game/RaceEngineer.js';
+import { Play, Pause, FastForward, SkipForward, ChevronRight } from 'lucide-react';
 
 export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrategies, selectedObjective, weekendContext, onRaceComplete }) {
   // Engine instance Ref
@@ -27,7 +27,7 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
   
   useEffect(() => {
     engineRef.current = new LiveRaceEngine(teams, track, laps, qualifyingGrid, selectedStrategies, weekendContext);
-    strategyEngineRef.current = new MLStrategyEngine(engineRef.current, selectedObjective);
+    strategyEngineRef.current = new RaceEngineer(engineRef.current, { objective: selectedObjective });
     setFrame(f => f + 1);
   }, [teams, track, laps, qualifyingGrid, selectedStrategies, selectedObjective, weekendContext]);
 
@@ -47,6 +47,7 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
         const deltaMs = time - lastTime;
         const dt = Math.min(deltaMs, 100) / 1000; 
         engineRef.current.tick(dt * speed);
+        strategyEngineRef.current?.update();
         setFrame(f => f + 1);
       }
       
@@ -59,7 +60,12 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
   }, [paused, speed]);
 
   const handleCommand = (driverId, command, value) => {
-    if (engineRef.current) engineRef.current.playerCommand(driverId, command, value);
+    if (!engineRef.current) return;
+    // A manual call from the strategy panel takes the car off engineer auto
+    const car = engineRef.current.cars.find(c => c.id === driverId);
+    if (car?.autoEngineer) strategyEngineRef.current?.setAuto(driverId, false);
+    engineRef.current.playerCommand(driverId, command, value);
+    setFrame(f => f + 1);
   };
 
   const skipToNextLap = () => {
@@ -68,6 +74,7 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
     const targetLap = currentLap + 1;
     while (!engineRef.current.raceCompleted && engineRef.current.cars[0].lap < targetLap) {
       engineRef.current.tick(0.1);
+      strategyEngineRef.current?.update();
     }
     setFrame(f => f + 1);
   };
@@ -76,6 +83,7 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
     if (!engineRef.current) return;
     while (!engineRef.current.raceCompleted) {
       engineRef.current.tick(1.0);
+      strategyEngineRef.current?.update();
     }
     setFrame(f => f + 1);
   };
@@ -92,7 +100,7 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
   const isFinished = engine.raceCompleted;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 100px)', overflow: 'hidden', backgroundColor: '#050505', borderRadius: '16px', border: `1px solid ${HUB.border}` }}>
+    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 100px)', overflow: 'hidden', backgroundColor: HUB.sidebar, borderRadius: '16px', border: `1px solid ${HUB.border}` }}>
       
       {/* ── Layer 0: The Track Canvas ── */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
@@ -106,21 +114,21 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
         <div style={{ position: 'absolute', left: '16px', top: '16px', bottom: '16px', width: '320px', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
           {/* Race Header Status */}
-          <div style={{ backgroundColor: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ backgroundColor: 'rgba(17,17,19,0.88)', border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '16px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: '1.1' }}>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: '16px', fontFamily: HUB.fontWide, color: '#fff', textTransform: 'uppercase', lineHeight: '1.1' }}>
                 {track.name}
               </h2>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <span style={{...pill(), fontSize: '9px', padding: '2px 6px'}}>{engine.weatherStr}</span>
-                {isFinished && <span style={{...pill(true), backgroundColor: HUB.accent, borderColor: HUB.accent, color: '#fff', fontSize: '9px', padding: '2px 6px'}}>FINISHED</span>}
+                <span style={{...pill(), fontSize: '11px', padding: '2px 6px'}}>{engine.weatherStr}</span>
+                {isFinished && <span style={{...pill(true), fontSize: '11px', padding: '2px 6px'}}>Finished</span>}
               </div>
             </div>
             
             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <div style={{ fontSize: '10px', color: HUB.textMuted, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>Current Lap</div>
-              <div style={{ fontSize: '24px', fontFamily: HUB.fontMono, fontWeight: 'bold', color: '#fff', lineHeight: '1' }}>
-                {Math.max(1, engine.cars[0]?.lap || 1)} <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.4)' }}>/ {engine.totalLaps}</span>
+              <div style={{ fontSize: '11px', color: HUB.textMuted, fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", marginBottom: '2px' }}>Lap</div>
+              <div style={{ fontSize: '24px', fontFamily: HUB.fontMono, fontWeight: 400, color: '#fff', lineHeight: '1' }}>
+                {Math.max(1, engine.cars[0]?.lap || 1)} <span style={{ fontSize: '14px', color: HUB.textFaint }}>/ {engine.totalLaps}</span>
               </div>
             </div>
           </div>
@@ -140,30 +148,30 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
         <div style={{ position: 'absolute', right: '16px', top: '16px', bottom: '16px', width: '380px', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
           {/* Header */}
-          <div style={{ backgroundColor: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-             <h3 style={{ margin: 0, fontSize: '12px', color: HUB.textMuted, letterSpacing: '0.2em', textTransform: 'uppercase' }}>Operations Control</h3>
+          <div style={{ backgroundColor: 'rgba(17,17,19,0.88)', border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '12px', textAlign: 'center' }}>
+             <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontBold }}>Pit wall</h3>
           </div>
 
           {/* Scrolling Sections */}
-          <div style={{ flex: 1, backgroundColor: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div style={{ flex: 1, backgroundColor: 'rgba(17,17,19,0.88)', border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
              
              <section style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '10px', color: HUB.accent, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>AI Race Engineer</h4>
-               <RaceEngineerPanel strategyEngine={strategyEngineRef.current} engine={engine} />
+               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Race engineer</h4>
+               <RaceEngineerPanel engineer={strategyEngineRef.current} engine={engine} onChange={() => setFrame(f => f + 1)} />
              </section>
 
              <section>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '10px', color: HUB.accent, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>Pit Wall Controls</h4>
+               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Strategy</h4>
                <PlayerStrategyPanel engine={engine} onCommand={handleCommand} />
              </section>
 
              <section>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '10px', color: HUB.accent, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>Live Telemetry</h4>
+               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Telemetry</h4>
                <TelemetryCenter engine={engine} />
              </section>
 
              <section>
-               <h4 style={{ margin: '0 0 12px 0', fontSize: '10px', color: HUB.accent, letterSpacing: '0.1em', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>Radio Comms</h4>
+               <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 400, color: HUB.textFaint, fontFamily: HUB.fontRegular, borderBottom: `1px solid ${HUB.border}`, paddingBottom: '8px' }}>Radio</h4>
                <CommsPanel engine={engine} />
              </section>
              
@@ -174,38 +182,36 @@ export function RaceControl({ teams, track, laps, qualifyingGrid, selectedStrate
         <div style={{ 
           position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', 
           pointerEvents: 'auto', display: 'flex', gap: '8px', 
-          backgroundColor: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)', 
-          border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '8px 16px',
+          backgroundColor: 'rgba(17,17,19,0.88)', 
+          border: `1px solid ${HUB.border}`, borderRadius: '12px', padding: '6px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
         }}>
           {!isFinished ? (
             <>
-              <button onClick={() => setPaused(!paused)} style={actionBtn({ padding: '10px 14px', backgroundColor: paused ? 'rgba(255,255,255,0.15)' : 'transparent', border: 'none', color: '#fff' })}>
-                {paused ? <Play size={18} /> : <Pause size={18} />}
+              <button className={btnClass('ghost')} onClick={() => setPaused(!paused)} aria-label={paused ? 'Resume' : 'Pause'} title={paused ? 'Resume' : 'Pause'}
+                style={iconBtn('sm', paused ? { backgroundColor: HUB.raised, color: HUB.textPrimary } : { color: HUB.textPrimary })}>
+                {paused ? <Play size={16} strokeWidth={1.5} /> : <Pause size={16} strokeWidth={1.5} />}
               </button>
-              <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-              {[1, 2, 4, 8, 16].map(s => (
-                <button key={s} onClick={() => setSpeed(s)} style={actionBtn({ 
-                  padding: '8px 12px', 
-                  backgroundColor: speed === s ? HUB.accent : 'transparent', 
-                  border: speed === s ? `1px solid ${HUB.accent}` : '1px solid transparent',
-                  boxShadow: speed === s ? `0 0 12px ${HUB.accent}40` : 'none',
-                  color: speed === s ? '#fff' : HUB.textMuted
-                })}>
-                  {s}x
-                </button>
-              ))}
-              <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-              <button onClick={skipToNextLap} style={actionBtn({ padding: '10px 14px', backgroundColor: 'transparent', border: 'none', color: HUB.textMuted })} title="Skip to Next Lap">
-                <SkipForward size={18} />
+              <div style={{ width: '1px', backgroundColor: HUB.border, margin: '4px' }} />
+              <div role="radiogroup" aria-label="Simulation speed" style={{ display: 'flex', gap: '2px' }}>
+                {[1, 2, 4, 8, 16].map(s => (
+                  <button key={s} role="radio" aria-checked={speed === s} className={btnClass('ghost')} onClick={() => setSpeed(s)}
+                    style={btn('ghost', 'sm', { minWidth: '40px', padding: '0 8px', fontFamily: HUB.fontBold, fontVariantNumeric: 'tabular-nums', ...(speed === s ? { backgroundColor: HUB.raised, color: HUB.textPrimary, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' } : {}) })}>
+                    {s}×
+                  </button>
+                ))}
+              </div>
+              <div style={{ width: '1px', backgroundColor: HUB.border, margin: '4px' }} />
+              <button className={btnClass('ghost')} onClick={skipToNextLap} style={iconBtn('sm')} aria-label="Skip to next lap" title="Skip to next lap">
+                <SkipForward size={16} strokeWidth={1.5} />
               </button>
-              <button onClick={skipToFinish} style={actionBtn({ padding: '10px 14px', backgroundColor: 'transparent', border: 'none', color: '#ef4444' })} title="Skip to Finish">
-                <FastForward size={18} />
+              <button className={btnClass('ghost')} onClick={skipToFinish} style={iconBtn('sm')} aria-label="Skip to finish" title="Skip to finish">
+                <FastForward size={16} strokeWidth={1.5} />
               </button>
             </>
           ) : (
-            <button onClick={finishRace} style={{ ...actionBtn({ padding: '12px 48px', fontSize: '14px' }), backgroundColor: HUB.accent, color: '#fff', border: 'none' }}>
-              CONTINUE TO RESULTS
+            <button className={btnClass('primary')} onClick={finishRace} style={btn('primary', 'md')}>
+              Continue to results <ChevronRight size={16} strokeWidth={1.5} />
             </button>
           )}
         </div>

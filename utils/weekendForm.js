@@ -9,6 +9,9 @@
 
 import { getDriverFormMultiplier } from "./raceBalance.js";
 import { getDriverPuPerformance } from "./engineeringSystem.js";
+import { getTeamSetupQuality } from "../game/setup/setupLab.js";
+
+const SETUP_WEIGHT = 0.05;
 
 // Explainable outliers that randomly occur to explain performance swings
 const OUTLIER_EVENTS = [
@@ -37,6 +40,10 @@ export function generateWeekendContext(teams, track, raceHistory = [], appState 
   };
 
   teams.forEach(team => {
+    // Setup quality comes from the Setup Lab (player's setup sheet / AI engineering
+    // strength). Falls back to a random roll when no game state is available.
+    const teamSetupQuality = getTeamSetupQuality(team, track, appState);
+
     // 1. Car Performance (45%)
     // Base scale is typically 70-100. Normalize to 0-1.
     const teamOvr = team.specs?.ovr ?? team.carPerformance ?? 85;
@@ -60,7 +67,7 @@ export function generateWeekendContext(teams, track, raceHistory = [], appState 
       const trackSuitabilityScore = 0.3 + Math.random() * 0.7;
 
       // 6. Setup Quality (5%)
-      const setupQualityScore = 0.2 + Math.random() * 0.8;
+      const setupQualityScore = teamSetupQuality ?? (0.2 + Math.random() * 0.8);
 
       // 7. Driver Confidence (5%)
       const driverConfidenceScore = 0.2 + Math.random() * 0.8;
@@ -82,7 +89,7 @@ export function generateWeekendContext(teams, track, raceHistory = [], appState 
         driverPaceScore * 0.20 +
         formScore * 0.05 +
         trackSuitabilityScore * 0.05 +
-        setupQualityScore * 0.05 +
+        setupQualityScore * SETUP_WEIGHT +
         driverConfidenceScore * 0.05 +
         engQualityScore * 0.05 +
         puHealthScore * 0.05 +
@@ -119,6 +126,9 @@ export function generateWeekendContext(teams, track, raceHistory = [], appState 
       const finalModifier = 1.05 - (finalWeekendPerformanceScore * 0.15);
 
       context.drivers[driver.name] = {
+        team: team.name,
+        setupQualityScore,
+        scoreExSetup: weekendPerformanceScore - setupQualityScore * SETUP_WEIGHT,
         weekendPerformanceScore: finalWeekendPerformanceScore,
         formMult: rawFormMult,
         outlierMult,
@@ -136,5 +146,23 @@ export function generateWeekendContext(teams, track, raceHistory = [], appState 
     });
   });
 
+  return context;
+}
+
+/**
+ * Re-apply the player's current setup to an existing weekend context
+ * (the context is generated before practice; setup changes happen after).
+ */
+export function refreshPlayerSetupInContext(context, track, appState) {
+  if (!context?.drivers || !appState?.team) return context;
+  const quality = getTeamSetupQuality(appState.team, track, appState);
+  if (quality == null) return context;
+  for (const entry of Object.values(context.drivers)) {
+    if (entry.team !== appState.team.name || entry.scoreExSetup === undefined) continue;
+    entry.setupQualityScore = quality;
+    const raw = entry.scoreExSetup + quality * SETUP_WEIGHT;
+    entry.weekendPerformanceScore = Math.max(0.01, Math.min(1.5, raw / (entry.outlierMult || 1)));
+    entry.finalModifier = 1.05 - entry.weekendPerformanceScore * 0.15;
+  }
   return context;
 }

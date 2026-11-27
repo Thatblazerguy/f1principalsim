@@ -42,9 +42,9 @@ export function Header() {
 	return (
 		<header
 			className={cn(
-				'sticky top-0 z-50 mx-auto w-full max-w-5xl border-b border-transparent md:rounded-md md:border md:transition-all md:ease-out',
+				'sticky top-0 z-50 mx-auto w-full max-w-5xl border-b border-transparent md:rounded-md md:border md:transition-colors md:ease-out',
 				{
-					'bg-background/95 supports-[backdrop-filter]:bg-background/50 border-border backdrop-blur-lg md:top-4 md:max-w-4xl md:shadow':
+					'bg-background/95 supports-[backdrop-filter]:bg-background/50 border-border  md:top-4 md:max-w-4xl md:shadow':
 						scrolled && !open,
 					'bg-background/90': open,
 				},
@@ -52,7 +52,7 @@ export function Header() {
 		>
 			<nav
 				className={cn(
-					'flex h-14 w-full items-center justify-between px-4 md:h-12 md:transition-all md:ease-out',
+					'flex h-14 w-full items-center justify-between px-4 md:h-12 md:transition-colors md:ease-out',
 					{
 						'md:px-2': scrolled,
 					},

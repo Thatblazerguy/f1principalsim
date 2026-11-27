@@ -372,7 +372,7 @@ export function generateTrackBlueprint(options = {}) {
     country: chosenPreset?.country || country,
     region: chosenPreset?.region || region,
     type: chosenPreset?.type || type,
-    description: chosenPreset?.description || `High-performance modern circuit engineered for competitive Formula 1 racing in ${country}.`,
+    description: chosenPreset?.description || `High-performance modern circuit engineered for competitive single-seater racing in ${country}.`,
     points: basePoints,
     trackWidth: 14,
     scale: 60,

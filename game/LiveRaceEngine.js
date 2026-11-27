@@ -1,15 +1,24 @@
-import { getTeamLapCredit, getTeamPerformanceBonus } from "../utils/simTeam.js";
-import { getTrackWetProbability, calculateRacePaceLapTime } from "../utils/raceBalance.js";
-import { rollForFailures, applySessionWear, getDriverPuPerformance, ensureEngineeringState } from "../utils/engineeringSystem.js";
+import { getTrackWetProbability } from "../utils/raceBalance.js";
+import { rollForFailures, applySessionWear, ensureEngineeringState } from "../utils/engineeringSystem.js";
+import { strategies } from "../data/strategies.js";
 import { state } from "../state.js";
-
-const TIRE_DEGRADATION = {
-  "Soft": 0.035,
-  "Medium": 0.020,
-  "Hard": 0.012,
-  "Intermediate": 0.040,
-  "Wet": 0.030
-};
+import {
+  buildPaceProfile,
+  expectedLapTime,
+  tyreLife,
+  tyreWearPct,
+  chooseNextCompound,
+  parseStrategyCompounds,
+  overtakeChance,
+  dirtyAirPenalty,
+  getOvertakingDifficulty,
+  gaussian,
+  clamp,
+  DRIVE_MODES,
+  ERS_DELTA,
+  DRY_COMPOUNDS,
+  PIT_LOSS_BASE,
+} from "./paceModel.js";
 
 export function compareCars(a, b, totalLaps) {
   // 1. Retired cars always go to the back
@@ -38,22 +47,6 @@ export function compareCars(a, b, totalLaps) {
   return b.distance - a.distance;
 }
 
-const PACE_MODIFIERS = {
-  "Push": 0.020,
-  "Attack": 0.040,
-  "Balanced": 0,
-  "Conserve": -0.020,
-  "Defend": -0.015
-};
-
-const TIRE_WEAR_MODIFIERS = {
-  "Push": 1.5,
-  "Attack": 2.2,
-  "Balanced": 1.0,
-  "Conserve": 0.5,
-  "Defend": 1.2
-};
-
 const FUEL_USAGE = {
   "Rich": 1.2,
   "Standard": 1.0,
@@ -79,11 +72,14 @@ export class LiveRaceEngine {
     this.raceCompleted = false;
     this.elapsedTime = 0;
     this.snapshots = []; // Store lap-by-lap state for replay
+    this.pitLog = [];    // PIT_STOP events for the post-race report
+    this.overtakingDifficulty = getOvertakingDifficulty(track);
+    this.weekendContext = weekendContext;
 
     this.cars = this.initCars(teams, qualifyingGrid, playerSelectedStrategies, weekendContext);
     this.calculateFailures();
     
-    this.addEvent("Race started!");
+    this.addEvent("Lights out");
     this.addComm("Engineer", "Lights out and away we go! Keep it clean into turn 1.", true);
   }
 
@@ -152,32 +148,22 @@ export class LiveRaceEngine {
     teams.forEach(team => {
       team.drivers.forEach(driver => {
         const gridPos = this.getGridPosition(qualifyingGrid, driver);
-        const weekendPerformanceScore = weekendContext?.drivers?.[driver.name]?.weekendPerformanceScore ?? null;
-        let effectiveBaseLap;
+        const isPlayer = !!playerSelectedStrategies && (playerSelectedStrategies[driver.name] !== undefined);
+        const profile = buildPaceProfile({ team, driver, track: this.track, isWet: this.isWet, weekendContext, appState: state });
 
-        if (weekendPerformanceScore !== null) {
-          effectiveBaseLap = calculateRacePaceLapTime({
-            team,
-            driver,
-            trackBaseTime: this.track.baseTime,
-            weekendPerformanceScore,
-            tyreHealth: 1.0,
-            fuelLoad: 1.0,
-            trackGrip: 1.0,
-            isWet: this.isWet,
-            lap: 1,
-            totalLaps: this.totalLaps
-          });
-        } else {
-          const baseLap = this.track.baseTime - (driver.pace * 0.03) - (team.carPerformance * 0.03);
-          const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
-          const puPerfMod = getDriverPuPerformance(state, driver.name);
-          const puPenalty = (1.0 - puPerfMod) * 3.0;
-          effectiveBaseLap = baseLap * finalModifier + puPenalty;
-        }
+        // Starting compound and stint plan from the chosen (or AI-picked) strategy
+        const roundStrats = this.track.round ? (strategies[this.track.round] || []) : [];
+        const pick = playerSelectedStrategies?.[driver.name];
+        const strat = pick
+          ? (roundStrats.find(st => st.id === pick)?.label ?? String(pick))
+          : (roundStrats[Math.floor(Math.random() * Math.min(2, roundStrats.length))]?.label ?? "M -> H");
+        let plan = parseStrategyCompounds(strat).filter(c => DRY_COMPOUNDS.includes(c));
+        if (plan.length === 0) plan = ["Medium", "Hard"];
+        if (this.isWet) plan = ["Intermediate"];
+        const startCompound = plan[0];
+        const expected = expectedLapTime(profile, { compound: startCompound, tyreAge: 0, lap: 1, totalLaps: this.totalLaps });
+        const speedKms = (this.track.baseTime / expected) * 220;
 
-        const speedKms = (this.track.baseTime / effectiveBaseLap) * 220;
-        
         cars.push({
           id: driver.name,
           driver,
@@ -195,7 +181,16 @@ export class LiveRaceEngine {
           driverMode: "Balanced",
           fuelMode: "Standard",
           ersMode: "Balanced",
-          tireCompound: this.isWet ? "Intermediate" : "Medium",
+          tireCompound: startCompound,
+          tyreAge: 0,          // effective laps of wear on this set
+          plan,
+          planIdx: 0,
+          stints: [{ compound: startCompound, startLap: 1, endLap: null }],
+          usedCompounds: [startCompound],
+          profile,
+          lapNoise: 0,
+          holdUntil: 0,
+          overtakes: 0,
           
           // Telemetry
           tireWear: 0, 
@@ -214,7 +209,9 @@ export class LiveRaceEngine {
           pitStopStatus: "None",
           pitTimer: 0,
           stops: 0,
-          isPlayer: !!playerSelectedStrategies && (playerSelectedStrategies[driver.name] !== undefined), 
+          isPlayer,
+          autoEngineer: false,
+          totalLaps: this.totalLaps,
           totalTime: 0,
           retired: false,
           
@@ -252,13 +249,15 @@ export class LiveRaceEngine {
     if (!car || !car.isPlayer) return;
     
     if (command === "MODE") {
+      if (car.driverMode === value) return;
       car.driverMode = value;
-      this.addComm("Engineer", `Copy that, switch to ${value} pace.`, true);
+      if (!car.autoEngineer) this.addComm(car.driver.name, `Copy, ${value.toLowerCase()} mode.`, true);
     } else if (command === "FUEL") {
       car.fuelMode = value;
     } else if (command === "ERS") {
       car.ersMode = value;
     } else if (command === "PIT") {
+      if (car.pitStopStatus !== "None" && car.pitStopStatus !== "OutLap") return;
       car.pitStopStatus = "InLap";
       car.nextTire = value;
       this.addComm("Engineer", `Box box. Box this lap for ${value}s.`, true);
@@ -270,76 +269,107 @@ export class LiveRaceEngine {
   }
 
   generateComms(dt) {
-    // Check drivers for comms triggers
+    // Driver-side radio. Engineer calls come from game/RaceEngineer.js.
     this.cars.forEach(car => {
        if (car.retired || !car.isPlayer) return;
-
-       if (car.tireWear > 50 && !car._commsFlags.tireWarning50) {
+       if (car.tireWear > 60 && !car._commsFlags.tireWarning50) {
          car._commsFlags.tireWarning50 = true;
-         if (Math.random() > 0.5) {
-           this.addComm(car.driver.name, "Starting to lose some grip on the rears.", true);
-         }
+         this.addComm(car.driver.name, "Starting to lose grip on the rears.", true);
        }
-       if (car.tireWear > 75 && !car._commsFlags.tireWarning75) {
+       if (car.tireWear > 92 && !car._commsFlags.tireWarning75) {
          car._commsFlags.tireWarning75 = true;
-         this.addComm(car.driver.name, "Tyres are completely gone, we need to box soon.", true);
-         this.addComm("Engineer", "Understood, looking at the pit window now.", true);
+         this.addComm(car.driver.name, "These tyres are finished, I'm sliding everywhere.", true);
        }
-       
-       if (car.ers < 10 && car.ersMode !== "Harvest" && !car._commsFlags.ersWarning) {
-         car._commsFlags.ersWarning = true;
-         this.addComm("Engineer", "Battery is getting low, recommend harvesting.", true);
-       } else if (car.ers > 20) {
-         car._commsFlags.ersWarning = false;
+       if (car.engineTemp > 116 && !car._commsFlags.tempWarning) {
+         car._commsFlags.tempWarning = true;
+         this.addComm(car.driver.name, "Engine feels hot, I'm losing power.", true);
+       } else if (car.engineTemp < 105) {
+         car._commsFlags.tempWarning = false;
        }
     });
-
-    // Random engineer chatter
-    if (Math.random() < 0.005 * dt) {
-      const pCars = this.cars.filter(c => c.isPlayer && !c.retired);
-      if (pCars.length > 0) {
-         const car = pCars[Math.floor(Math.random() * pCars.length)];
-         const idx = this.cars.findIndex(c => c.id === car.id);
-         if (idx > 0) {
-           const gap = ((this.cars[idx-1].distance - car.distance) * 90).toFixed(1);
-           if (gap < 3.0) {
-             this.addComm("Engineer", `Gap to ${this.cars[idx-1].driver.name} ahead is ${gap}s. You have the pace.`, true);
-           }
-         }
-      }
-    }
   }
 
-  aiLogic(car, dt) {
-     if (car.isPlayer || car.retired) return;
+  /** Nearest car ahead on track that is still running (cars must be sorted). */
+  carAhead(i) {
+    for (let j = i - 1; j >= 0; j--) {
+      const c = this.cars[j];
+      if (!c.retired && c.distance < this.totalLaps) return c;
+    }
+    return null;
+  }
 
-     // Simple personality AI
-     const isAggressive = car.team.name === "Red Bull Racing" || car.team.name === "McLaren";
-     const isConservative = car.team.name === "Aston Martin" || car.team.name === "Williams";
+  completePitStop(car) {
+    const from = car.tireCompound;
+    const lapsLeft = this.totalLaps - car.distance;
+    const next = car.nextTire || chooseNextCompound(car.profile, lapsLeft, car.usedCompounds, { lap: car.lap, totalLaps: this.totalLaps });
+    car.pitStopStatus = "OutLap";
+    car.tireCompound = next;
+    car.tyreAge = 0;
+    car.tireWear = 0;
+    car.stops++;
+    car.planIdx++;
+    car.usedCompounds.push(next);
+    car.stints[car.stints.length - 1].endLap = car.pitLap ?? car.lapTimes.length;
+    car.stints.push({ compound: next, startLap: (car.pitLap ?? car.lapTimes.length) + 1, endLap: null });
+    car.nextTire = null;
+    car._commsFlags = { tireWarning50: false, tireWarning75: false, ersWarning: false };
 
-     // Tire logic
-     const wearLimit = isAggressive ? 85 : isConservative ? 75 : 80;
-     if (car.tireWear > wearLimit && car.pitStopStatus === "None" && car.distance < this.totalLaps - 1) {
+    const exitPos = this.cars.filter(c => !c.retired && c.distance > car.distance).length + 1;
+    this.pitLog.push({
+      type: "PIT_STOP",
+      driver: car.driver.name,
+      team: car.team.name,
+      lap: car.pitLap ?? car.lap,
+      time: (2.0 + Math.random() * 0.9).toFixed(2),
+      oldPos: car.pitEntryPos,
+      newPos: exitPos,
+      strategy: `${from} → ${next}`,
+    });
+    this.addEvent(`${car.driver.name} pits: ${from} → ${next}, rejoins P${exitPos}`);
+  }
+
+  aiLogic(car, dt, idx) {
+     // Player cars are run by the player (or by the race engineer on auto)
+     if (car.retired || car.isPlayer) return;
+
+     // ── Tyres: pit near the end of the tyre's useful life ──
+     if (!car.aiPitThreshold) car.aiPitThreshold = 0.82 + Math.random() * 0.18;
+     const lapsLeft = this.totalLaps - car.distance;
+     const life = tyreLife(car.profile, car.tireCompound);
+     const dryUsed = new Set(car.usedCompounds.filter(c => DRY_COMPOUNDS.includes(c)));
+     const needsRule = !this.isWet && dryUsed.size < 2;
+     const canReachEnd = car.tyreAge + lapsLeft <= life * 1.1;
+     const wornOut = car.tyreAge >= life * car.aiPitThreshold;
+     const ruleDeadline = needsRule && lapsLeft < 12 && car.tyreAge > 6;
+     if (car.pitStopStatus === "None" && lapsLeft > 2 && ((wornOut && !(canReachEnd && !needsRule)) || ruleDeadline)) {
+       const planned = car.plan[car.planIdx + 1];
+       const usable = planned && (!needsRule || !dryUsed.has(planned)) && tyreLife(car.profile, planned) * 1.15 >= lapsLeft;
+       car.nextTire = usable ? planned : chooseNextCompound(car.profile, lapsLeft, car.usedCompounds, { lap: car.lap, totalLaps: this.totalLaps });
        car.pitStopStatus = "InLap";
-       car.nextTire = this.isWet ? "Intermediate" : "Medium"; // Naive selection
      }
 
-     // ERS / Fuel / Temp logic
-     // CRITICAL: Prevent AI thermal suicide
+     // ── Racing modes ──
+     const ahead = this.carAhead(idx);
+     const behind = this.cars[idx + 1];
+     const lt = car.targetLapTime || this.track.baseTime;
+     const gapAhead = ahead ? (ahead.distance - car.distance) * lt : 99;
+     const gapBehind = behind && !behind.retired ? (car.distance - behind.distance) * lt : 99;
+
      if (car.engineTemp > 115) {
         car.ersMode = "Balanced";
         car.driverMode = "Conserve";
+     } else if (gapAhead < 1.0 && car.ers > 30) {
+        car.driverMode = "Push";
+        car.ersMode = "Overtake";
+     } else if (gapBehind < 0.8) {
+        car.driverMode = "Defend";
+        car.ersMode = car.ers > 25 ? "Deploy" : "Balanced";
+     } else if (car.ers < 20) {
+        car.ersMode = "Harvest";
+        car.driverMode = "Balanced";
      } else {
-        if (car.ers > 80 && Math.random() < 0.1) {
-           car.ersMode = "Deploy";
-           car.driverMode = "Push";
-        } else if (car.ers < 20) {
-           car.ersMode = "Harvest";
-           car.driverMode = "Balanced";
-        } else if (car.ersMode === "Deploy" && car.ers < 50) {
-           car.ersMode = "Balanced";
-           car.driverMode = "Balanced";
-        }
+        car.driverMode = "Balanced";
+        car.ersMode = "Balanced";
      }
   }
 
@@ -381,66 +411,107 @@ export class LiveRaceEngine {
       anyCarRacing = true;
 
       // AI Decision Making
-      this.aiLogic(car, dt);
+      this.aiLogic(car, dt, i);
 
       if (car.pitStopStatus === "Pitting") {
         car.currentSpeed = 0;
         car.pitTimer -= dt;
-        if (car.pitTimer <= 0) {
-          car.pitStopStatus = "OutLap";
-          car.tireCompound = car.nextTire || "Medium";
-          car.tireWear = 0;
-          car.stops++;
-          car._commsFlags = { tireWarning50: false, tireWarning75: false, ersWarning: false };
-          this.addEvent(`${car.driver.name} completes pit stop.`);
-        }
+        car.totalTime += dt;
+        if (car.pitTimer <= 0) this.completePitStop(car);
         continue;
       }
 
-      // Physics/Telemetry Update
-      let lapsPerSecond = 1 / this.track.baseTime;
-      lapsPerSecond *= (car.baseSpeed / 220);
-      lapsPerSecond *= (1 + PACE_MODIFIERS[car.driverMode]);
-      
-      // ERS Boost
-      if (car.ersMode === "Overtake" || car.ersMode === "Deploy") {
-         lapsPerSecond *= 1.02;
+      // ── Lap time from the shared pace model ────────────────────────────
+      const mode = DRIVE_MODES[car.driverMode] || DRIVE_MODES.Balanced;
+      const ersDelta = car.ers > 2 || (ERS_DELTA[car.ersMode] || 0) > 0 ? (ERS_DELTA[car.ersMode] || 0) : 0;
+      const fuelModeDelta = car.fuelMode === "Lean" ? 0.15 : car.fuelMode === "Rich" ? -0.1 : 0;
+      let lapTime = expectedLapTime(car.profile, {
+        compound: car.tireCompound,
+        tyreAge: car.tyreAge,
+        lap: Math.max(1, car.lap),
+        totalLaps: this.totalLaps,
+        fuelFrac: car.fuel / 110,
+        modeDelta: mode.delta + ersDelta + fuelModeDelta,
+      });
+      car.basePace = lapTime;          // underlying pace: what decides an overtake
+      lapTime += car.lapNoise;
+      if (car.lap <= 1) lapTime += 1.5; // standing start
+      if (car.fuel <= 0) lapTime += 8;  // out of fuel: crawling home
+      if (car.engineTemp > 120) lapTime += 2.5;
+      else if (car.engineTemp > 115) lapTime += 0.6;
+
+      // Dirty air / traffic: find the nearest running car ahead
+      const ahead = this.carAhead(i);
+      if (ahead && ahead.pitStopStatus !== "Pitting") {
+        const gapSec = (ahead.distance - car.distance) * lapTime;
+        lapTime += dirtyAirPenalty(gapSec, this.overtakingDifficulty);
       }
 
-      // Fuel weight penalty (lighter is faster, up to 3% faster)
-      let fuelWeightPenalty = (car.fuel / 110) * 0.03;
-      lapsPerSecond *= (1 + (0.03 - fuelWeightPenalty));
-
-      let wearPenalty = (car.tireWear / 100) * 0.05; 
-      lapsPerSecond *= (1 - wearPenalty);
-      
-      if (this.isWet && !["Intermediate", "Wet"].includes(car.tireCompound)) {
-        lapsPerSecond *= 0.7; 
-      } else if (!this.isWet && ["Intermediate", "Wet"].includes(car.tireCompound)) {
-        lapsPerSecond *= 0.8; 
-      }
-
-      // Thermal Pace Penalties (Instead of RNG Death)
-      if (car.engineTemp > 120) lapsPerSecond *= 0.80; // 20% pace loss
-      else if (car.engineTemp > 115) lapsPerSecond *= 0.95; // 5% pace loss
-
+      let lapsPerSecond = 1 / lapTime;
       car.currentSpeed = lapsPerSecond;
+      car.targetLapTime = lapTime;
 
       let oldDistance = car.distance;
       let newDistance = car.distance + (lapsPerSecond * dt);
-      
+
+      // ── Overtaking: one roll per attempt, then hold position for a while ──
+      // Cars on in/out laps are slow and out of the fight: they're passed without a battle
+      const aheadInPitCycle = ahead && ahead.pitStopStatus !== "None";
+      if (ahead && !aheadInPitCycle && car.pitStopStatus !== "InLap" &&
+          ahead.distance < this.totalLaps && newDistance > ahead.distance - 0.002) {
+        const edge = (ahead.basePace ?? car.basePace) - car.basePace;
+        if (this.elapsedTime < car.holdUntil || (edge <= 0 && car.lap > 1)) {
+          // Not quicker underneath (just a good lap) or still regrouping: stay behind
+          newDistance = Math.min(newDistance, ahead.distance - 0.002);
+        } else {
+          const p = overtakeChance({
+            paceAdvantage: edge,
+            attackerRacecraft: car.profile.racecraft,
+            defenderRacecraft: ahead.profile.racecraft + (ahead.driverMode === "Defend" ? 6 : 0),
+            difficulty: car.lap <= 1 ? this.overtakingDifficulty * 0.6 : this.overtakingDifficulty,
+            drs: car.lap > 2,
+            tyreAgeDelta: ahead.tyreAge - car.tyreAge,
+          });
+          if (Math.random() < p) {
+            car.overtakes++;
+            newDistance = Math.max(newDistance, ahead.distance + 0.0005); // move clear ahead
+            ahead.holdUntil = this.elapsedTime + lapTime; // no instant switch-back
+            const posNow = this.cars.indexOf(ahead) + 1;
+            this.addEvent(`LAP ${car.lap}: ${car.driver.name} overtakes ${ahead.driver.name} for P${posNow}`);
+            if (car.isPlayer) this.addComm("Engineer", `Great move! That's P${posNow}.`, true);
+            if (ahead.isPlayer) this.addComm("Engineer", `Lost the position to ${car.driver.name}. Regroup.`, true);
+          } else {
+            car.holdUntil = this.elapsedTime + lapTime; // next go at the next DRS zone
+            newDistance = Math.min(newDistance, ahead.distance - 0.002);
+          }
+        }
+      }
+
       // Lap Cross
       if (Math.floor(newDistance) > Math.floor(oldDistance) && oldDistance > 0) {
-        let lapTime = this.elapsedTime - car.currentLapStartTime;
-        car.lapTimes.push(lapTime);
-        car.lastLapTime = lapTime;
-        if (lapTime < car.bestLapTime) car.bestLapTime = lapTime;
-        car.currentLapStartTime = this.elapsedTime;
+        // Interpolate the exact moment we crossed the line inside this tick
+        const crossFrac = (Math.floor(newDistance) - oldDistance) / Math.max(1e-9, newDistance - oldDistance);
+        const crossTime = this.elapsedTime - dt + crossFrac * dt;
+        let lapTimeDone = crossTime - car.currentLapStartTime;
+        car.lapTimes.push(lapTimeDone);
+        car.lastLapTime = lapTimeDone;
+        if (lapTimeDone < car.bestLapTime) car.bestLapTime = lapTimeDone;
+        car.currentLapStartTime = crossTime;
+
+        // New lap: fresh noise sample and a chance of a mistake
+        car.lapNoise = clamp(gaussian() * car.profile.noiseSigma, -2.5 * car.profile.noiseSigma, 2.5 * car.profile.noiseSigma);
+        const mistakeMult = car.driverMode === "Attack" ? 2 : car.driverMode === "Push" ? 1.4 : 1;
+        if (Math.random() < car.profile.mistakeChance * mistakeMult) {
+          car.lapNoise += 0.6 + Math.random() * 1.6;
+          if (car.isPlayer) this.addComm(car.driver.name, "Sorry, locked up into the hairpin.", true);
+        }
 
         if (car.pitStopStatus === "InLap") {
           car.pitStopStatus = "Pitting";
-          car.pitTimer = 22 + Math.random() * 3; 
-          newDistance = Math.floor(oldDistance) + 0.01; 
+          car.pitTimer = PIT_LOSS_BASE + Math.random() * 1.5;
+          car.pitEntryPos = this.cars.indexOf(car) + 1;
+          car.pitLap = car.lapTimes.length;
+          newDistance = Math.floor(newDistance) + 0.001;
         } else if (car.pitStopStatus === "OutLap") {
           car.pitStopStatus = "None";
         }
@@ -458,19 +529,15 @@ export class LiveRaceEngine {
          car.totalTime += dt;
       }
 
-      // Telemetry Deg/Usage
-      let wearRate = (TIRE_DEGRADATION[car.tireCompound] || 0.02) * TIRE_WEAR_MODIFIERS[car.driverMode];
-      if (this.isWet && !["Intermediate", "Wet"].includes(car.tireCompound)) wearRate *= 2;
-      else if (!this.isWet && ["Intermediate", "Wet"].includes(car.tireCompound)) wearRate *= 4;
-      
-      car.tireWear += wearRate * 100 * (lapsPerSecond * dt);
-      car.tireWear = Math.min(100, car.tireWear);
+      // ── Tyres, fuel, ERS, temperature ──────────────────────────────────
+      const dLaps = Math.max(0, newDistance - oldDistance);
+      car.tyreAge += dLaps * mode.wear;
+      car.tireWear = tyreWearPct(car.profile, car.tireCompound, car.tyreAge);
 
-      car.fuel -= (FUEL_USAGE[car.fuelMode] || 1.0) * (110 / this.totalLaps) * (lapsPerSecond * dt);
-      car.ers += (ERS_USAGE[car.ersMode] || 0) * (lapsPerSecond * dt) * 10;
+      car.fuel = Math.max(0, car.fuel - (FUEL_USAGE[car.fuelMode] || 1.0) * (105 / this.totalLaps) * dLaps);
+      car.ers += (ERS_USAGE[car.ersMode] || 0) * dLaps * 10;
       car.ers = Math.max(0, Math.min(100, car.ers));
-      
-      // Temps
+
       if (car.driverMode === "Push" || car.driverMode === "Attack") car.engineTemp += dt * 0.5;
       else if (car.driverMode === "Conserve") car.engineTemp -= dt * 1.0;
       else car.engineTemp += (90 - car.engineTemp) * 0.01; // drift to 90
@@ -479,6 +546,8 @@ export class LiveRaceEngine {
       // DNF Checks
       if (car.failureData && car.distance >= car.failureData.distance) {
         car.retired = true;
+        car.dnfReason = `${car.failureData.type} failure`;
+        car.stints[car.stints.length - 1].endLap = car.lapTimes.length;
         this.addEvent(`${car.driver.name} is OUT of the race with a ${car.failureData.type.toLowerCase()} failure.`);
         if (car.isPlayer) {
            if (car.failureData.type === "Engine") this.addComm(car.driver.name, "I've lost the engine.", true);
@@ -490,9 +559,7 @@ export class LiveRaceEngine {
 
     this.generateComms(dt);
 
-    let oldOrder = this.cars.map(c => c.id);
     this.cars.sort((a, b) => compareCars(a, b, this.totalLaps));
-    let newOrder = this.cars.map(c => c.id);
 
     // Leader lap check for snapshots
     const leaderNewLap = this.cars.length > 0 ? this.cars[0].lap : 0;
@@ -500,31 +567,10 @@ export class LiveRaceEngine {
        this.saveSnapshot();
     }
 
-    for (let i = 0; i < oldOrder.length; i++) {
-      if (oldOrder[i] !== newOrder[i]) {
-        let driverGained = newOrder[i];
-        let driverLost = oldOrder[i];
-        let carGained = this.cars.find(c => c.id === driverGained);
-        let carLost = this.cars.find(c => c.id === driverLost);
-        
-        if (carGained && carLost && i < 10 && carGained.pitStopStatus === "None" && carLost.pitStopStatus === "None") {
-           const paceAdvantage = carGained.currentSpeed / Math.max(0.001, carLost.currentSpeed);
-           if (paceAdvantage > 1.002 && Math.random() < 0.6) {
-             this.addEvent(`LAP ${carGained.lap}: ${carGained.driver.name} overtakes ${carLost.driver.name} for P${i+1}`);
-             if (carGained.isPlayer) this.addComm("Engineer", `Great job, that's P${i+1}.`, true);
-             if (carLost.isPlayer) this.addComm("Engineer", `We lost the position to ${carGained.driver.name}.`, true);
-           } else {
-             // Overtake failed, revert order visually by pegging distance to car ahead minus tiny delta
-             carGained.distance = carLost.distance - 0.001;
-           }
-        }
-      }
-    }
-
     if (!anyCarRacing) {
       this.raceCompleted = true;
       this.saveSnapshot(); // Final snapshot
-      this.addEvent("Race Finished!");
+      this.addEvent("Chequered flag");
       this.finalClassification = this.generateFinalClassification();
 
       // Apply component wear for player cars based on how they drove
@@ -553,7 +599,12 @@ export class LiveRaceEngine {
         time: c.retired ? 99999 : c.totalTime,
         retired: c.retired,
         stops: c.stops,
-        tireCompound: c.tireCompound
+        tireCompound: c.tireCompound,
+        gridPos: c.gridPos,
+        dnfReason: c.dnfReason || null,
+        lapTimes: [...c.lapTimes],
+        stints: c.stints.map(st => ({ ...st, endLap: st.endLap ?? c.lapTimes.length })),
+        overtakes: c.overtakes,
       }))
     };
 
@@ -578,15 +629,20 @@ export class LiveRaceEngine {
       retired: c.retired,
       stops: c.stops,
       tireCompound: c.tireCompound,
-      lapTimes: c.lapTimes
+      lapTimes: c.lapTimes,
+      stints: c.stints,
     }));
   }
 
   getReplayData() {
     return {
       totalLaps: this.totalLaps,
+      weather: this.isWet ? 'wet' : 'dry',
       snapshots: this.snapshots,
-      events: this.events
+      events: [...this.pitLog],
+      feed: this.events,
+      scLaps: [],
+      vscLaps: [],
     };
   }
 }

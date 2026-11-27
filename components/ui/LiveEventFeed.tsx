@@ -22,27 +22,26 @@ export function LiveEventFeed({ events }) {
         {recentEvents.map((ev, index) => (
           <motion.div
             key={ev.time + ev.msg} // unique enough for events
-            initial={{ opacity: 0, x: 20, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              backgroundColor: 'rgba(15, 15, 20, 0.85)',
-              backdropFilter: 'blur(12px)',
-              borderLeft: `3px solid ${ev.msg.includes('Overtake') ? '#10b981' : ev.msg.includes('Pit') ? '#3b82f6' : HUB.accent}`,
-              borderRadius: '6px',
-              padding: '10px 14px',
-              color: '#fff',
+              backgroundColor: HUB.surface,
+              border: `1px solid ${HUB.border}`,
+              borderRadius: '8px',
+              padding: '8px 12px',
+              color: HUB.textPrimary,
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px'
+              gap: '2px'
             }}
           >
-            <div style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>
-              LAP {Math.floor(ev.time / 90) + 1}
+            <div style={{ fontSize: '11px', color: HUB.textFaint, fontFamily: HUB.fontRegular }}>
+              Lap {Math.floor(ev.time / 90) + 1}
             </div>
-            <div style={{ fontSize: '12px', fontWeight: 'bold' }}>
+            <div style={{ fontSize: '12px', fontWeight: 400, fontFamily: HUB.fontBold }}>
               {ev.msg}
             </div>
           </motion.div>

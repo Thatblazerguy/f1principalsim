@@ -6,7 +6,7 @@ import { getTeamRoster, getActiveDrivers, setTeamActiveDrivers, ensureTeamState 
 import { rotateSponsorOffers } from "../utils/sponsorDeals.js";
 import { syncGame } from "../lib/supabaseApi.js";
 import { getRoundRaceDay } from "../utils/seasonTimeline.js";
-import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
+import { mountLayout, HUB, glassCard, statCell, btn, btnClass, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
 import { ShieldCheck, TrendingUp, Users, DollarSign, Activity, AlertCircle, ChevronRight, Target, CheckCircle, Zap, Star } from "lucide-react";
 import { motion } from 'framer-motion';
 import { SlideUp } from '../components/ui/motion.tsx';
@@ -316,11 +316,11 @@ export function processEndofSeasonFinancials(s: any) {
       let sponsorTotal = 0;
       const sponsorDetails: any[] = [];
       const SPONSOR_SLOTS = [
-        { key: "title", label: "Title Sponsor" },
-        { key: "kit", label: "Kit Sponsor" },
-        { key: "sidepod", label: "Sidepod Sponsor" },
-        { key: "rearWing", label: "Rear Wing Sponsor" },
-        { key: "halo", label: "Halo Sponsor" }
+        { key: "title", label: "Title sponsor" },
+        { key: "kit", label: "Kit sponsor" },
+        { key: "sidepod", label: "Sidepod sponsor" },
+        { key: "rearWing", label: "Rear wing sponsor" },
+        { key: "halo", label: "Halo sponsor" }
       ];
       SPONSOR_SLOTS.forEach(slot => {
         const sponsor = s.team!.sponsorSlots?.[slot.key];
@@ -337,11 +337,11 @@ export function processEndofSeasonFinancials(s: any) {
       // Calculate performance evaluation
       const sortedByCar = [...teamList].sort((a, b) => b.carPerformance - a.carPerformance);
       const carRank = sortedByCar.findIndex(t => t.name === s.team!.name) + 1;
-      let performanceEvaluation = "Met Expectations";
+      let performanceEvaluation = "Met expectations";
       if (pos < carRank) {
-        performanceEvaluation = "Overperformed Projected";
+        performanceEvaluation = "Overperformed car rank";
       } else if (pos > carRank) {
-        performanceEvaluation = "Underperformed Projected";
+        performanceEvaluation = "Underperformed car rank";
       }
 
       playerReport = {
@@ -389,7 +389,7 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
        if (d.wet > 85) notes.push("Masterful wet-weather driving ability.");
        if (d.racecraft > 85) notes.push("Outstanding racecraft and overtaking capability.");
        if (d.age > 33) notes.push("Late career decline expected soon.");
-       else if (d.age < 24 && getOvr(d) > 80) notes.push("Future World Champion prospect.");
+       else if (d.age < 24 && getOvr(d) > 80) notes.push("Future world champion prospect.");
        if (d.tyre < 70) notes.push("Struggles with tyre management on long stints.");
        return notes.length > 0 ? notes : ["Solid, reliable midfielder."];
     };
@@ -423,11 +423,11 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
     // Engineer Review
     const upgradeCount = s.team!.upgradeHistory?.length || 0;
     const upgradeEfficiency = upgradeCount > 5 ? "Excellent" : upgradeCount > 2 ? "Average" : "Poor";
-    const aeroReadiness = s.team!.car?.aero > 70 ? "Strong" : "Requires Focus";
+    const aeroReadiness = s.team!.car?.aero > 70 ? "Strong" : "Requires focus";
 
     // AI Advisor Notes
     const advisorNotes = [];
-    if (roster.length < 2) advisorNotes.push("URGENT: We must sign a second driver to comply with regulations.");
+    if (roster.length < 2) advisorNotes.push("Urgent: we must sign a second driver to comply with regulations.");
     if (s.team!.budget > 50) advisorNotes.push("Finances are extremely healthy. We can afford a blockbuster signing.");
     else if (s.team!.budget < 10) advisorNotes.push("Budget is dangerously low. R&D next season will be severely restricted.");
     
@@ -480,40 +480,39 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
 
     if (view === 'report') {
       const report = processEndofSeasonFinancials(s);
-      if (!report) return <div style={{ color: '#fff', padding: '40px', fontFamily: HUB.fontSans }}>Generating end-of-season audit...</div>;
+      if (!report) return <div style={{ color: HUB.textPrimary, padding: '40px', fontFamily: HUB.fontSans }}>Generating end-of-season report…</div>;
 
       const totalPayout = report.prize + report.tvRights + report.sponsorTotal;
 
       return (
         <div style={{ paddingBottom: '80px', maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ marginBottom: '40px' }}>
-            {sectionLabel('Season Overview')}
-            {pageTitle(`Season ${s.season.year || 1} Financial & Performance Report`)}
+            {pageTitle(`Season ${s.season.year || 1} report`)}
             {pageSubtitle('Detailed audit of constructors standings, team performance, F1 TV shares, and sponsor payouts.')}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
             {/* Card 1: Performance Evaluation */}
-            <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Target size={16} color={HUB.accent} /> Car Performance Audit
+            <div style={{ ...glassCard(), display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Target size={16} strokeWidth={1.5} color={HUB.textMuted} /> Car performance
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Constructor Finish</span>
-                  <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>P{report.position}</span>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Constructor finish</span>
+                  <span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>P{report.position}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Expected Performance Rank</span>
-                  <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>P{report.carRank}</span>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Expected rank (car pace)</span>
+                  <span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>P{report.carRank}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Overall Assessment</span>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Assessment</span>
                   <span style={{
                     fontSize: '13px',
-                    fontWeight: 700,
-                    color: report.performanceEvaluation.includes('Overperformed') ? '#10b981' : 
-                           report.performanceEvaluation.includes('Underperformed') ? '#ef4444' : '#f59e0b'
+                    fontWeight: 400, fontFamily: HUB.fontBold,
+                    color: report.performanceEvaluation.includes('Overperformed') ? HUB.positive : 
+                           report.performanceEvaluation.includes('Underperformed') ? HUB.negative : HUB.textPrimary
                   }}>
                     {report.performanceEvaluation}
                   </span>
@@ -522,69 +521,69 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
             </div>
 
             {/* Card 2: ATR Handicap */}
-            <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={16} color="#3b82f6" /> Aerodynamic Testing Handicap (ATR)
+            <div style={{ ...glassCard(), display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Zap size={16} strokeWidth={1.5} color={HUB.textMuted} /> Aerodynamic testing allocation (ATR)
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Wind Tunnel & CFD Allocation</span>
-                  <span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>{Math.round(report.atrMultiplier * 100)}%</span>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>Wind tunnel and CFD allocation</span>
+                  <span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>{Math.round(report.atrMultiplier * 100)}%</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>R&D Development Rate Modifier</span>
+                  <span style={{ fontSize: '13px', color: HUB.textMuted }}>R&D rate vs baseline</span>
                   <span style={{
                     fontSize: '13px',
-                    fontWeight: 700,
-                    color: report.atrMultiplier > 1.0 ? '#10b981' : report.atrMultiplier < 1.0 ? '#ef4444' : '#fff'
+                    fontWeight: 400, fontFamily: HUB.fontBold,
+                    color: report.atrMultiplier > 1.0 ? HUB.positive : report.atrMultiplier < 1.0 ? HUB.negative : HUB.textPrimary
                   }}>
                     {report.atrMultiplier >= 1.0 ? `+${Math.round((report.atrMultiplier - 1.0) * 100)}%` : `-${Math.round((1.0 - report.atrMultiplier) * 100)}%`}
                   </span>
                 </div>
-                <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0, lineHeight: 1.4 }}>
-                  *Note: Under FIA regulations, lower-placed teams receive higher testing allocations to enable field convergence.
+                <p style={{ fontSize: '12px', color: HUB.textFaint, margin: 0, lineHeight: 1.4 }}>
+                  Under FIA regulations, lower-placed teams receive higher testing allocations to enable field convergence.
                 </p>
               </div>
             </div>
           </div>
 
           {/* Card 3: Financial summary */}
-          <div style={{ ...glassCard({ padding: '32px' }), marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <DollarSign size={18} color="#10b981" /> Financial Credits Summary (Season payouts credited to all teams)
+          <div style={{ ...glassCard(), marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <DollarSign size={16} strokeWidth={1.5} color={HUB.textMuted} /> Season payouts
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: `1px solid ${HUB.border}`, paddingBottom: '12px' }}>
                 <div>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', display: 'block' }}>F1 TV Rights Share</span>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>Distribution based on team presence and standings (All Teams)</span>
+                  <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, display: 'block' }}>F1 TV rights share</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>Distribution based on team presence and standings (all teams)</span>
                 </div>
-                <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: HUB.fontMono, color: '#10b981' }}>+${report.tvRights.toFixed(1)}M</span>
+                <span style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontMono, color: HUB.positive }}>+${report.tvRights.toFixed(1)}M</span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: `1px solid ${HUB.border}`, paddingBottom: '12px' }}>
                 <div>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', display: 'block' }}>Constructor Prize Money</span>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>Based on final Constructor standing (P{report.position}) (All Teams)</span>
+                  <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, display: 'block' }}>Constructor prize money</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted }}>Based on final constructors standing (P{report.position}) (all teams)</span>
                 </div>
-                <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: HUB.fontMono, color: '#10b981' }}>+${report.prize.toFixed(1)}M</span>
+                <span style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontMono, color: HUB.positive }}>+${report.prize.toFixed(1)}M</span>
               </div>
 
               {report.sponsorDetails.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div>
-                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff', display: 'block' }}>Sponsor Renewal Payouts</span>
+                      <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, display: 'block' }}>Sponsor renewal payouts</span>
                       <span style={{ fontSize: '11px', color: HUB.textMuted }}>Loyalty bonuses and target payouts based on contract satisfaction</span>
                     </div>
-                    <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: HUB.fontMono, color: '#10b981' }}>+${report.sponsorTotal.toFixed(1)}M</span>
+                    <span style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontMono, color: HUB.positive }}>+${report.sponsorTotal.toFixed(1)}M</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: HUB.raised, borderRadius: '8px' }}>
                     {report.sponsorDetails.map((sp: any, idx: number) => (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                         <span style={{ color: HUB.textMuted }}>{sp.slot}: {sp.name}</span>
-                        <span style={{ color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>+${sp.payout.toFixed(1)}M</span>
+                        <span style={{ color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>+${sp.payout.toFixed(1)}M</span>
                       </div>
                     ))}
                   </div>
@@ -592,17 +591,18 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px' }}>
-                <span style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>Total Seasonal Payout Credits</span>
-                <span style={{ fontSize: '24px', fontWeight: 900, fontFamily: HUB.fontMono, color: '#10b981' }}>+${totalPayout.toFixed(1)}M</span>
+                <span style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Total payouts</span>
+                <span style={{ fontSize: '24px', fontWeight: 400, fontFamily: HUB.fontMono, color: HUB.positive }}>+${totalPayout.toFixed(1)}M</span>
               </div>
             </div>
           </div>
 
           <button
             onClick={() => setView('headquarters')}
-            style={{ ...actionBtn({ width: '100%', padding: '20px 32px', fontSize: '16px' }) }}
+            className={btnClass('primary')}
+            style={btn('primary', 'md', { width: '100%' })}
           >
-            PROCEED TO OFF-SEASON HEADQUARTERS
+            Continue to offseason
           </button>
         </div>
       );
@@ -625,21 +625,20 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
         {/* Header */}
         <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            {sectionLabel('Season Transition')}
-            {pageTitle('Off-Season Headquarters')}
+            {pageTitle('Offseason')}
             {pageSubtitle(`Review your performance and rebuild the team for Season ${(s.season.year || 1) + 1}.`)}
           </div>
           <div style={{ display: 'flex', gap: '16px' }}>
-            <div style={statCell()}>{statLabel('Available Budget')}<span style={{fontFamily:HUB.fontMono, fontVariantNumeric:'tabular-nums', letterSpacing:'0.03em', color: s.team!.budget > 20 ? '#10b981' : '#f59e0b', fontSize:'18px', fontWeight:800}}>{statValue(`$${(s.team!.budget || 0).toFixed(1)}M`)}</span></div>
+            <div style={statCell()}>{statLabel('Available budget')}{statValue(`$${(s.team!.budget || 0).toFixed(1)}M`, s.team!.budget > 20 ? HUB.textPrimary : HUB.warning)}</div>
           </div>
         </div>
 
         {flashMessage && (
           <div style={{ position: 'fixed', bottom: '32px', right: '32px', zIndex: 1000, maxWidth: '400px' }}>
             <SlideUp>
-              <div style={{ ...glassCard({ padding: '16px' }), borderLeft: `4px solid ${HUB.accent}`, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
-                <AlertCircle size={18} color={HUB.accent} style={{ flexShrink: 0 }} />
-                <p style={{ fontSize: '14px', color: '#fff', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>{flashMessage}</p>
+              <div style={{ ...glassCard({ padding: '16px' }), display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                <AlertCircle size={16} strokeWidth={1.5} color={HUB.textMuted} style={{ flexShrink: 0 }} />
+                <p style={{ fontSize: '14px', color: HUB.textPrimary, margin: 0, fontWeight: 400, lineHeight: 1.4 }}>{flashMessage}</p>
               </div>
             </SlideUp>
           </div>
@@ -649,41 +648,38 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '40px' }}>
            
            {/* Season Review Hero */}
-           <div style={{ ...glassCard({ padding: '32px' }), background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.5) 100%)', position: 'relative', overflow: 'hidden' }}>
-             <h3 style={{ fontSize: '12px', fontWeight: 800, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 24px', display: 'flex', alignItems: 'center', gap: '8px' }}><Target size={16} /> Season {(s.season.year || 1)} Review</h3>
+           <div style={{ ...glassCard(), position: 'relative', overflow: 'hidden' }}>
+             <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 24px', display: 'flex', alignItems: 'center', gap: '8px' }}><Target size={16} strokeWidth={1.5} color={HUB.textMuted} /> Season {(s.season.year || 1)} Review</h3>
              
              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
                <div>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Season Grade</span>
-                  <span style={{ fontSize: '36px', fontWeight: 900, color: seasonGrade.includes('A') ? '#10b981' : seasonGrade === 'B' ? '#3b82f6' : '#ef4444' }}>{seasonGrade}</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Season grade</span>
+                  <span style={{ fontSize: '28px', fontWeight: 400, fontFamily: HUB.fontBold, color: seasonGrade.includes('A') ? HUB.positive : seasonGrade === 'B' ? HUB.textPrimary : HUB.negative }}>{seasonGrade}</span>
                </div>
                <div>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Constructors</span>
-                  <span style={{ fontSize: '36px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono }}>{constPos > 0 ? `P${constPos}` : '-'}</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Constructors</span>
+                  <span style={{ fontSize: '28px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{constPos > 0 ? `P${constPos}` : '-'}</span>
                </div>
                <div>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Total Points</span>
-                  <span style={{ fontSize: '36px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono }}>{teamPts}</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Points</span>
+                  <span style={{ fontSize: '28px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{teamPts}</span>
                </div>
                <div>
-                  <span style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', display: 'block' }}>Car Dev Rank</span>
-                  <span style={{ fontSize: '36px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono }}>{myCarRank}</span>
+                  <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Car pace rank</span>
+                  <span style={{ fontSize: '28px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{myCarRank}</span>
                </div>
              </div>
 
-             <div style={{ position: 'absolute', right: '-20px', bottom: '-20px', opacity: 0.05, pointerEvents: 'none' }}>
-                <Target size={200} />
-             </div>
            </div>
 
            {/* AI Advisor Panel */}
-           <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column' }}>
-             <h3 style={{ fontSize: '12px', fontWeight: 800, color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.15em', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} /> AI Board Advisor</h3>
+           <div style={{ ...glassCard(), display: 'flex', flexDirection: 'column' }}>
+             <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} strokeWidth={1.5} color={HUB.textMuted} /> Board advisor</h3>
              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {advisorNotes.map((note, i) => (
                   <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                    <ChevronRight size={14} color={HUB.accent} style={{ marginTop: '3px', flexShrink: 0 }} />
-                    <p style={{ fontSize: '13px', color: '#e5e7eb', margin: 0, lineHeight: 1.4 }}>{note}</p>
+                    <ChevronRight size={16} strokeWidth={1.5} color={HUB.textFaint} style={{ marginTop: '1px', flexShrink: 0 }} />
+                    <p style={{ fontSize: '13px', color: HUB.textMuted, margin: 0, lineHeight: 1.4 }}>{note}</p>
                   </div>
                 ))}
              </div>
@@ -694,33 +690,33 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px', marginBottom: '40px' }}>
           
           <div style={{ gridColumn: 'span 8' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Users size={20} /> Driver Roster</h3>
-            {roster.length === 0 && <p style={{ fontSize: '14px', color: HUB.textMuted }}>No drivers currently contracted.</p>}
+            <h3 style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><Users size={18} strokeWidth={1.5} color={HUB.textMuted} /> Driver roster</h3>
+            {roster.length === 0 && <p style={{ fontSize: '14px', color: HUB.textMuted }}>No drivers under contract</p>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {roster.map((driver: any) => {
                 const ovr = getOvr(driver);
                 return (
-                  <div key={driver.name} style={{ ...glassCard({ padding: '20px' }), display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '24px', alignItems: 'center' }}>
+                  <div key={driver.name} style={{ ...glassCard(), display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '24px', alignItems: 'center' }}>
                     <img src={getDriverHeadshotUrl(driver)} alt={driver.name} style={{ width: '80px', height: '80px', borderRadius: '8px', objectFit: 'cover', border: `1px solid ${HUB.border}` }} loading="lazy" />
                     
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <h4 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: 0 }}>{driver.name}</h4>
-                        <span style={{ ...pill(true), padding: '2px 8px', fontSize: '11px', background: 'rgba(255,255,255,0.1)' }}>Age {driver.age}</span>
+                        <h4 style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: 0 }}>{driver.name}</h4>
+                        <span style={{ ...pill(false) }}>Age {driver.age}</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '20px' }}>
-                        <div><span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', textTransform: 'uppercase' }}>Salary</span><span style={{ fontSize: '14px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>$${driver.salary}M</span></div>
-                        <div><span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', textTransform: 'uppercase' }}>Market Value</span><span style={{ fontSize: '14px', color: '#10b981', fontWeight: 700, fontFamily: HUB.fontMono }}>$${driver.market}M</span></div>
-                        <div><span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', textTransform: 'uppercase' }}>Role</span><span style={{ fontSize: '14px', color: '#fff', fontWeight: 700 }}>{active.find(d => d.name === driver.name) ? 'Active' : 'Reserve'}</span></div>
+                      <div style={{ display: 'flex', gap: '24px' }}>
+                        <div><span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Salary</span><span style={{ fontSize: '14px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>${driver.salary}M</span></div>
+                        <div><span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Market value</span><span style={{ fontSize: '14px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>${driver.market}M</span></div>
+                        <div><span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Role</span><span style={{ fontSize: '14px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{active.find(d => d.name === driver.name) ? 'Active' : 'Reserve'}</span></div>
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                       <div style={{ textAlign: 'center' }}>
-                         <span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', textTransform: 'uppercase', marginBottom: '4px' }}>OVR</span>
-                         <span style={{ fontSize: '28px', color: '#fff', fontWeight: 900, fontFamily: HUB.fontMono }}>{ovr}</span>
+                         <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block', marginBottom: '4px' }}>OVR</span>
+                         <span style={{ fontSize: '28px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>{ovr}</span>
                       </div>
-                      <button onClick={() => handleRelease(driver.name)} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444' }) }}>Release</button>
+                      <button onClick={() => handleRelease(driver.name)} className={btnClass('danger')} style={btn('danger', 'sm')}>Release</button>
                     </div>
                   </div>
                 );
@@ -729,22 +725,22 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
           </div>
 
           <div style={{ gridColumn: 'span 4', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ ...glassCard({ padding: '24px' }) }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><TrendingUp size={16} /> Engineering Review</h3>
+            <div style={{ ...glassCard() }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><TrendingUp size={16} strokeWidth={1.5} color={HUB.textMuted} /> Engineering review</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Car Performance Rating</span><span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>{s.team!.carPerformance}</span></div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Season Upgrades Applied</span><span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>{upgradeCount}</span></div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>R&D Efficiency</span><span style={{ fontSize: '13px', color: upgradeEfficiency === 'Excellent' ? '#10b981' : '#f59e0b', fontWeight: 700 }}>{upgradeEfficiency}</span></div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Aero Platform</span><span style={{ fontSize: '13px', color: '#fff', fontWeight: 700 }}>{aeroReadiness}</span></div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Car performance</span><span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>{s.team!.carPerformance}</span></div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Upgrades this season</span><span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>{upgradeCount}</span></div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>R&D efficiency</span><span style={{ fontSize: '13px', color: upgradeEfficiency === 'Excellent' ? HUB.positive : upgradeEfficiency === 'Poor' ? HUB.warning : HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{upgradeEfficiency}</span></div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Aero platform</span><span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{aeroReadiness}</span></div>
               </div>
             </div>
 
-            <div style={{ ...glassCard({ padding: '24px' }) }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={16} /> Financial Overview</h3>
+            <div style={{ ...glassCard() }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={16} strokeWidth={1.5} color={HUB.textMuted} /> Finances</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Current Budget</span><span style={{ fontSize: '13px', color: '#fff', fontWeight: 700, fontFamily: HUB.fontMono }}>$${s.team!.budget.toFixed(1)}M</span></div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Driver Salary Drain</span><span style={{ fontSize: '13px', color: '#ef4444', fontWeight: 700, fontFamily: HUB.fontMono }}>-$${roster.reduce((sum: number, d: any) => sum + d.salary, 0)}M</span></div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Sponsor Income Projection</span><span style={{ fontSize: '13px', color: '#10b981', fontWeight: 700 }}>High</span></div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Current budget</span><span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontMono }}>${s.team!.budget.toFixed(1)}M</span></div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Driver salaries</span><span style={{ fontSize: '13px', color: HUB.negative, fontWeight: 400, fontFamily: HUB.fontMono }}>-${roster.reduce((sum: number, d: any) => sum + d.salary, 0)}M</span></div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: HUB.textMuted }}>Sponsor income projection</span><span style={{ fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>High</span></div>
               </div>
             </div>
           </div>
@@ -753,8 +749,8 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
 
         {/* --- SECTION 3: TRANSFER MARKET SCOUTING --- */}
         <div style={{ marginBottom: '40px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldCheck size={20} /> Global Scouting Network</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldCheck size={18} strokeWidth={1.5} color={HUB.textMuted} /> Scouting</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
             {candidates.map((driver: any) => {
               const currentTeam = findAiTeamByDriver(driver.name);
               const rosterFull = roster.length >= 3;
@@ -765,39 +761,39 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
               const reportNotes = getScoutReport(driver);
 
               return (
-                <div key={driver.name} style={{ ...glassCard({ padding: '20px' }), display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div key={driver.name} style={{ ...glassCard(), display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                         <img src={getDriverHeadshotUrl(driver)} alt={driver.name} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} loading="lazy" />
                         <div>
-                           <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: '0 0 2px' }}>{driver.name}</h4>
-                           <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0 }}>{currentTeam ? `At ${currentTeam.name}` : "Free Agent"} • Age {driver.age}</p>
+                           <h4 style={{ fontSize: '16px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 2px' }}>{driver.name}</h4>
+                           <p style={{ fontSize: '11px', color: HUB.textMuted, margin: 0 }}>{currentTeam ? `At ${currentTeam.name}` : "Free agent"} • Age {driver.age}</p>
                         </div>
                      </div>
                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '20px', fontWeight: 900, color: '#fff', fontFamily: HUB.fontMono, display: 'block' }}>{ovr}</span>
+                        <span style={{ fontSize: '22px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono, display: 'block' }}>{ovr}</span>
                         <div style={{ display: 'flex', gap: '2px', marginTop: '2px' }}>
                           {Array.from({length: 5}).map((_, i) => (
-                             <Star key={i} size={10} color={i < stars ? '#f59e0b' : 'rgba(255,255,255,0.1)'} fill={i < stars ? '#f59e0b' : 'transparent'} />
+                             <Star key={i} size={11} strokeWidth={1.5} color={i < stars ? HUB.textPrimary : HUB.borderMid} fill={i < stars ? HUB.textPrimary : 'transparent'} />
                           ))}
                         </div>
                      </div>
                   </div>
 
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '6px' }}>
-                     <p style={{ fontSize: '10px', color: HUB.accent, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 8px', fontWeight: 700 }}>Scout Report</p>
-                     <ul style={{ margin: 0, paddingLeft: '16px', color: '#e5e7eb', fontSize: '12px', lineHeight: 1.4 }}>
+                  <div style={{ background: HUB.raised, padding: '12px', borderRadius: '8px' }}>
+                     <p style={{ fontSize: '12px', color: HUB.textFaint, margin: '0 0 8px', fontWeight: 400, fontFamily: HUB.fontRegular }}>Scout report</p>
+                     <ul style={{ margin: 0, paddingLeft: '16px', color: HUB.textMuted, fontSize: '12px', lineHeight: 1.4 }}>
                        {reportNotes.map((note, i) => <li key={i} style={{ marginBottom: '4px' }}>{note}</li>)}
                      </ul>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
                      <div>
-                        <span style={{ fontSize: '10px', color: HUB.textMuted, display: 'block', textTransform: 'uppercase' }}>Transfer Fee</span>
-                        <span style={{ fontSize: '14px', fontWeight: 700, color: canAfford ? '#fff' : '#ef4444', fontFamily: HUB.fontMono }}>$${poachCost}M</span>
+                        <span style={{ fontSize: '11px', color: HUB.textMuted, display: 'block' }}>Transfer fee</span>
+                        <span style={{ fontSize: '14px', fontWeight: 400, color: canAfford ? HUB.textPrimary : HUB.negative, fontFamily: HUB.fontMono }}>${poachCost}M</span>
                      </div>
-                     <button onClick={() => handleSign(driver)} disabled={rosterFull || !canAfford} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px', backgroundColor: (rosterFull || !canAfford) ? 'rgba(255,255,255,0.05)' : HUB.accent }), opacity: (rosterFull || !canAfford) ? 0.5 : 1, cursor: (rosterFull || !canAfford) ? 'not-allowed' : 'pointer' }}>
-                       {rosterFull ? 'Roster Full' : !canAfford ? 'Cannot Afford' : 'Sign Driver'}
+                     <button onClick={() => handleSign(driver)} disabled={rosterFull || !canAfford} className={btnClass('secondary')} style={btn('secondary', 'sm')}>
+                       {rosterFull ? 'Roster full' : !canAfford ? 'Cannot afford' : 'Sign driver'}
                      </button>
                   </div>
                 </div>
@@ -807,48 +803,48 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
         </div>
 
         {/* --- SECTION 4: PRE-SEASON CHECKLIST & LAUNCH --- */}
-        <div style={{ ...glassCard({ padding: '32px' }), background: 'rgba(255,255,255,0.02)' }}>
-           <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: '0 0 24px', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={20} /> Pre-Season Checklist</h3>
+        <div style={{ ...glassCard() }}>
+           <h3 style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 24px', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={18} strokeWidth={1.5} color={HUB.textMuted} /> Pre-season checklist</h3>
            
            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
              
              {/* Checklist Item: Drivers */}
-             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: roster.length >= 2 ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)', border: `1px solid ${roster.length >= 2 ? '#10b981' : '#ef4444'}`, borderRadius: '8px' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: HUB.raised, border: `1px solid ${roster.length >= 2 ? HUB.border : 'rgba(229,72,77,0.4)'}`, borderRadius: '8px' }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                 {roster.length >= 2 ? <CheckCircle size={20} color="#10b981" /> : <AlertCircle size={20} color="#ef4444" />}
+                 {roster.length >= 2 ? <CheckCircle size={20} strokeWidth={1.5} color={HUB.positive} /> : <AlertCircle size={20} strokeWidth={1.5} color={HUB.negative} />}
                  <div>
-                   <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: '0 0 2px' }}>Driver Lineup Completed</h4>
-                   <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>You must have at least 2 drivers contracted to race.</p>
+                   <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 2px' }}>Driver lineup</h4>
+                   <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>At least 2 contracted drivers are required to race</p>
                  </div>
                </div>
-               <span style={{ fontSize: '14px', fontWeight: 700, color: roster.length >= 2 ? '#10b981' : '#ef4444' }}>{roster.length}/2</span>
+               <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: roster.length >= 2 ? HUB.positive : HUB.negative }}>{roster.length}/2</span>
              </div>
 
              {/* Checklist Item: Sponsors */}
-             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: keepSponsors !== null ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${keepSponsors !== null ? '#10b981' : HUB.border}`, borderRadius: '8px' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px' }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                 {keepSponsors !== null ? <CheckCircle size={20} color="#10b981" /> : <AlertCircle size={20} color={HUB.textMuted} />}
+                 {keepSponsors !== null ? <CheckCircle size={20} strokeWidth={1.5} color={HUB.positive} /> : <AlertCircle size={20} strokeWidth={1.5} color={HUB.textMuted} />}
                  <div>
-                   <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: '0 0 2px' }}>Sponsor Obligations</h4>
-                   <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>Decide to keep current sponsors or seek new partners.</p>
+                   <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 2px' }}>Sponsor obligations</h4>
+                   <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>Keep current sponsors or seek new partners</p>
                  </div>
                </div>
                <div style={{ display: 'flex', gap: '8px' }}>
-                 <button onClick={() => setKeepSponsors(true)} style={{ ...actionBtn({ padding: '6px 12px', fontSize: '12px', backgroundColor: keepSponsors === true ? HUB.accent : 'rgba(255,255,255,0.05)', border: keepSponsors === true ? `1px solid ${HUB.accent}` : '1px solid transparent' }) }}>Keep Current</button>
-                 <button onClick={() => setKeepSponsors(false)} style={{ ...actionBtn({ padding: '6px 12px', fontSize: '12px', backgroundColor: keepSponsors === false ? HUB.accent : 'rgba(255,255,255,0.05)', border: keepSponsors === false ? `1px solid ${HUB.accent}` : '1px solid transparent' }) }}>Seek New</button>
+                 <button onClick={() => setKeepSponsors(true)} aria-pressed={keepSponsors === true} className="hub-btn" style={btn('secondary', 'sm', keepSponsors === true ? { backgroundColor: HUB.accentSoft, borderColor: 'rgba(225,6,0,0.4)' } : {})}>Keep current</button>
+                 <button onClick={() => setKeepSponsors(false)} aria-pressed={keepSponsors === false} className="hub-btn" style={btn('secondary', 'sm', keepSponsors === false ? { backgroundColor: HUB.accentSoft, borderColor: 'rgba(225,6,0,0.4)' } : {})}>Seek new</button>
                </div>
              </div>
 
              {/* Checklist Item: Budget */}
-             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: s.team!.budget >= 0 ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)', border: `1px solid ${s.team!.budget >= 0 ? '#10b981' : '#ef4444'}`, borderRadius: '8px' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: HUB.raised, border: `1px solid ${s.team!.budget >= 0 ? HUB.border : 'rgba(229,72,77,0.4)'}`, borderRadius: '8px' }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                 {s.team!.budget >= 0 ? <CheckCircle size={20} color="#10b981" /> : <AlertCircle size={20} color="#ef4444" />}
+                 {s.team!.budget >= 0 ? <CheckCircle size={20} strokeWidth={1.5} color={HUB.positive} /> : <AlertCircle size={20} strokeWidth={1.5} color={HUB.negative} />}
                  <div>
-                   <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: '0 0 2px' }}>Budget Approval</h4>
-                   <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>Ensure the team is not in debt before the season starts.</p>
+                   <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: '0 0 2px' }}>Budget approval</h4>
+                   <p style={{ fontSize: '12px', color: HUB.textMuted, margin: 0 }}>The team cannot start the season in debt</p>
                  </div>
                </div>
-               <span style={{ fontSize: '14px', fontWeight: 700, color: s.team!.budget >= 0 ? '#10b981' : '#ef4444', fontFamily: HUB.fontMono }}>$${s.team!.budget.toFixed(1)}M</span>
+               <span style={{ fontSize: '14px', fontWeight: 400, color: s.team!.budget >= 0 ? HUB.positive : HUB.negative, fontFamily: HUB.fontMono }}>${s.team!.budget.toFixed(1)}M</span>
              </div>
 
            </div>
@@ -856,12 +852,9 @@ export function renderOffseason(root: HTMLElement, initialFlashMessage = "") {
            <button 
              onClick={() => setView('setup')} 
              disabled={!isChecklistComplete || s.team!.budget < 0}
-             style={{ 
-               ...actionBtn({ padding: '20px 32px', fontSize: '16px', width: '100%', backgroundColor: (isChecklistComplete && s.team!.budget >= 0) ? HUB.accent : 'rgba(255,255,255,0.05)' }), 
-               opacity: (isChecklistComplete && s.team!.budget >= 0) ? 1 : 0.5,
-               cursor: (isChecklistComplete && s.team!.budget >= 0) ? 'pointer' : 'not-allowed'
-             }}>
-             PROCEED TO SEASON CONFIGURATION
+             className={btnClass('primary')}
+             style={btn('primary', 'md', { width: '100%' })}>
+             Continue to season setup
            </button>
         </div>
       </div>

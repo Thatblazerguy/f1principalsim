@@ -72,6 +72,44 @@ export function fillEmptySeats(teams, teamName, blockedNames = []) {
   }
 }
 
+/**
+ * A driver can only be on one team. Removes the player's drivers (and any
+ * driver already claimed by an earlier AI team) from AI rosters, then refills
+ * the empty AI seats from free agents / F2. Safe to run any time.
+ * @returns {Array<{team: string, removed: string}>} what changed
+ */
+export function reconcileRosters(playerTeam, aiTeams) {
+  const changes = [];
+  if (!Array.isArray(aiTeams)) return changes;
+  const claimed = new Set();
+  if (playerTeam) {
+    (playerTeam.drivers || []).forEach(d => d?.name && claimed.add(d.name));
+    if (playerTeam.reserveDriver?.name) claimed.add(playerTeam.reserveDriver.name);
+  }
+  const playerNames = [...claimed];
+
+  // Race seats first, then reserves, so a reserve never blocks a race seat.
+  aiTeams.forEach(team => {
+    team.drivers = (team.drivers || []).filter(d => {
+      if (!d?.name || claimed.has(d.name)) { changes.push({ team: team.name, removed: d?.name }); return false; }
+      claimed.add(d.name);
+      return true;
+    });
+  });
+  aiTeams.forEach(team => {
+    const r = team.reserveDriver;
+    if (!r) return;
+    if (claimed.has(r.name)) { changes.push({ team: team.name, removed: r.name }); team.reserveDriver = null; }
+    else claimed.add(r.name);
+  });
+
+  if (changes.length) {
+    const touched = new Set(changes.map(c => c.team));
+    aiTeams.filter(t => touched.has(t.name)).forEach(t => fillEmptySeats(aiTeams, t.name, playerNames));
+  }
+  return changes;
+}
+
 export function createAiTeams() {
   return [
     createTeam(

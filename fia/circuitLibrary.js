@@ -54,7 +54,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 5, mechanicalGripImportance: 6, tyreDegradation: 5, brakingIntensity: 6, coolingRequirement: 4, wetWeatherSensitivity: 4 },
     keyCharacteristics: ['Flowing Layout', 'Medium Aero', 'Overtaking Opportunities'],
     idealCar: 'Balanced car with good mechanical grip and braking precision.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/australia',
     lastVerified: '2026-10',
   },
   {
@@ -84,7 +83,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 7, downforceRequirement: 5, mechanicalGripImportance: 5, tyreDegradation: 7, brakingIntensity: 7, coolingRequirement: 4, wetWeatherSensitivity: 3 },
     keyCharacteristics: ['Long Back Straight', 'Heavy Braking', 'High Tyre Wear'],
     idealCar: 'Strong engine and good braking stability with tyre management.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/china',
     lastVerified: '2026-10',
   },
   {
@@ -114,7 +112,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 8, mechanicalGripImportance: 6, tyreDegradation: 7, brakingIntensity: 5, coolingRequirement: 4, wetWeatherSensitivity: 5 },
     keyCharacteristics: ['High-Speed Sectors', 'Aero Dominance', '130R Challenge'],
     idealCar: 'High downforce car with superior aero stability and tyre resilience.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/japan',
     lastVerified: '2026-10',
   },
   {
@@ -144,7 +141,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 5, mechanicalGripImportance: 5, tyreDegradation: 5, brakingIntensity: 7, coolingRequirement: 8, wetWeatherSensitivity: 2 },
     keyCharacteristics: ['Hot Conditions', 'Braking Zones', 'Night Race'],
     idealCar: 'Good cooling efficiency and braking performance in high heat.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/bahrain',
     lastVerified: '2026-10',
   },
   {
@@ -174,7 +170,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 8, downforceRequirement: 3, mechanicalGripImportance: 4, tyreDegradation: 3, brakingIntensity: 5, coolingRequirement: 7, wetWeatherSensitivity: 2 },
     keyCharacteristics: ['High Speed', 'Low Downforce', 'Engine Dominated'],
     idealCar: 'Strong PU output and straight-line efficiency in a fast street layout.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/saudi-arabia',
     lastVerified: '2026-10',
   },
   {
@@ -204,7 +199,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 5, mechanicalGripImportance: 5, tyreDegradation: 5, brakingIntensity: 6, coolingRequirement: 6, wetWeatherSensitivity: 4 },
     keyCharacteristics: ['Balanced Layout', 'Long Straights', 'Sprint Weekend'],
     idealCar: 'Well-rounded car with solid braking and good engine performance.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/miami',
     lastVerified: '2026-10',
   },
   {
@@ -234,7 +228,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 7, downforceRequirement: 3, mechanicalGripImportance: 5, tyreDegradation: 5, brakingIntensity: 8, coolingRequirement: 4, wetWeatherSensitivity: 5 },
     keyCharacteristics: ['Heavy Braking', 'Low Downforce', 'Engine Power'],
     idealCar: 'Strong engine and braking performance; rewards late braking courage.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/canada',
     lastVerified: '2026-10',
   },
   {
@@ -264,7 +257,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 3, downforceRequirement: 9, mechanicalGripImportance: 8, tyreDegradation: 3, brakingIntensity: 7, coolingRequirement: 5, wetWeatherSensitivity: 5 },
     keyCharacteristics: ['Very High Downforce', 'Mechanical Grip', 'Qualifying Circuit'],
     idealCar: 'Maximum downforce setup; mechanical grip and driver precision critical.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/monaco',
     lastVerified: '2026-10',
   },
   {
@@ -294,7 +286,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 7, mechanicalGripImportance: 6, tyreDegradation: 8, brakingIntensity: 5, coolingRequirement: 5, wetWeatherSensitivity: 3 },
     keyCharacteristics: ['High Tyre Wear', 'Aero Sensitive', 'Technical Corners'],
     idealCar: 'Strong tyre management and good aerodynamic balance.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/spain',
     lastVerified: '2026-10',
   },
   {
@@ -324,7 +315,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 5, mechanicalGripImportance: 4, tyreDegradation: 7, brakingIntensity: 6, coolingRequirement: 5, wetWeatherSensitivity: 5 },
     keyCharacteristics: ['Elevation Changes', 'Heavy Braking', 'Compact Layout'],
     idealCar: 'Balanced car with strong braking stability and tyre durability.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/austria',
     lastVerified: '2026-10',
   },
   {
@@ -354,7 +344,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 7, mechanicalGripImportance: 5, tyreDegradation: 7, brakingIntensity: 5, coolingRequirement: 4, wetWeatherSensitivity: 7 },
     keyCharacteristics: ['High-Speed Corners', 'Aero Balance', 'Changeable Weather'],
     idealCar: 'High downforce setup with aerodynamic stability in changeable conditions.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/great-britain',
     lastVerified: '2026-10',
   },
   {
@@ -384,7 +373,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 7, downforceRequirement: 7, mechanicalGripImportance: 4, tyreDegradation: 5, brakingIntensity: 6, coolingRequirement: 4, wetWeatherSensitivity: 8 },
     keyCharacteristics: ['Eau Rouge', 'High Speed', 'Unpredictable Weather'],
     idealCar: 'High downforce + strong engine; wet-weather adaptability is critical.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/belgium',
     lastVerified: '2026-10',
   },
   {
@@ -414,7 +402,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 4, downforceRequirement: 9, mechanicalGripImportance: 8, tyreDegradation: 6, brakingIntensity: 6, coolingRequirement: 5, wetWeatherSensitivity: 4 },
     keyCharacteristics: ['Maximum Downforce', 'Mechanical Grip', 'Low Overtaking'],
     idealCar: 'Very high downforce car with strong mechanical grip and qualifying pace.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/hungary',
     lastVerified: '2026-10',
   },
   {
@@ -444,7 +431,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 8, mechanicalGripImportance: 6, tyreDegradation: 7, brakingIntensity: 5, coolingRequirement: 4, wetWeatherSensitivity: 4 },
     keyCharacteristics: ['Banked Turns', 'High Downforce', 'Tyre Intensive'],
     idealCar: 'High downforce car with strong tyre preservation on the banked sections.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/netherlands',
     lastVerified: '2026-10',
   },
   {
@@ -474,7 +460,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 10, downforceRequirement: 1, mechanicalGripImportance: 3, tyreDegradation: 4, brakingIntensity: 8, coolingRequirement: 5, wetWeatherSensitivity: 3 },
     keyCharacteristics: ['Engine Dominant', 'Low Downforce', 'Slipstream Battles'],
     idealCar: 'Maximum engine performance and top speed — sacrifice downforce for drag.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/italy',
     lastVerified: '2026-10',
   },
   {
@@ -504,7 +489,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 6, mechanicalGripImportance: 6, tyreDegradation: 6, brakingIntensity: 7, coolingRequirement: 6, wetWeatherSensitivity: 4 },
     keyCharacteristics: ['Street Precision', 'Braking Zones', 'Balanced Demands'],
     idealCar: 'Balanced setup with good braking performance on street surface.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/spain',
     lastVerified: '2026-10',
   },
   {
@@ -534,7 +518,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 9, downforceRequirement: 3, mechanicalGripImportance: 5, tyreDegradation: 4, brakingIntensity: 8, coolingRequirement: 5, wetWeatherSensitivity: 2 },
     keyCharacteristics: ['2.08km Straight', 'Engine Power', 'Heavy Braking'],
     idealCar: 'Maximum straight-line speed; strong engine and reliable braking are vital.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/azerbaijan',
     lastVerified: '2026-10',
   },
   {
@@ -564,7 +547,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 4, downforceRequirement: 9, mechanicalGripImportance: 8, tyreDegradation: 9, brakingIntensity: 8, coolingRequirement: 9, wetWeatherSensitivity: 3 },
     keyCharacteristics: ['Very High Tyre Wear', 'Maximum Downforce', 'Extreme Heat'],
     idealCar: 'Maximum downforce with excellent tyre management in high heat/humidity.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/singapore',
     lastVerified: '2026-10',
   },
   {
@@ -594,7 +576,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 7, mechanicalGripImportance: 6, tyreDegradation: 7, brakingIntensity: 6, coolingRequirement: 5, wetWeatherSensitivity: 4 },
     keyCharacteristics: ['Elevation Changes', 'Technical Sections', 'High Downforce'],
     idealCar: 'High downforce with strong tyre management across varied corner types.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/united-states',
     lastVerified: '2026-10',
   },
   {
@@ -624,7 +605,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 3, mechanicalGripImportance: 6, tyreDegradation: 4, brakingIntensity: 7, coolingRequirement: 4, wetWeatherSensitivity: 3 },
     keyCharacteristics: ['High Altitude', 'Thin Air', 'Reduced Downforce & Engine Power'],
     idealCar: 'ERS deployment compensates for altitude; braking precision important.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/mexico',
     lastVerified: '2026-10',
   },
   {
@@ -654,7 +634,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 6, mechanicalGripImportance: 6, tyreDegradation: 6, brakingIntensity: 6, coolingRequirement: 5, wetWeatherSensitivity: 8 },
     keyCharacteristics: ['Unpredictable Weather', 'Elevation Changes', 'Passionate Crowd'],
     idealCar: 'Versatile setup; wet-weather adaptability often the decisive factor.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/brazil',
     lastVerified: '2026-10',
   },
   {
@@ -684,7 +663,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 9, downforceRequirement: 2, mechanicalGripImportance: 4, tyreDegradation: 5, brakingIntensity: 6, coolingRequirement: 3, wetWeatherSensitivity: 2 },
     keyCharacteristics: ['1.9km Straight', 'Engine Dominant', 'Low Downforce Night Race'],
     idealCar: 'Maximum straight-line speed; slipstream battles define the race.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/las-vegas',
     lastVerified: '2026-10',
   },
   {
@@ -714,7 +692,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 6, downforceRequirement: 5, mechanicalGripImportance: 5, tyreDegradation: 10, brakingIntensity: 5, coolingRequirement: 8, wetWeatherSensitivity: 2 },
     keyCharacteristics: ['Extreme Tyre Wear', 'High Heat', 'Tyre Strategy Critical'],
     idealCar: 'Superior tyre management is the decisive competitive factor.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/qatar',
     lastVerified: '2026-10',
   },
   {
@@ -744,7 +721,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 7, downforceRequirement: 5, mechanicalGripImportance: 5, tyreDegradation: 5, brakingIntensity: 6, coolingRequirement: 7, wetWeatherSensitivity: 1 },
     keyCharacteristics: ['Fast Flowing', 'Season Finale', 'Hot & Dry Conditions'],
     idealCar: 'Strong engine output; consistent performance across all sectors.',
-    sourceUrl: 'https://www.formula1.com/en/racing/2026/abu-dhabi',
     lastVerified: '2026-10',
   },
 
@@ -837,7 +813,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 8, mechanicalGripImportance: 6, tyreDegradation: 7, brakingIntensity: 5, coolingRequirement: 5, wetWeatherSensitivity: 4 },
     keyCharacteristics: ['Turn 8', 'Multi-Apex High-Speed', 'Tyre Loading', 'Elevation'],
     idealCar: 'High downforce car with superior aero balance to manage Turn 8 loads.',
-    sourceUrl: 'https://www.formula1.com/en/latest/article/formula-1-announces-return-of-turkish-grand-prix-to-the-2027-fia-formula-one',
     lastVerified: '2026-10',
   },
   {
@@ -898,7 +873,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 6, mechanicalGripImportance: 7, tyreDegradation: 6, brakingIntensity: 7, coolingRequirement: 4, wetWeatherSensitivity: 5 },
     keyCharacteristics: ['Blind Crests', 'Elevation Changes', 'Driver Confidence', 'Technical Flow'],
     idealCar: 'Aero balance and mechanical grip are key; drivers who read the road excel here.',
-    sourceUrl: 'https://www.formula1.com/en/latest/article/formula-1-announces-return-of-portuguese-grand-prix-to-2027-calendar',
     lastVerified: '2026-10',
   },
   {
@@ -1355,7 +1329,6 @@ export const CIRCUIT_LIBRARY = [
     perf: { engineImportance: 5, downforceRequirement: 6, mechanicalGripImportance: 7, tyreDegradation: 6, brakingIntensity: 7, coolingRequirement: 4, wetWeatherSensitivity: 5 },
     keyCharacteristics: ['Blind Crests', 'Elevation Changes', 'Aero Balance', 'Downhill Braking'],
     idealCar: 'Aerodynamic balance and mechanical grip critical on the blind elevation changes.',
-    sourceUrl: 'https://www.formula1.com/en/latest/article/formula-1-announces-return-of-portuguese-grand-prix-to-2027-calendar',
     lastVerified: '2026-10',
   },
 ];

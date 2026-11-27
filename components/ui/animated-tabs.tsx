@@ -21,27 +21,27 @@ export function AnimatedTabs({
   if (!tabs?.length) return null; 
 
   return ( 
-    <div style={{ display: 'flex', gap: '4px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px', border: `1px solid ${HUB.border}` }}>
+    <div style={{ display: 'flex', gap: '4px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '8px', border: `1px solid ${HUB.border}` }}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return ( 
           <button 
             key={tab.id} 
             onClick={() => setActiveTab(tab.id)} 
+            className="hub-btn hub-btn-ghost"
             style={{
               position: 'relative',
               flex: 1,
-              padding: '6px 12px',
-              fontSize: '10px',
-              fontWeight: 700,
+              height: '28px',
+              padding: '0 12px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 400,
               fontFamily: HUB.fontBold,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: isActive ? '#fff' : HUB.textMuted,
+              color: isActive ? HUB.textPrimary : HUB.textMuted,
               background: 'transparent', // overrides global button
               border: 'none',            // overrides global button
               margin: 0,                 // overrides global button
-              outline: 'none',
               cursor: 'pointer',
               zIndex: 1
             }}
@@ -53,7 +53,7 @@ export function AnimatedTabs({
                   position: 'absolute',
                   inset: 0,
                   backgroundColor: 'rgba(255,255,255,0.1)',
-                  borderRadius: '4px',
+                  borderRadius: '6px',
                   zIndex: -1
                 }}
                 transition={{ type: "spring", duration: 0.5, bounce: 0 }} 

@@ -13,7 +13,7 @@ export function BattleTracker({ cars }) {
        for (let i = 1; i < cars.length; i++) {
          const car = cars[i];
          const carAhead = cars[i-1];
-         
+
          if (car.retired || carAhead.retired) continue;
          if (car.pitStopStatus.includes("Pit") || carAhead.pitStopStatus.includes("Pit")) continue;
 
@@ -35,25 +35,25 @@ export function BattleTracker({ cars }) {
 
   if (battles.length === 0) return null;
 
+  const code = { fontSize: '13px', color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold };
+
   return (
     <div style={{ position: 'absolute', bottom: '88px', right: '416px', display: 'flex', flexDirection: 'column-reverse', gap: '8px', zIndex: 10, pointerEvents: 'none' }}>
       {battles.slice(0, 3).map((b, idx) => (
-        <div key={idx} style={{ 
-          backgroundColor: 'rgba(10,10,10,0.85)', 
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderLeft: `3px solid ${HUB.accent}`,
+        <div key={idx} style={{
+          backgroundColor: HUB.surface,
+          border: `1px solid ${HUB.border}`,
           padding: '8px 12px',
-          borderRadius: '4px',
-          backdropFilter: 'blur(4px)',
+          borderRadius: '8px',
           minWidth: '160px'
         }}>
-          <div style={{ fontSize: '10px', color: HUB.textMuted, fontWeight: 'bold', marginBottom: '4px', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '11px', color: HUB.textFaint, fontWeight: 400, fontFamily: HUB.fontRegular, marginBottom: '4px' }}>
             Battle for P{b.pos}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             <span style={{ fontSize: '13px', color: '#fff', fontWeight: 'bold' }}>{b.carAhead.driver.name.substring(0,3).toUpperCase()}</span>
-             <span style={{ fontSize: '12px', color: HUB.accent, fontFamily: HUB.fontMono, fontWeight: 'bold' }}>+{b.gapTime}</span>
-             <span style={{ fontSize: '13px', color: '#fff', fontWeight: 'bold' }}>{b.car.driver.name.substring(0,3).toUpperCase()}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+             <span style={code}>{b.carAhead.driver.name.substring(0,3).toUpperCase()}</span>
+             <span style={{ fontSize: '12px', color: HUB.textMuted, fontFamily: HUB.fontMono, fontWeight: 400 }}>+{b.gapTime}s</span>
+             <span style={code}>{b.car.driver.name.substring(0,3).toUpperCase()}</span>
           </div>
         </div>
       ))}

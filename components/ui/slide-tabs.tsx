@@ -94,7 +94,8 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className={`hub-slide-tab hub-slide-tab-more ${isDropdownActive ? "hub-slide-tab-active" : ""}`}
+                className={`hub-btn hub-btn-ghost hub-slide-tab hub-slide-tab-more ${isDropdownActive ? "hub-slide-tab-active" : ""}`}
+                style={{ height: '32px', minHeight: '32px', borderRadius: '8px' }}
               >
                 More
                 <ChevronDown size={14} style={{ marginLeft: 4, opacity: 0.7 }} />
@@ -121,8 +122,8 @@ export const SlideTabs = ({ items, activeKey, onSelect, onLogout }: SlideTabsPro
 
       <Cursor position={position} />
       <div className="hub-slide-tab-item">
-        <button type="button" className="hub-slide-tab hub-slide-tab-logout" onClick={onLogout}>
-          Logout
+        <button type="button" className="hub-btn hub-btn-danger hub-slide-tab hub-slide-tab-logout" onClick={onLogout} style={{ height: '32px', minHeight: '32px', borderRadius: '8px' }}>
+          Log out
         </button>
       </div>
     </div>
@@ -157,7 +158,7 @@ const Tab = React.forwardRef<
       }}
       className="hub-slide-tab-item"
     >
-      <button type="button" className={`hub-slide-tab ${isActive ? "hub-slide-tab-active" : ""}`}>
+      <button type="button" className={`hub-btn hub-btn-ghost hub-slide-tab ${isActive ? "hub-slide-tab-active" : ""}`} style={{ height: '32px', minHeight: '32px', borderRadius: '8px' }}>
         {children}
       </button>
     </div>
@@ -170,14 +171,15 @@ const Cursor = ({ position }: { position: { left: number; width: number; opacity
   return (
     <motion.div
       animate={{
-        ...position,
+        ...position
       }}
       className="hub-slide-cursor"
       style={{
         position: "absolute",
         zIndex: 1,
         pointerEvents: "none",
-        height: "36px", // matching hub-slide-tab min-height
+        height: "32px", // matching hub-slide-tab height
+        borderRadius: "8px",
         top: "auto", // will be aligned by positioning logic if needed
       }}
     />

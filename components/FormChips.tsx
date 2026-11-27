@@ -3,21 +3,20 @@ import { HUB } from './HubLayout.tsx';
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 export function getPositionColor(pos: number | null, retired: boolean): string {
-  if (retired)  return '#ef4444';
-  if (!pos)     return 'rgba(255,255,255,0.15)';
-  if (pos === 1) return '#FFD700';
-  if (pos === 2) return '#C0C0C0';
-  if (pos === 3) return '#CD7F32';
-  if (pos <= 10) return 'rgba(225,6,0,0.85)';
-  return 'rgba(255,255,255,0.2)';
+  // Win = accent, points = raised, outside points / DNF = quiet
+  if (retired)  return HUB.raised;
+  if (!pos)     return HUB.raised;
+  if (pos === 1) return HUB.accent;
+  if (pos <= 10) return HUB.raised;
+  return 'transparent';
 }
 
 export function getPositionTextColor(pos: number | null, retired: boolean): string {
-  if (retired)   return '#fff';
+  if (retired)   return HUB.negative;
   if (!pos)      return HUB.textMuted;
-  if (pos <= 3)  return '#0B0F19';   // dark text on bright medal chips
-  if (pos <= 10) return '#fff';
-  return HUB.textMuted;
+  if (pos === 1) return '#fff';
+  if (pos <= 10) return HUB.textPrimary;
+  return HUB.textFaint;
 }
 
 // ─── FormChip ─────────────────────────────────────────────────────────────────
@@ -49,11 +48,11 @@ export function FormChips({ results, isTeam = false }: FormChipsProps) {
           <div key={i} style={{
             width: '28px', height: '22px',
             borderRadius: '4px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: HUB.raised,
+            border: `1px solid ${HUB.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <span style={{ fontSize: '8px', color: 'rgba(255,255,255,0.2)' }}>—</span>
+            <span style={{ fontSize: '11px', color: HUB.textFaint }}>—</span>
           </div>
         ))}
       </div>
@@ -81,18 +80,17 @@ export function FormChips({ results, isTeam = false }: FormChipsProps) {
               width: '32px', height: '22px',
               borderRadius: '4px',
               background: bg,
-              border: `1px solid ${r.retired ? '#ef4444' : (pos && pos <= 3 ? 'transparent' : 'rgba(255,255,255,0.08)')}`,
+              border: `1px solid ${pos === 1 && !r.retired ? HUB.accent : HUB.border}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'default',
-              transition: 'transform 0.1s',
-              transform: isOpen ? 'translateY(-2px)' : 'none',
+              transition: `transform 120ms ${HUB.ease}`,
+              transform: isOpen ? 'translateY(-2px)' : 'none'
             }}>
               <span style={{
-                fontSize: '8px',
+                fontSize: '11px',
                 fontFamily: HUB.fontBold,
-                fontWeight: 700,
-                color: txtCol,
-                letterSpacing: '0.03em',
+                fontWeight: 400,
+                color: txtCol
               }}>{label}</span>
             </div>
 
@@ -105,14 +103,13 @@ export function FormChips({ results, isTeam = false }: FormChipsProps) {
                 transform: 'translateX(-50%)',
                 marginBottom: '8px',
                 zIndex: 200,
-                background: 'rgba(8,11,18,0.98)',
-                backdropFilter: 'blur(16px)',
+                background: HUB.raised,
                 border: `1px solid ${HUB.borderMid}`,
                 borderRadius: '8px',
-                padding: '12px 14px',
+                padding: '12px 16px',
                 minWidth: '180px',
                 pointerEvents: 'none',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.6)'
               }}>
                 {/* Arrow */}
                 <div style={{
@@ -121,19 +118,19 @@ export function FormChips({ results, isTeam = false }: FormChipsProps) {
                   left: '50%',
                   transform: 'translateX(-50%) rotate(45deg)',
                   width: '8px', height: '8px',
-                  background: 'rgba(8,11,18,0.98)',
+                  background: HUB.raised,
                   border: `1px solid ${HUB.borderMid}`,
-                  borderTop: 'none', borderLeft: 'none',
+                  borderTop: 'none', borderLeft: 'none'
                 }} />
 
-                <div style={{ fontSize: '10px', color: HUB.accent, fontFamily: HUB.fontBold, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <div style={{ fontSize: '11px', color: HUB.textFaint, fontFamily: HUB.fontRegular, marginBottom: '4px' }}>
                   Round {r.round}{r.season ? ` · S${r.season}` : ''}
                 </div>
-                <div style={{ fontSize: '12px', color: '#fff', fontFamily: HUB.fontBold, marginBottom: '2px', lineHeight: 1.3 }}>
+                <div style={{ fontSize: '13px', color: HUB.textPrimary, fontFamily: HUB.fontBold, marginBottom: '2px', lineHeight: 1.3 }}>
                   {r.name}
                 </div>
                 {r.circuit && (
-                  <div style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontRegular, marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontRegular, marginBottom: '8px' }}>
                     {r.circuit}
                   </div>
                 )}
@@ -145,15 +142,15 @@ export function FormChips({ results, isTeam = false }: FormChipsProps) {
                   <span style={{
                     fontSize: '13px',
                     fontFamily: HUB.fontBold,
-                    color: r.retired ? '#ef4444' : (pos && pos <= 3 ? bg : '#fff'),
-                    fontWeight: 700,
+                    color: r.retired ? HUB.negative : HUB.textPrimary,
+                    fontWeight: 400
                   }}>
                     {r.retired ? 'DNF' : `P${pos}`}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                   <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontRegular }}>Points</span>
-                  <span style={{ fontSize: '13px', fontFamily: HUB.fontBold, color: r.points > 0 ? '#10b981' : HUB.textMuted }}>
+                  <span style={{ fontSize: '13px', fontFamily: HUB.fontBold, color: r.points > 0 ? HUB.positive : HUB.textMuted }}>
                     {r.points > 0 ? `+${r.points}` : '0'}
                   </span>
                 </div>

@@ -2,10 +2,10 @@ import React, { useState, useMemo, useRef } from 'react';
 import {
   CalendarDays, Plus, X, ChevronUp, ChevronDown, AlertTriangle, CheckCircle,
   DollarSign, Globe, Zap, RotateCcw, Save, Flag, GripVertical, Sparkles,
-  Sliders, ExternalLink, Trophy, ArrowRight, Eye, Check, RefreshCw
+  Sliders, ExternalLink, Trophy, ArrowRight, Eye, Check, RefreshCw, ArrowLeft
 } from 'lucide-react';
 import { renderToAppRoot } from '../../utils/reactRoot.tsx';
-import { HUB, glassCard, actionBtn } from '../../components/HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass, iconBtn, statCell, pill, pageTitle, sectionLabel } from '../../components/HubLayout.tsx';
 import { CIRCUIT_LIBRARY } from '../circuitLibrary.js';
 import {
   fiaCareer, saveFIACareer, setFIACareer,
@@ -47,15 +47,15 @@ function CircuitPickerRow({ circuit, onAdd, onDesign, career }: any) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.06)', marginBottom: 6,
-      transition: 'all 0.15s ease'
+      padding: '10px 12px', borderRadius: 8, background: HUB.raised,
+      border: `1px solid ${HUB.border}`, marginBottom: 6,
+      transition: `border-color 150ms ${HUB.ease}`
     }}>
       <div style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-        <div style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontFamily: HUB.fontBold, fontSize: 13, color: HUB.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {circuit.name}
         </div>
-        <div style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted, marginTop: 2 }}>
+        <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, marginTop: 2 }}>
           {circuit.country || lib?.country} · ${circuit.hostingFee || lib?.hostingFee || 40}M
         </div>
       </div>
@@ -63,25 +63,20 @@ function CircuitPickerRow({ circuit, onAdd, onDesign, career }: any) {
         {circuit.points && (
           <button
             onClick={() => onDesign(circuit)}
-            title="Open in Track Designer"
-            style={{
-              padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)', color: '#CBD5E1', cursor: 'pointer',
-              fontSize: 10, display: 'flex', alignItems: 'center'
-            }}
+            title="Open in circuit designer"
+            aria-label="Open in circuit designer"
+            className={btnClass('ghost')}
+            style={iconBtn('sm')}
           >
-            <Eye size={11} />
+            <Eye size={14} strokeWidth={1.5} />
           </button>
         )}
         <button
           onClick={() => onAdd(circuit)}
-          style={{
-            padding: '5px 10px', borderRadius: 6, background: 'rgba(225,6,0,0.12)',
-            border: '1px solid rgba(225,6,0,0.3)', color: FIA.accent, cursor: 'pointer',
-            fontFamily: HUB.fontBold, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4
-          }}
+          className={btnClass('secondary')}
+          style={btn('secondary', 'sm')}
         >
-          <Plus size={12} /> Add
+          <Plus size={14} strokeWidth={1.5} />Add race
         </button>
       </div>
     </div>
@@ -109,35 +104,34 @@ function DraggableCalendarRaceRow({
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '12px 16px', borderRadius: 10,
         background: isDragging
-          ? 'rgba(225,6,0,0.08)'
+          ? HUB.raised
           : isDragOver
-          ? 'rgba(225,6,0,0.15)'
-          : 'rgba(26,30,46,0.65)',
+          ? HUB.accentSoft
+          : HUB.surface,
         border: isDragOver
-          ? '2px dashed #E10600'
-          : `1px solid ${!eligible ? 'rgba(245,158,11,0.3)' : race.sprint ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}`,
-        boxShadow: isDragOver ? '0 0 16px rgba(225,6,0,0.3)' : 'none',
+          ? `1px dashed ${HUB.accent}`
+          : `1px solid ${HUB.border}`,
         marginBottom: 8,
         opacity: isDragging ? 0.35 : 1,
         cursor: 'grab',
-        transition: 'background 0.15s, border-color 0.15s, transform 0.15s',
+        transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}`
       }}
     >
       {/* Drag Handle */}
       <div
-        title="Drag to reorder race calendar"
+        title="Drag to reorder"
         style={{ color: HUB.textMuted, cursor: 'grab', display: 'flex', alignItems: 'center' }}
       >
-        <GripVertical size={16} />
+        <GripVertical size={16} strokeWidth={1.5} />
       </div>
 
       {/* Round Badge */}
       <div style={{
-        fontFamily: HUB.fontBold, fontSize: 11,
-        color: race.sprint ? '#F59E0B' : FIA.accent,
-        background: race.sprint ? 'rgba(245,158,11,0.12)' : 'rgba(225,6,0,0.12)',
-        border: `1px solid ${race.sprint ? 'rgba(245,158,11,0.3)' : 'rgba(225,6,0,0.25)'}`,
-        padding: '4px 8px', borderRadius: 6, minWidth: 32, textAlign: 'center'
+        fontFamily: HUB.fontBold, fontSize: 12,
+        color: HUB.textMuted,
+        background: HUB.raised,
+        padding: '4px 8px', borderRadius: 6, minWidth: 32, textAlign: 'center',
+        fontVariantNumeric: 'tabular-nums'
       }}>
         R{index + 1 < 10 ? `0${index + 1}` : index + 1}
       </div>
@@ -145,21 +139,21 @@ function DraggableCalendarRaceRow({
       {/* Circuit & Country Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: HUB.fontBold, fontSize: 13, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <span style={{ fontFamily: HUB.fontBold, fontSize: 14, color: HUB.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {race.name}
           </span>
           {custom && (
-            <span style={{ fontSize: 9, fontFamily: HUB.fontBold, background: 'rgba(59,130,246,0.15)', color: '#60A5FA', padding: '1px 6px', borderRadius: 4 }}>
-              CUSTOM
+            <span style={{ ...pill(), padding: '2px 6px', fontSize: 11 }}>
+              Custom
             </span>
           )}
         </div>
-        <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, display: 'flex', gap: 12, marginTop: 3 }}>
+        <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <span>{race.country || 'International'}</span>
-          <span>• {race.laps || lib?.laps || 55} Laps</span>
-          <span>• ${race.hostingFee || lib?.hostingFee || 40}M Fee</span>
+          <span>· {race.laps || lib?.laps || 55} laps</span>
+          <span>· ${race.hostingFee || lib?.hostingFee || 40}M fee</span>
           {!eligible && (
-            <span style={{ color: '#F59E0B', fontFamily: HUB.fontBold }}>⚠️ License Pending</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: HUB.warning }}><AlertTriangle size={12} strokeWidth={1.5} /> License pending</span>
           )}
         </div>
       </div>
@@ -168,61 +162,53 @@ function DraggableCalendarRaceRow({
       {(custom?.points || lib) && (
         <button
           onClick={() => onDesignTrack(custom || lib)}
-          title="Open in Track Designer Studio"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-            borderRadius: 6, background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.1)', color: '#CBD5E1',
-            cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 10,
-          }}
+          title="Open in circuit designer"
+          className={btnClass('secondary')}
+          style={btn('secondary', 'sm')}
         >
-          <Sliders size={12} /> Design
+          <Sliders size={14} strokeWidth={1.5} />Design track
         </button>
       )}
 
       {/* Sprint Weekend Toggle Button */}
       <button
         onClick={() => onToggleSprint(index)}
-        title="Toggle Sprint Weekend Format"
+        title="Toggle sprint weekend"
+        aria-pressed={!!race.sprint}
         style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          padding: '5px 10px', borderRadius: 6, fontFamily: HUB.fontBold, fontSize: 10,
-          background: race.sprint ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${race.sprint ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}`,
-          color: race.sprint ? '#F59E0B' : HUB.textMuted, cursor: 'pointer',
-          textTransform: 'uppercase', letterSpacing: '0.06em',
-          transition: 'all 0.15s ease'
+          display: 'flex', alignItems: 'center', gap: 6,
+          height: 28, padding: '0 10px', borderRadius: 8, fontFamily: HUB.fontBold, fontSize: 12,
+          background: race.sprint ? HUB.accentSoft : HUB.raised,
+          border: `1px solid ${race.sprint ? 'rgba(225,6,0,0.4)' : HUB.border}`,
+          color: race.sprint ? HUB.textPrimary : HUB.textMuted, cursor: 'pointer',
+          transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`
         }}
       >
-        <Zap size={11} color={race.sprint ? '#F59E0B' : HUB.textMuted} />
-        {race.sprint ? 'Sprint ✓' : 'Sprint'}
+        {race.sprint ? <Check size={14} strokeWidth={1.5} /> : <Zap size={14} strokeWidth={1.5} />}
+        Sprint
       </button>
 
       {/* Reorder Buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ display: 'flex', gap: 2 }}>
         <button
           onClick={() => onMove(index, -1)}
           disabled={index === 0}
           title="Move up"
-          style={{
-            background: 'none', border: 'none',
-            color: index === 0 ? 'rgba(255,255,255,0.1)' : HUB.textMuted,
-            cursor: index === 0 ? 'default' : 'pointer', padding: 2
-          }}
+          aria-label="Move up"
+          className={btnClass('ghost')}
+          style={iconBtn('sm')}
         >
-          <ChevronUp size={13} />
+          <ChevronUp size={14} strokeWidth={1.5} />
         </button>
         <button
           onClick={() => onMove(index, 1)}
           disabled={index === total - 1}
           title="Move down"
-          style={{
-            background: 'none', border: 'none',
-            color: index === total - 1 ? 'rgba(255,255,255,0.1)' : HUB.textMuted,
-            cursor: index === total - 1 ? 'default' : 'pointer', padding: 2
-          }}
+          aria-label="Move down"
+          className={btnClass('ghost')}
+          style={iconBtn('sm')}
         >
-          <ChevronDown size={13} />
+          <ChevronDown size={14} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -230,14 +216,11 @@ function DraggableCalendarRaceRow({
       <button
         onClick={() => onRemove(index)}
         title="Remove from calendar"
-        style={{
-          background: 'none', border: 'none', color: 'rgba(225,6,0,0.5)',
-          cursor: 'pointer', padding: 6, borderRadius: 4, transition: 'all 0.15s'
-        }}
-        onMouseEnter={e => { e.currentTarget.style.color = '#E10600'; e.currentTarget.style.backgroundColor = 'rgba(225,6,0,0.1)'; }}
-        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(225,6,0,0.5)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+        aria-label="Remove from calendar"
+        className={btnClass('ghost')}
+        style={iconBtn('sm')}
       >
-        <X size={15} />
+        <X size={16} strokeWidth={1.5} />
       </button>
     </div>
   );
@@ -339,7 +322,7 @@ function FIACalendarBoard({ appRoot }: any) {
 
     setDraggedIndex(null);
     setDragOverIndex(null);
-    showNotif('Calendar reordered.');
+    showNotif('Calendar reordered');
   };
 
   const handleDragEnd = () => {
@@ -352,7 +335,7 @@ function FIACalendarBoard({ appRoot }: any) {
     const id = circuit.circuitId || circuit.circuit;
     const exists = draftCircuits.some(c => (c.circuitId || c.circuit) === id);
     if (exists) {
-      showNotif('Circuit already present in calendar.');
+      showNotif('Circuit is already in the calendar');
       return;
     }
     const lib = CIRCUIT_LIBRARY.find(c => c.circuitId === id);
@@ -367,7 +350,7 @@ function FIACalendarBoard({ appRoot }: any) {
       tyreWear: circuit.tyreWear || 1.3,
       hostingFee: circuit.hostingFee || lib?.hostingFee || 40,
     }]);
-    showNotif(`Added "${circuit.name}" to calendar.`);
+    showNotif(`Added ${circuit.name} to calendar`);
   };
 
   const handleRemove = (idx: number) => {
@@ -399,13 +382,13 @@ function FIACalendarBoard({ appRoot }: any) {
     };
     setFIACareer(updated);
     saveFIACareer();
-    showNotif('Calendar draft successfully saved!');
+    showNotif('Calendar draft saved');
   };
 
   // ── Direct Scene Ratification ──────────────────────────────────────────────
   const handleApproveSeason = () => {
     if (!validation.isValid) {
-      showNotif('Cannot approve: please resolve validation errors first.');
+      showNotif('Resolve validation errors before approving');
       return;
     }
 
@@ -422,7 +405,7 @@ function FIACalendarBoard({ appRoot }: any) {
         }
       ],
       notifications: [
-        { id: `app-${Date.now()}`, message: `Championship Calendar for Season ${career.currentYear} officially ratified with ${draftCircuits.length} rounds.`, time: Date.now() },
+        { id: `app-${Date.now()}`, message: `Season ${career.currentYear} calendar approved with ${draftCircuits.length} rounds`, time: Date.now() },
         ...(career.notifications || [])
       ]
     };
@@ -446,12 +429,12 @@ function FIACalendarBoard({ appRoot }: any) {
     setFIACareer(updated);
     saveFIACareer();
     setShowRatifiedModal(true);
-    showNotif(`Season ${career.currentYear} calendar approved & ratified!`);
+    showNotif(`Season ${career.currentYear} calendar approved`);
   };
 
   const handleReset = () => {
     setDraftCircuits(buildInitialDraft({ ...career, calendarDrafts: [] }));
-    showNotif('Reset to standard 24-race championship.');
+    showNotif('Reset to the standard 24-race calendar');
   };
 
   // ── Track Generator: Add Directly to Calendar ──────────────────────────────
@@ -493,7 +476,7 @@ function FIACalendarBoard({ appRoot }: any) {
     });
 
     setShowGenerateModal(false);
-    showNotif(`"${blueprint.name}" synthesized, licensed & added to calendar!`);
+    showNotif(`${blueprint.name} created, licensed and added to calendar`);
   };
 
   // ── Open in Track Designer ─────────────────────────────────────────────────
@@ -502,14 +485,13 @@ function FIACalendarBoard({ appRoot }: any) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#060911', color: '#fff', fontFamily: HUB.fontRegular }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
       {/* Toast Notification */}
       {notification && (
         <div style={{
           position: 'fixed', top: 24, right: 24, zIndex: 400,
-          background: 'rgba(16,185,129,0.18)', border: '1px solid rgba(16,185,129,0.5)',
-          padding: '12px 22px', borderRadius: 10, fontFamily: HUB.fontBold, fontSize: 12, color: FIA.green,
-          backdropFilter: 'blur(8px)', boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+          background: HUB.raised, border: `1px solid ${HUB.borderMid}`,
+          padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary, boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
         }}>
           {notification}
         </div>
@@ -517,55 +499,42 @@ function FIACalendarBoard({ appRoot }: any) {
 
       {/* ── Left Column: Circuit Selector & Generator ────────────────────────── */}
       <aside style={{
-        width: 310, flexShrink: 0, background: '#06080F',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-        padding: '28px 20px', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto',
+        width: 310, flexShrink: 0, background: HUB.sidebar,
+        borderRight: `1px solid ${HUB.border}`,
+        padding: '28px 20px', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto'
       }}>
         <div>
           <button
             onClick={() => renderFIADashboard(appRoot)}
-            style={{
-              background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer',
-              fontFamily: HUB.fontBold, fontSize: 11, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4
-            }}
+            className={btnClass('ghost')}
+            style={btn('ghost', 'sm', { marginBottom: 12, marginLeft: -12 })}
           >
-            ← BACK TO DASHBOARD
+            <ArrowLeft size={14} strokeWidth={1.5} />Back to FIA dashboard
           </button>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4 }}>
-            Circuit Selector
-          </div>
-          <h2 style={{ fontFamily: HUB.fontWide, fontSize: 17, color: '#fff', margin: 0, textTransform: 'uppercase' }}>
-            Add Venues
+          <h2 style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary, margin: 0 }}>
+            Add circuits
           </h2>
         </div>
 
         {/* Generate New Track CTA Button */}
         <button
           onClick={() => setShowGenerateModal(true)}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '12px 16px', borderRadius: 8,
-            background: 'linear-gradient(135deg, rgba(225,6,0,0.25), rgba(245,158,11,0.2))',
-            border: '1px solid rgba(225,6,0,0.45)', color: '#fff',
-            cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 12,
-            boxShadow: '0 4px 16px rgba(225,6,0,0.2)', transition: 'all 0.15s'
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.borderColor = '#E10600'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(225,6,0,0.45)'; }}
+          className={btnClass('secondary')}
+          style={btn('secondary', 'md')}
         >
-          <Sparkles size={15} color="#F59E0B" />
-          <span>Generate Track (Dubai...)</span>
+          <Plus size={16} strokeWidth={1.5} />
+          <span>Generate track</span>
         </button>
 
         {/* Circuit Search Box */}
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Filter venues & custom circuits..."
+          placeholder="Filter circuits"
           style={{
-            width: '100%', padding: '9px 12px', background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff',
-            fontFamily: HUB.fontRegular, fontSize: 12, outline: 'none', boxSizing: 'border-box',
+            width: '100%', height: 36, padding: '0 12px', background: HUB.raised,
+            border: `1px solid ${HUB.border}`, borderRadius: 8, color: HUB.textPrimary,
+            fontFamily: HUB.fontRegular, fontSize: 13, outline: 'none', boxSizing: 'border-box'
           }}
         />
 
@@ -586,34 +555,22 @@ function FIACalendarBoard({ appRoot }: any) {
       {/* ── Center Main Column: Calendar Order & Direct Approval ─────────────── */}
       <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto' }}>
         {/* Top Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4 }}>
-              FIA Championship Calendar
-            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <h1 style={{ fontFamily: HUB.fontWide, fontSize: 26, color: '#fff', margin: 0, textTransform: 'uppercase' }}>
-                Season {career.currentYear} Schedule
-              </h1>
+              {pageTitle(`Season ${career.currentYear} calendar`)}
               {isAlreadyApproved ? (
-                <span style={{
-                  display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6,
-                  background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)',
-                  color: FIA.green, fontFamily: HUB.fontBold, fontSize: 11
-                }}>
-                  <Check size={13} /> OFFICIAL RATIFIED
+                <span style={{ ...pill(), display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: HUB.positive }} /> Approved
                 </span>
               ) : (
-                <span style={{
-                  padding: '4px 10px', borderRadius: 6, background: 'rgba(245,158,11,0.12)',
-                  border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', fontFamily: HUB.fontBold, fontSize: 11
-                }}>
-                  DRAFT IN PROGRESS
+                <span style={{ ...pill(), marginBottom: 8 }}>
+                  Draft
                 </span>
               )}
             </div>
-            <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, marginTop: 4 }}>
-              Drag and drop rounds to reorder the schedule. Configure sprints, review logistics, and ratify directly on scene.
+            <p style={{ fontFamily: HUB.fontRegular, fontSize: 14, color: HUB.textMuted, margin: 0 }}>
+              Drag rounds to reorder. Set sprint weekends, check logistics and approve the calendar here.
             </p>
           </div>
 
@@ -621,90 +578,68 @@ function FIACalendarBoard({ appRoot }: any) {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={handleReset}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
-                borderRadius: 6, background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.1)', color: HUB.textMuted,
-                cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11
-              }}
+              className={btnClass('danger')}
+              style={btn('danger', 'sm')}
             >
-              <RotateCcw size={13} /> Reset
+              <RotateCcw size={14} strokeWidth={1.5} />Reset calendar
             </button>
             <button
               onClick={handleSaveDraft}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-                borderRadius: 6, background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)', color: '#fff',
-                cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11
-              }}
+              className={btnClass('secondary')}
+              style={btn('secondary', 'sm')}
             >
-              <Save size={13} /> Save Draft
+              <Save size={14} strokeWidth={1.5} />Save draft
             </button>
           </div>
         </div>
 
         {/* ── Direct Ratification & Approval Scene Banner ─────────────────────── */}
         <div style={{
-          ...glassCard({ padding: '20px 24px' }),
-          background: validation.isValid
-            ? 'linear-gradient(135deg, rgba(225,6,0,0.15), rgba(16,185,129,0.06))'
-            : 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(225,6,0,0.05))',
-          border: validation.isValid ? '1px solid rgba(225,6,0,0.35)' : '1px solid rgba(245,158,11,0.3)',
+          ...glassCard({ padding: '24px' }),
           marginBottom: 24,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16
         }}>
           <div>
-            <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: validation.isValid ? FIA.green : '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>
-              {validation.isValid ? 'Calendar Ratification Ready' : 'Calendar Validation Pending'}
-            </div>
-            <h3 style={{ fontFamily: HUB.fontWide, fontSize: 17, color: '#fff', margin: '0 0 4px' }}>
-              {draftCircuits.length} Rounds · {draftCircuits.filter(r => r.sprint).length} Sprint Weekends
+            {sectionLabel(validation.isValid ? 'Ready to approve' : 'Validation pending')}
+            <h3 style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary, margin: '0 0 4px' }}>
+              {draftCircuits.length} rounds · {draftCircuits.filter(r => r.sprint).length} sprint weekends
             </h3>
-            <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0 }}>
+            <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, margin: 0 }}>
               {validation.isValid
-                ? 'All technical and regulatory requirements met. One-click ratification enforces this calendar.'
-                : 'Resolve highlighted calendar warnings or minimum round counts to approve.'}
+                ? 'All requirements met. Approving makes this the season calendar.'
+                : 'Resolve the calendar errors or minimum round count to approve.'}
             </p>
           </div>
 
           <button
             onClick={handleApproveSeason}
             disabled={!validation.isValid}
-            style={{
-              ...actionBtn({ padding: '14px 28px', fontSize: 12 }),
-              background: validation.isValid
-                ? 'linear-gradient(135deg, #E10600, #FF3B30)'
-                : 'rgba(255,255,255,0.1)',
-              opacity: validation.isValid ? 1 : 0.45,
-              cursor: validation.isValid ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', gap: 8,
-              boxShadow: validation.isValid ? '0 6px 20px rgba(225,6,0,0.35)' : 'none'
-            }}
+            className={btnClass('primary')}
+            style={btn('primary', 'md')}
           >
-            <Flag size={15} />
-            <span>APPROVE &amp; RATIFY CALENDAR DIRECTLY</span>
+            <Flag size={16} strokeWidth={1.5} />
+            <span>Approve calendar</span>
           </button>
         </div>
 
         {/* Validation Errors / Warnings */}
         {(validation.errors.length > 0 || validation.warnings.length > 0) && (
           <div style={{
-            display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 18px', marginBottom: 20,
-            background: validation.errors.length > 0 ? 'rgba(225,6,0,0.08)' : 'rgba(245,158,11,0.08)',
-            border: `1px solid ${validation.errors.length > 0 ? 'rgba(225,6,0,0.25)' : 'rgba(245,158,11,0.25)'}`,
-            borderRadius: 10,
+            display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 16px', marginBottom: 20,
+            background: HUB.surface,
+            border: `1px solid ${HUB.border}`,
+            borderRadius: 10
           }}>
             {validation.errors.map((e: any, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <AlertTriangle size={13} color={FIA.accent} style={{ flexShrink: 0 }} />
-                <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>{e.message}</span>
+                <AlertTriangle size={14} strokeWidth={1.5} color={HUB.negative} style={{ flexShrink: 0 }} />
+                <span style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary }}>{e.message}</span>
               </div>
             ))}
             {validation.warnings.map((w: any, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <AlertTriangle size={13} color="#F59E0B" style={{ flexShrink: 0 }} />
-                <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>{w.message}</span>
+                <AlertTriangle size={14} strokeWidth={1.5} color={HUB.warning} style={{ flexShrink: 0 }} />
+                <span style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted }}>{w.message}</span>
               </div>
             ))}
           </div>
@@ -713,10 +648,10 @@ function FIACalendarBoard({ appRoot }: any) {
         {/* Drag and Drop Race List */}
         {draftCircuits.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: HUB.textMuted }}>
-            <CalendarDays size={42} color="rgba(255,255,255,0.1)" style={{ marginBottom: 12 }} />
-            <p style={{ fontFamily: HUB.fontBold, fontSize: 15, color: '#fff' }}>No circuits in the calendar.</p>
-            <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, opacity: 0.7 }}>
-              Select circuits from the left panel or click "Generate Track" to add venues.
+            <CalendarDays size={40} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: 12 }} />
+            <p style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>No circuits in the calendar</p>
+            <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textFaint }}>
+              Add circuits from the left panel or generate a new track.
             </p>
           </div>
         ) : (
@@ -747,28 +682,26 @@ function FIACalendarBoard({ appRoot }: any) {
 
       {/* ── Right Column: Scorecard & Regional Stats ─────────────────────────── */}
       <aside style={{
-        width: 270, flexShrink: 0, background: '#06080F',
-        borderLeft: '1px solid rgba(255,255,255,0.06)',
-        padding: '28px 20px', overflowY: 'auto',
+        width: 270, flexShrink: 0, background: HUB.sidebar,
+        borderLeft: `1px solid ${HUB.border}`,
+        padding: '28px 20px', overflowY: 'auto'
       }}>
-        <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 16 }}>
-          Calendar Scorecard
-        </div>
+        <div style={{ marginBottom: 12 }}>{sectionLabel('Calendar scorecard')}</div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
-            { icon: <Flag size={14} />, label: 'Total Grands Prix', value: scorecard.totalRaces, color: '#fff' },
-            { icon: <Zap size={14} />, label: 'Sprint Weekends', value: scorecard.sprintWeekends, color: '#F59E0B' },
-            { icon: <Globe size={14} />, label: 'Continents', value: scorecard.continentsRepresented, color: FIA.blue },
-            { icon: <Globe size={14} />, label: 'Countries', value: scorecard.regionsRepresented, color: FIA.blue },
-            { icon: <DollarSign size={14} />, label: 'Est. Promoter Revenue', value: `$${scorecard.estimatedRevenue}M`, color: FIA.green },
-            { icon: <DollarSign size={14} />, label: 'Logistics Costs', value: `$${scorecard.estimatedLogisticsCost}M`, color: FIA.accent },
-            { icon: <CheckCircle size={14} />, label: 'European Rounds', value: scorecard.europeanRaces, color: '#fff' },
+            { icon: <Flag size={14} strokeWidth={1.5} />, label: 'Grands Prix', value: scorecard.totalRaces, color: HUB.textPrimary },
+            { icon: <Zap size={14} strokeWidth={1.5} />, label: 'Sprint weekends', value: scorecard.sprintWeekends, color: HUB.textPrimary },
+            { icon: <Globe size={14} strokeWidth={1.5} />, label: 'Continents', value: scorecard.continentsRepresented, color: HUB.textPrimary },
+            { icon: <Globe size={14} strokeWidth={1.5} />, label: 'Countries', value: scorecard.regionsRepresented, color: HUB.textPrimary },
+            { icon: <DollarSign size={14} strokeWidth={1.5} />, label: 'Est. promoter revenue', value: `$${scorecard.estimatedRevenue}M`, color: HUB.textPrimary },
+            { icon: <DollarSign size={14} strokeWidth={1.5} />, label: 'Logistics costs', value: `$${scorecard.estimatedLogisticsCost}M`, color: HUB.textPrimary },
+            { icon: <CheckCircle size={14} strokeWidth={1.5} />, label: 'European rounds', value: scorecard.europeanRaces, color: HUB.textPrimary },
           ].map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: HUB.raised, borderRadius: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: item.color }}>{item.icon}</span>
-                <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>{item.label}</span>
+                <span style={{ display: 'flex', color: HUB.textFaint }}>{item.icon}</span>
+                <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{item.label}</span>
               </div>
               <span style={{ fontFamily: HUB.fontBold, fontSize: 13, color: item.color }}>{item.value}</span>
             </div>
@@ -777,9 +710,7 @@ function FIACalendarBoard({ appRoot }: any) {
 
         {/* Regional Breakdown */}
         <div style={{ marginTop: 24 }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>
-            Regional Density
-          </div>
+          <div style={{ marginBottom: 8 }}>{sectionLabel('Regional density')}</div>
           {(() => {
             const counts: Record<string, number> = {};
             draftCircuits.forEach(r => {
@@ -790,9 +721,9 @@ function FIACalendarBoard({ appRoot }: any) {
             return Object.entries(counts)
               .sort((a, b) => b[1] - a[1])
               .map(([region, count]) => (
-                <div key={region} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>{region}</span>
-                  <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: '#fff' }}>{count}</span>
+                <div key={region} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${HUB.border}` }}>
+                  <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{region}</span>
+                  <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: HUB.textPrimary }}>{count}</span>
                 </div>
               ));
           })()}
@@ -802,36 +733,35 @@ function FIACalendarBoard({ appRoot }: any) {
       {/* ── Modal: Track Generator & Synthesizer (Downtown Dubai, etc.) ───────── */}
       {showGenerateModal && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
+          position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
         }}>
           <div style={{
-            ...glassCard({ padding: '32px' }), maxWidth: 840, width: '100%',
-            background: '#090D1A', border: '1px solid rgba(255,255,255,0.15)',
+            ...glassCard({ padding: '24px' }), maxWidth: 840, width: '100%',
             maxHeight: '90vh', overflowY: 'auto'
           }}>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
-                <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.15em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Sparkles size={13} color="#F59E0B" /> FIA Track Synthesizer &amp; Blueprint Engine
-                </div>
-                <h2 style={{ fontFamily: HUB.fontWide, fontSize: 22, color: '#fff', margin: '6px 0 0', textTransform: 'uppercase' }}>
-                  Generate &amp; Design New Circuit
+                {sectionLabel('Track generator')}
+                <h2 style={{ fontFamily: HUB.fontBold, fontSize: 20, color: HUB.textPrimary, margin: 0 }}>
+                  Generate a new circuit
                 </h2>
               </div>
               <button
                 onClick={() => setShowGenerateModal(false)}
-                style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontSize: 20 }}
+                aria-label="Close"
+                title="Close"
+                className={btnClass('ghost')}
+                style={iconBtn('sm')}
               >
-                ✕
+                <X size={16} strokeWidth={1.5} />
               </button>
             </div>
 
             {/* Presets Bar */}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-                Select Circuit Archetype / Preset
+              <label style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, display: 'block', marginBottom: 8 }}>
+                Preset
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
                 {TRACK_PRESETS.map(preset => (
@@ -845,14 +775,15 @@ function FIACalendarBoard({ appRoot }: any) {
                     }}
                     style={{
                       padding: '10px 12px', borderRadius: 8,
-                      background: selectedPresetId === preset.id ? 'rgba(225,6,0,0.18)' : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${selectedPresetId === preset.id ? FIA.accent : 'rgba(255,255,255,0.08)'}`,
-                      color: selectedPresetId === preset.id ? '#fff' : HUB.textMuted,
-                      fontFamily: HUB.fontBold, fontSize: 11, textAlign: 'left', cursor: 'pointer'
+                      background: selectedPresetId === preset.id ? HUB.accentSoft : HUB.raised,
+                      border: `1px solid ${selectedPresetId === preset.id ? 'rgba(225,6,0,0.4)' : HUB.border}`,
+                      color: selectedPresetId === preset.id ? HUB.textPrimary : HUB.textMuted,
+                      fontFamily: HUB.fontBold, fontSize: 12, textAlign: 'left', cursor: 'pointer',
+                      transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}`
                     }}
                   >
-                    <div style={{ color: '#fff', fontSize: 12 }}>{preset.name}</div>
-                    <div style={{ fontSize: 10, color: HUB.textMuted, marginTop: 2 }}>{preset.country} · {preset.type}</div>
+                    <div style={{ color: HUB.textPrimary, fontSize: 13 }}>{preset.name}</div>
+                    <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, marginTop: 2 }}>{preset.country} · {preset.type}</div>
                   </button>
                 ))}
               </div>
@@ -862,65 +793,62 @@ function FIACalendarBoard({ appRoot }: any) {
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24, marginBottom: 24 }}>
               {/* SVG Blueprint Canvas */}
               <div style={{
-                background: '#040711', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
+                background: HUB.sidebar, borderRadius: 14, border: `1px solid ${HUB.border}`,
                 padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center'
               }}>
                 <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, textTransform: 'uppercase' }}>
-                    Blueprint Telemetry View
+                  <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>
+                    Blueprint preview
                   </span>
-                  <span style={{ fontFamily: HUB.fontMono, fontSize: 10, color: FIA.green }}>GRADE 1 FIA SPEC</span>
+                  <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint }}>FIA Grade 1</span>
                 </div>
-                <svg width="360" height="260" viewBox="0 0 640 480" style={{ width: '100%', height: 'auto', background: 'radial-gradient(circle, #0F172A 0%, #060911 100%)', borderRadius: 8 }}>
+                <svg width="360" height="260" viewBox="0 0 640 480" style={{ width: '100%', height: 'auto', background: HUB.bg, borderRadius: 8 }}>
                   <defs>
                     <pattern id="modalGrid" width="20" height="20" patternUnits="userSpaceOnUse">
-                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(237,237,237,0.04)" strokeWidth="0.5" />
                     </pattern>
                   </defs>
                   <rect width="100%" height="100%" fill="url(#modalGrid)" />
                   {previewBlueprint.svgPath && (
                     <>
-                      <path d={previewBlueprint.svgPath} fill="none" stroke="rgba(225,6,0,0.3)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d={previewBlueprint.svgPath} fill="none" stroke="#1E293B" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d={previewBlueprint.svgPath} fill="none" stroke="#E10600" strokeWidth="2" strokeDasharray="6 3" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d={previewBlueprint.svgPath} fill="none" stroke={HUB.raised} strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d={previewBlueprint.svgPath} fill="none" stroke={HUB.textPrimary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                     </>
                   )}
                   {previewBlueprint.points?.map((pt: any, i: number) => (
-                    <circle key={i} cx={pt.x} cy={pt.y} r="4" fill={i === 0 ? '#10B981' : '#fff'} />
+                    <circle key={i} cx={pt.x} cy={pt.y} r={i === 0 ? 7 : 3} fill={i === 0 ? HUB.accent : HUB.textFaint} />
                   ))}
                 </svg>
-                <div style={{ fontSize: 10, color: HUB.textMuted, marginTop: 8 }}>
-                  Green marker indicates Start/Finish line &amp; main pit straight.
+                <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginTop: 8 }}>
+                  Red marker: start/finish line and main straight
                 </div>
               </div>
 
               {/* Technical Specifications */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontFamily: HUB.fontBold, fontSize: 11, color: HUB.textMuted, textTransform: 'uppercase' }}>
-                  Circuit Engineering Profile
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sectionLabel('Circuit profile')}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div style={{ ...glassCard({ padding: '10px 12px' }) }}>
-                    <div style={{ fontSize: 10, color: HUB.textMuted }}>Length</div>
-                    <div style={{ fontFamily: HUB.fontBold, fontSize: 15, color: '#fff' }}>{previewBlueprint.lengthKm} km</div>
+                  <div style={statCell()}>
+                    <div style={{ fontSize: 12, color: HUB.textFaint }}>Length</div>
+                    <div style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>{previewBlueprint.lengthKm} km</div>
                   </div>
-                  <div style={{ ...glassCard({ padding: '10px 12px' }) }}>
-                    <div style={{ fontSize: 10, color: HUB.textMuted }}>Corners</div>
-                    <div style={{ fontFamily: HUB.fontBold, fontSize: 15, color: '#fff' }}>{previewBlueprint.corners} Turns</div>
+                  <div style={statCell()}>
+                    <div style={{ fontSize: 12, color: HUB.textFaint }}>Corners</div>
+                    <div style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>{previewBlueprint.corners} turns</div>
                   </div>
-                  <div style={{ ...glassCard({ padding: '10px 12px' }) }}>
-                    <div style={{ fontSize: 10, color: HUB.textMuted }}>Target Laps</div>
-                    <div style={{ fontFamily: HUB.fontBold, fontSize: 15, color: '#fff' }}>{previewBlueprint.laps} Laps</div>
+                  <div style={statCell()}>
+                    <div style={{ fontSize: 12, color: HUB.textFaint }}>Target laps</div>
+                    <div style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>{previewBlueprint.laps} laps</div>
                   </div>
-                  <div style={{ ...glassCard({ padding: '10px 12px' }) }}>
-                    <div style={{ fontSize: 10, color: HUB.textMuted }}>Hosting Fee</div>
-                    <div style={{ fontFamily: HUB.fontBold, fontSize: 15, color: FIA.gold }}>${previewBlueprint.hostingFee}M</div>
+                  <div style={statCell()}>
+                    <div style={{ fontSize: 12, color: HUB.textFaint }}>Hosting fee</div>
+                    <div style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>${previewBlueprint.hostingFee}M</div>
                   </div>
                 </div>
 
-                <div style={{ ...glassCard({ padding: '12px 14px' }), marginTop: 6 }}>
-                  <div style={{ fontSize: 10, color: HUB.textMuted, marginBottom: 4 }}>Track Characteristic</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+                <div style={statCell()}>
+                  <div style={{ fontSize: 12, color: HUB.textFaint, marginBottom: 4 }}>Track character</div>
+                  <div style={{ fontSize: 13, color: HUB.textPrimary, lineHeight: 1.5 }}>
                     {previewBlueprint.description}
                   </div>
                 </div>
@@ -928,10 +856,11 @@ function FIACalendarBoard({ appRoot }: any) {
             </div>
 
             {/* Modal Bottom Actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${HUB.border}`, paddingTop: 16 }}>
               <button
                 onClick={() => setShowGenerateModal(false)}
-                style={{ padding: '10px 18px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11 }}
+                className={btnClass('secondary')}
+                style={btn('secondary', 'md')}
               >
                 Cancel
               </button>
@@ -939,27 +868,20 @@ function FIACalendarBoard({ appRoot }: any) {
               <div style={{ display: 'flex', gap: 12 }}>
                 <button
                   onClick={() => handleOpenInDesigner(previewBlueprint)}
-                  style={{
-                    padding: '10px 18px', borderRadius: 6,
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-                    color: '#fff', cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11,
-                    display: 'flex', alignItems: 'center', gap: 6
-                  }}
+                  className={btnClass('secondary')}
+                  style={btn('secondary', 'md')}
                 >
-                  <Sliders size={13} />
-                  <span>Customize in Track Designer →</span>
+                  <Sliders size={16} strokeWidth={1.5} />
+                  <span>Edit in circuit designer</span>
                 </button>
 
                 <button
                   onClick={() => handleAddGeneratedToCalendar(previewBlueprint)}
-                  style={{
-                    ...actionBtn({ padding: '10px 22px', fontSize: 11 }),
-                    background: 'linear-gradient(135deg, #E10600, #FF3B30)',
-                    display: 'flex', alignItems: 'center', gap: 6
-                  }}
+                  className={btnClass('primary')}
+                  style={btn('primary', 'md')}
                 >
-                  <Plus size={14} />
-                  <span>ADD DIRECTLY TO CALENDAR</span>
+                  <Plus size={16} strokeWidth={1.5} />
+                  <span>Add to calendar</span>
                 </button>
               </div>
             </div>
@@ -970,59 +892,57 @@ function FIACalendarBoard({ appRoot }: any) {
       {/* ── Modal: Celebration of Official Calendar Ratification ─────────────── */}
       {showRatifiedModal && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.88)',
-          backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
+          position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
         }}>
           <div style={{
-            ...glassCard({ padding: '36px' }), maxWidth: 540, width: '100%',
-            background: 'linear-gradient(135deg, #0A0F1D, #060911)',
-            border: '1px solid rgba(16,185,129,0.4)', textAlign: 'center'
+            ...glassCard({ padding: '32px' }), maxWidth: 540, width: '100%',
+            textAlign: 'center'
           }}>
             <div style={{
-              width: 60, height: 60, borderRadius: '50%', background: 'rgba(16,185,129,0.15)',
+              width: 56, height: 56, borderRadius: '50%', background: HUB.raised,
               display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
-              border: '1px solid rgba(16,185,129,0.4)'
+              border: `1px solid ${HUB.border}`
             }}>
-              <Trophy size={28} color={FIA.green} />
+              <Trophy size={24} strokeWidth={1.5} color={HUB.textPrimary} />
             </div>
 
-            <div style={{ fontFamily: HUB.fontBold, fontSize: 11, color: FIA.green, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4 }}>
-              FIA World Motor Sport Council
-            </div>
-            <h2 style={{ fontFamily: HUB.fontWide, fontSize: 24, color: '#fff', margin: '0 0 10px', textTransform: 'uppercase' }}>
-              Season {career.currentYear} Calendar Ratified!
+            {sectionLabel('FIA World Motor Sport Council')}
+            <h2 style={{ fontFamily: HUB.fontBold, fontSize: 22, color: HUB.textPrimary, margin: '0 0 8px' }}>
+              Season {career.currentYear} calendar approved
             </h2>
-            <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, margin: '0 0 24px', lineHeight: 1.6 }}>
-              The championship calendar has been officially approved. All constructors and promoters have been notified, and regulations for all {draftCircuits.length} rounds are now in effect.
+            <p style={{ fontFamily: HUB.fontRegular, fontSize: 14, color: HUB.textMuted, margin: '0 0 24px', lineHeight: 1.6 }}>
+              Constructors and promoters have been notified, and regulations for all {draftCircuits.length} rounds are now in effect.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: 8 }}>
-                <div style={{ fontSize: 10, color: HUB.textMuted }}>Total Grands Prix</div>
-                <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: '#fff' }}>{draftCircuits.length}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+              <div style={{ background: HUB.raised, padding: '12px', borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: HUB.textFaint }}>Grands Prix</div>
+                <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary }}>{draftCircuits.length}</div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: 8 }}>
-                <div style={{ fontSize: 10, color: HUB.textMuted }}>Sprint Rounds</div>
-                <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: '#F59E0B' }}>{draftCircuits.filter(r => r.sprint).length}</div>
+              <div style={{ background: HUB.raised, padding: '12px', borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: HUB.textFaint }}>Sprint rounds</div>
+                <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary }}>{draftCircuits.filter(r => r.sprint).length}</div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: 8 }}>
-                <div style={{ fontSize: 10, color: HUB.textMuted }}>Promoter Revenue</div>
-                <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: FIA.green }}>${scorecard.estimatedRevenue}M</div>
+              <div style={{ background: HUB.raised, padding: '12px', borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: HUB.textFaint }}>Promoter revenue</div>
+                <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary }}>${scorecard.estimatedRevenue}M</div>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button
                 onClick={() => setShowRatifiedModal(false)}
-                style={{ padding: '10px 20px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11 }}
+                className={btnClass('secondary')}
+                style={btn('secondary', 'md')}
               >
-                Keep Viewing Calendar
+                Keep viewing calendar
               </button>
               <button
                 onClick={() => renderFIADashboard(appRoot)}
-                style={{ ...actionBtn({ padding: '10px 24px', fontSize: 11 }) }}
+                className={btnClass('primary')}
+                style={btn('primary', 'md')}
               >
-                Return to FIA Hub →
+                Back to FIA dashboard
               </button>
             </div>
           </div>

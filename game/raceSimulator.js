@@ -1,123 +1,53 @@
 /**
- * raceSimulator.js  v2
+ * raceSimulator.js  v3
  * ────────────────────
- * Complete rewrite for realistic F1-style championship progression.
+ * Lap-by-lap quick simulation of a full Grand Prix.
  *
- * Key changes from v1:
- *  1. Compressed team performance spread (via simTeam.js coefficients)
- *  2. Wider lap variance — enough to create real position changes
- *  3. Driver form/confidence from recent race history (0.92–1.08×)
- *  4. Per-weekend setup quality per driver (random each race)
- *  5. Weather creates genuine wet-weather specialist advantage
- *  6. Track grip evolution builds over race distance
- *  7. Realistic DNF model — top teams ~4%, backmarkers ~11%
- *  8. First-lap start incidents (42% of races affect 1–3 drivers)
- *  9. Strategy archetype system — not all AI chooses optimal strategy
- * 10. Safety car bunching — compresses gaps and creates undercut opportunities
- * 11. Tyre degradation mid-race position swaps based on delta pace
+ * Pace comes from game/paceModel.js (shared with the live race and the race
+ * engineer): car ≈ two thirds of raw pace, driver ≈ one third, with tyre
+ * management, consistency, racecraft and wet skill deciding the rest.
+ *
+ * Each lap, the whole field runs together so cars interact:
+ *  - real tyre stints from each team's chosen strategy (compound offsets, wear, cliff)
+ *  - fuel burn and track evolution
+ *  - dirty air when following, and overtakes that need pace, racecraft and DRS
+ *  - safety cars / VSCs that bunch the field and make pit stops cheap
+ *  - mistakes from inconsistent drivers, start incidents, reliability failures
  */
 
 import { state } from "../state.js";
-import { 
-  rollForFailures, 
-  applySessionWear, 
-  getDriverPuPerformance 
-} from "../utils/engineeringSystem.js";
-import { getTeamLapCredit, getTeamPerformanceBonus } from "../utils/simTeam.js";
+import { rollForFailures, applySessionWear } from "../utils/engineeringSystem.js";
 import { strategies } from "../data/strategies.js";
-import { computeCircuitSuitability } from "../utils/circuitSuitability.js";
 import {
-  DRIVER_PACE_COEFF,
-  DRIVER_RACECRAFT_COEFF,
-  RACE_ENGINE_BOOST_COEFF,
-  RACE_PERF_BONUS_COEFF,
-  LAP_VARIANCE_BASE,
-  LAP_CONSISTENCY_NOISE,
-  WET_SPECIALIST_BONUS,
-  WET_SPECIALIST_PENALTY,
-  START_POSITION_PENALTY,
   START_INCIDENT_PROB,
   START_INCIDENT_MIN,
   START_INCIDENT_MAX,
-  SAFETY_CAR_COMPRESSION,
-  getDNFPerLap,
   getTrackWetProbability,
   getTeamArchetype,
   getArchetypeWeights,
-  calculateRacePaceLapTime,
+  getDNFPerLap,
 } from "../utils/raceBalance.js";
+import {
+  buildPaceProfile,
+  expectedLapTime,
+  tyreLife,
+  chooseNextCompound,
+  parseStrategyCompounds,
+  overtakeChance,
+  dirtyAirPenalty,
+  getOvertakingDifficulty,
+  gaussian,
+  DRY_COMPOUNDS,
+  PIT_LOSS_BASE,
+  SC_PIT_FACTOR,
+  VSC_PIT_FACTOR,
+} from "./paceModel.js";
+import { parseCustomPitLaps, sanitizeCustomPitLaps } from "../utils/strategyModel.js";
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
-}
-
-// ─── Race Boost from Engine Profile ──────────────────────────────────────────
-
-function getRaceBoost(team) {
-  const effects = team.engineProfile?.effects || {};
-  return (effects.raceBoost || 0) + (effects.paceBoost || 0) * RACE_ENGINE_BOOST_COEFF;
-}
-
-// ─── Pit Stop Loss ────────────────────────────────────────────────────────────
-
-/**
- * Simulates time lost in the pit lane.
- * Good tyre management reduces degradation and the need for early stops.
- */
-function pitStopLoss(driver, lap, totalLaps) {
-  // Tyre attribute reduces the wear component
-  const tyreWear = clamp((lap / totalLaps) * (100 - driver.tyre), 0, 25);
-  // Random element: good pit crews vs slow pit crews
-  const pitCrew = 19.5 + Math.random() * 2.5;
-  return pitCrew + tyreWear * 0.10 + Math.random() * 0.60;
-}
-
-// ─── Grid Position Helper ─────────────────────────────────────────────────────
-
-function gridPosition(qualifyingGrid, driver) {
-  if (!qualifyingGrid?.length) return 0;
-  const idx = qualifyingGrid.findIndex((e) => e.driver.name === driver.name);
-  return idx < 0 ? qualifyingGrid.length : idx;
-}
-
-// ─── Lap Variance ─────────────────────────────────────────────────────────────
-
-/**
- * Per-lap time variance.
- *
- * Sources:
- *  - Base random noise (wider than v1)
- *  - Consistency noise (poor consistency = bigger variance)
- *  - Wet specialist advantage/penalty
- *  - Track grip evolution (track gets faster as rubber goes down)
- *  - Tyre degradation ramp (car gets slower as tyres wear)
- */
-function lapVariance(driver, track, isWet, lap, totalLaps) {
-  // Base noise — symmetric but wider than v1
-  const consistencyNoise = (100 - driver.consistency) * LAP_CONSISTENCY_NOISE;
-  const baseNoise = (Math.random() * LAP_VARIANCE_BASE) - (LAP_VARIANCE_BASE * 0.3);
-
-  // Wet weather: specialists gain, others lose
-  let weatherDelta = 0;
-  if (isWet) {
-    const wetAbove85 = Math.max(0, driver.wet - 85);
-    const wetBelow85 = Math.max(0, 85 - driver.wet);
-    weatherDelta = -wetAbove85 * WET_SPECIALIST_BONUS
-                 + wetBelow85 * WET_SPECIALIST_PENALTY;
-  }
-
-  // Track grip evolution: track gets ~0.018s faster across the whole race distance
-  const gripEvolution = -(lap / totalLaps) * 0.018;
-
-  // Tyre degradation ramp: car gets slower in the last 30% of stint
-  const stintFraction = lap / totalLaps;
-  const tyreDeg = stintFraction > 0.70
-    ? (stintFraction - 0.70) * (100 - driver.tyre) * 0.003
-    : 0;
-
-  return baseNoise + (Math.random() - 0.5) * consistencyNoise + weatherDelta + gripEvolution + tyreDeg;
 }
 
 // ─── Strategy Selection ───────────────────────────────────────────────────────
@@ -180,10 +110,57 @@ function generateStartIncidents(finishers) {
   return incidentMap;
 }
 
+// ─── Objective modifiers (player only) ────────────────────────────────────────
+
+const OBJECTIVE_MODS = {
+  win:          { pace: -0.15, variance: 1.4, dnf: 1.3 },
+  podium:       { pace: -0.08, variance: 1.2, dnf: 1.15 },
+  points:       { pace: 0,     variance: 1.0, dnf: 1.0 },
+  conservative: { pace: 0.15,  variance: 0.6, dnf: 0.5 },
+  gamble:       { pace: -0.05, variance: 2.0, dnf: 1.2 },
+};
+
+// ─── Strategy planning ────────────────────────────────────────────────────────
+
+/** Turn a strategy label into a legal, condition-appropriate compound plan. */
+function buildCompoundPlan(label, isWet) {
+  if (isWet) return ["Intermediate"];
+  let plan = parseStrategyCompounds(label).map((c) => (DRY_COMPOUNDS.includes(c) ? c : null));
+  // Teams don't fit wet tyres on a dry track: swap them for sensible slicks
+  plan = plan.map((c, i) => c || (i === 0 ? "Medium" : "Hard"));
+  if (plan.length === 0) plan = ["Medium", "Hard"];
+  if (new Set(plan).size < 2) plan.push(plan[0] === "Hard" ? "Medium" : "Hard");
+  return plan;
+}
+
+/** Split the race into stints sized by each compound's life. Returns the pit laps. */
+function planPitLaps(profile, plan, laps, jitter) {
+  if (plan.length < 2) return [];
+  const lives = plan.map((c) => tyreLife(profile, c));
+  const total = lives.reduce((a, b) => a + b, 0);
+  const pits = [];
+  let acc = 0;
+  for (let i = 0; i < plan.length - 1; i++) {
+    acc += lives[i];
+    const lap = Math.round((acc / total) * laps + (Math.random() - 0.5) * 2 * jitter);
+    pits.push(clamp(lap, 2 + i * 3, laps - 3));
+  }
+  return pits.sort((a, b) => a - b).filter((l, i, arr) => i === 0 || l - arr[i - 1] >= 3);
+}
+
+function positionsOf(cars) {
+  const racing = cars.filter((c) => !c.retired).sort((a, b) => a.cum - b.cum);
+  const out = racing.slice();
+  cars.filter((c) => c.retired).sort((a, b) => b.lapTimes.length - a.lapTimes.length).forEach((c) => out.push(c));
+  const map = new Map();
+  out.forEach((c, i) => map.set(c.driver.name, i + 1));
+  return map;
+}
+
 // ─── Main Simulation ──────────────────────────────────────────────────────────
 
 /**
- * simulateRaceEvent  v2
+ * simulateRaceEvent  v3
  *
  * @param {Array}  teams                   All teams (player first, then AI)
  * @param {object} track                   Calendar track object
@@ -191,7 +168,8 @@ function generateStartIncidents(finishers) {
  * @param {Array}  [qualifyingGrid=null]   Pre-sorted qualifying grid
  * @param {object} [playerSelectedStrategies={}]  Player driver name → strategy id
  * @param {object} [weekendContext=null]   Pre-calculated performance context
- * @returns {Array} Sorted finisher list (P1 first, DNFs last)
+ * @param {string} [selectedObjective]     Player's race objective id
+ * @returns {{ finishers: Array, replayData: object }}
  */
 export function simulateRaceEvent(
   teams,
@@ -202,342 +180,349 @@ export function simulateRaceEvent(
   weekendContext = null,
   selectedObjective = 'points'
 ) {
+  playerSelectedStrategies = playerSelectedStrategies || {};
   const roundStrategies = track.round ? (strategies[track.round] || []) : [];
 
-  // ── Season Rules Modifiers ───────────────────────────────────────────────
+  // ── Season rules ───────────────────────────────────────────────────────────
   const seasonRules = state.season?.rules || {};
-  const scFreqMultiplier = seasonRules.scFrequency === 'low' ? 0.4
-    : seasonRules.scFrequency === 'high' ? 1.8
-    : 1.0; // normal
-  const failureMultiplier = seasonRules.failures === 'low' ? 0.3
-    : seasonRules.failures === 'high' ? 2.0
-    : 1.0; // normal
+  const scFreqMultiplier = seasonRules.scFrequency === 'low' ? 0.4 : seasonRules.scFrequency === 'high' ? 1.8 : 1.0;
+  const failureMultiplier = seasonRules.failures === 'low' ? 0.3 : seasonRules.failures === 'high' ? 2.0 : 1.0;
   const weatherEnabled = seasonRules.weather !== false;
 
-  // Race-wide conditions (determined once per race)
+  // ── Race-wide conditions ──────────────────────────────────────────────────
   const wetChance = weatherEnabled ? getTrackWetProbability(track.name || track.circuit || "") : 0;
   const isWet = Math.random() < wetChance;
+  const difficulty = getOvertakingDifficulty(track);
 
-  // Safety car: ~28% of races, scaled by scFrequency rule
-  const hasSafetyCar = Math.random() < (0.28 * scFreqMultiplier);
-  const safetyCarLap = hasSafetyCar
-    ? Math.floor(laps * (0.25 + Math.random() * 0.50))
-    : null;
+  const hasSafetyCar = Math.random() < 0.28 * scFreqMultiplier;
+  const safetyCarLap = hasSafetyCar ? Math.floor(laps * (0.15 + Math.random() * 0.65)) : null;
+  const scRange = safetyCarLap ? [safetyCarLap, Math.min(laps - 1, safetyCarLap + 3)] : null;
+  const hasVSC = !hasSafetyCar && Math.random() < 0.15 * scFreqMultiplier;
+  const vscLap = hasVSC ? Math.floor(laps * (0.2 + Math.random() * 0.6)) : null;
+  const vscRange = vscLap ? [vscLap, Math.min(laps - 1, vscLap + 1)] : null;
+  const inRange = (r, lap) => r && lap >= r[0] && lap <= r[1];
 
-  // Virtual safety car: separate from full SC, ~15% additional, also scaled
-  const hasVSC = !hasSafetyCar && Math.random() < (0.15 * scFreqMultiplier);
-  const vscLap = hasVSC
-    ? Math.floor(laps * (0.30 + Math.random() * 0.40))
-    : null;
-
-  // ── Build finisher array ──────────────────────────────────────────────────
-
-  const finishers = teams.flatMap((team) =>
+  // ── Build the field ───────────────────────────────────────────────────────
+  const cars = teams.flatMap((team) =>
     team.drivers.map((driver) => {
-      // ── Strategy selection ──────────────────────────────────────────────
       let chosenStrat = null;
-      if (playerSelectedStrategies[driver.name]) {
-        chosenStrat = roundStrategies.find(s => s.id === playerSelectedStrategies[driver.name]);
+      const playerPick = playerSelectedStrategies[driver.name];
+      if (playerPick) {
+        chosenStrat = roundStrategies.find((s) => s.id === playerPick) || { label: String(playerPick), winModifier: 0.05, riskModifier: 0.01 };
       } else if (roundStrategies.length > 0) {
         chosenStrat = selectAIStrategy(roundStrategies, team);
       }
+      const isPlayer = playerPick !== undefined;
+      const winMod = chosenStrat?.winModifier ?? 0;
+      const riskMod = chosenStrat?.riskModifier ?? 0;
+      const obj = isPlayer ? (OBJECTIVE_MODS[selectedObjective] || OBJECTIVE_MODS.points) : OBJECTIVE_MODS.points;
 
-      const winMod  = chosenStrat ? chosenStrat.winModifier  : 0;
-      const riskMod = chosenStrat ? chosenStrat.riskModifier : 0;
-      const isHighRisk = riskMod >= 0.05;
+      const profile = buildPaceProfile({ team, driver, track, isWet, weekendContext, appState: state });
+      const plan = buildCompoundPlan(chosenStrat?.label, isWet);
+      // A custom plan from the weekend Strategy builder carries its own pit laps
+      const customPits = isPlayer && !isWet ? sanitizeCustomPitLaps(parseCustomPitLaps(chosenStrat?.label), laps, plan.length) : null;
+      const pitLaps = isWet ? [] : customPits || planPitLaps(profile, plan, laps, isPlayer ? 1 : 3);
 
-      const isPlayer = playerSelectedStrategies[driver.name] !== undefined;
-
-      // ── Objective Modifiers (Player Only) ───────────────────────────────
-      let objPaceMod = 0;
-      let objVarMod = 1.0;
-      let objDnfMod = 1.0;
-
-      if (isPlayer) {
-        if (selectedObjective === 'win') { objPaceMod = -0.15; objVarMod = 1.6; objDnfMod = 1.3; }
-        else if (selectedObjective === 'podium') { objPaceMod = -0.08; objVarMod = 1.3; objDnfMod = 1.15; }
-        else if (selectedObjective === 'points') { objPaceMod = 0; objVarMod = 1.0; objDnfMod = 1.0; }
-        else if (selectedObjective === 'conservative') { objPaceMod = 0.15; objVarMod = 0.5; objDnfMod = 0.5; }
-        else if (selectedObjective === 'gamble') { objPaceMod = -0.05; objVarMod = 2.5; objDnfMod = 1.2; }
-        // For beat rivals, we just use a balanced pace
-      }
-
-      // ── Grid position ───────────────────────────────────────────────────
-      const pos = gridPosition(qualifyingGrid, driver);
-      const gridPos = pos; // store for incident targeting
-
-      // ── Weighted race pace model ───────────────────────────────────────
-      const finalModifier = weekendContext?.drivers?.[driver.name]?.finalModifier ?? 1.0;
-      const weekendPerformanceScore = weekendContext?.drivers?.[driver.name]?.weekendPerformanceScore ?? null;
-      const narrativeEvent = weekendContext?.drivers?.[driver.name]?.narrativeEvent ?? null;
-
-      const puPerfMod = getDriverPuPerformance(state, driver.name); // 1.0 is healthy, lower is worse
-      const puPenalty = (1.0 - puPerfMod) * 0.18; // small penalty, keeping the field tight
-
-      // ── Circuit Suitability Delta ────────────────────────────────────────
-      // Adjusts base lap time by ±0–1.2s based on how well the team's car
-      // attributes (engine, aero, chassis, tyre, wet) match the circuit's
-      // performance demands. Ensures car-circuit fit is meaningful without
-      // breaking the existing simulation balance.
-      let circuitSuitabilityDelta = 0;
-      try {
-        const { timeDelta } = computeCircuitSuitability(team, track.circuit || track.name || '');
-        // Apply 40% of the delta to preserve existing balance (±0.48s max)
-        circuitSuitabilityDelta = timeDelta * 0.4;
-      } catch (_) { /* ignore if circuit not found */ }
-
-      const baseLap = calculateRacePaceLapTime({
-        team,
-        driver,
-        trackBaseTime: track.baseTime + circuitSuitabilityDelta,
-        weekendPerformanceScore,
-        tyreHealth: clamp(1 - (0.12 + (driver.tyre / 100) * 0.06), 0.3, 1),
-        fuelLoad: 0.9,
-        trackGrip: finalModifier,
-        isWet,
-        randomVariation: (Math.random() - 0.5) * 0.15,
-        trafficPenalty: 0,
-        drsActive: false,
-        ersActive: false,
-        dirtyAirPenalty: 0,
-        driverMistake: 0,
-        safetyCar: false,
-        weatherDelta: 0,
-        lap: 1,
-        totalLaps: laps,
-      });
-      const adjustedBaseLap = baseLap * (1 - winMod * 0.01);
-      const effectiveBaseLap = adjustedBaseLap + objPaceMod + puPenalty;
-
-      // ── Risk strategy: more variance and potential for incidents ─────────
-      const riskVarianceMultiplier = (1 + (riskMod * 2.0)) * objVarMod;
+      // Risky strategies can bite: a stop-go style time loss or a retirement
       const riskTriggered = Math.random() < riskMod;
-      const riskPenaltyApplied = riskTriggered
-        ? (Math.random() < 0.30 ? "DNF" : "+35s")
-        : false;
+      const riskOutcome = riskTriggered ? (Math.random() < 0.3 ? "DNF" : "+35s") : null;
 
-      // ── Grid start penalty ──────────────────────────────────────────────
-      const startPenalty = qualifyingGrid?.length ? pos * START_POSITION_PENALTY : 0;
-
-      // ── Pit stop strategy ───────────────────────────────────────────────
-      // Two-stop strategies get a random second pit lap
-      const plannedPitLap  = Math.floor(laps * (0.38 + Math.random() * 0.18));
-      const hasSecondStop  = winMod > 0.08 && Math.random() < 0.30; // ~30% chance of 2-stopper for rank1
-      const secondPitLap   = hasSecondStop
-        ? Math.floor(laps * (0.65 + Math.random() * 0.15))
-        : null;
+      // Reliability
+      const stress = (riskMod >= 0.05 ? 1.2 : 1.0) * obj.dnf * failureMultiplier;
+      // Player cars use tracked component wear; the AI uses its team's reliability rating
+      const failures = rollForFailures(state, driver.name, stress);
+      let dnfLap = null;
+      let dnfReason = null;
+      if (failures.length > 0) {
+        dnfLap = 1 + Math.floor(Math.random() * laps);
+        dnfReason = `PU failure: ${failures[0].type}`;
+      } else if (!isPlayer && !state.engineering?.driverPools?.[driver.name]) {
+        const perLap = getDNFPerLap(team, driver, riskMod >= 0.05) * failureMultiplier;
+        if (Math.random() < 1 - Math.pow(1 - perLap, laps)) {
+          dnfLap = 1 + Math.floor(Math.random() * laps);
+          dnfReason = ['Engine', 'Gearbox', 'Hydraulics', 'Brakes', 'Electrical'][Math.floor(Math.random() * 5)] + ' failure';
+        }
+      }
+      if (riskOutcome === "DNF" && !dnfLap) {
+        dnfLap = 1 + Math.floor(Math.random() * laps);
+        dnfReason = "Collision damage";
+      }
 
       return {
         driver,
         team,
-        gridPos,
-        effectiveBaseLap,
-        riskVarianceMultiplier,
-        riskPenaltyApplied,
-        startPenalty,
-        plannedPitLap,
-        secondPitLap,
-        isHighRisk,
-        riskMod,
-        time: startPenalty,
-        retired: riskPenaltyApplied === "DNF",
         isPlayer,
-        objDnfMod,
-        circuitSuitabilityDelta,
-        explanation: narrativeEvent ? narrativeEvent.label : null
+        profile,
+        plan,
+        pitLaps,
+        planIdx: 0,
+        compound: plan[0],
+        tyreAge: 0,
+        usedCompounds: [plan[0]],
+        stints: [{ compound: plan[0], startLap: 1, endLap: null }],
+        stratPace: -winMod * 0.5 + obj.pace,
+        varianceMult: (1 + riskMod * 2) * obj.variance,
+        riskOutcome,
+        dnfLap,
+        dnfReason,
+        gridPos: 0,
+        cum: 0,
+        lapTimes: [],
+        cumulativeTimes: [],
+        stops: 0,
+        retired: false,
+        mistakes: 0,
+        overtakes: 0,
+        scStop: false,
+        incident: 0,
+        narrative: profile.narrative,
       };
     })
   );
 
-  // ── Apply first-lap incidents ─────────────────────────────────────────────
-  const startIncidents = generateStartIncidents(finishers);
-  finishers.forEach(f => {
-    const incidentPenalty = startIncidents.get(f.driver.name);
-    if (incidentPenalty) {
-      f.time += incidentPenalty;
-    }
+  // ── Grid ──────────────────────────────────────────────────────────────────
+  if (qualifyingGrid?.length) {
+    cars.forEach((c) => {
+      const idx = qualifyingGrid.findIndex((e) => e.driver?.name === c.driver.name);
+      c.gridPos = idx < 0 ? qualifyingGrid.length : idx;
+    });
+  } else {
+    // No qualifying session: grid by single-lap pace with a little noise
+    [...cars]
+      .map((c) => ({ c, k: c.profile.staticDelta + gaussian() * 0.25 }))
+      .sort((a, b) => a.k - b.k)
+      .forEach(({ c }, i) => { c.gridPos = i; });
+  }
+  cars.forEach((c) => { c.cum = c.gridPos * 0.25; }); // staggered grid slots
+
+  // ── Start ─────────────────────────────────────────────────────────────────
+  const startIncidents = generateStartIncidents(cars);
+  cars.forEach((c) => {
+    const launchSkill = 1 + (85 - c.profile.racecraft) * 0.03;
+    c.launch = gaussian() * 0.35 * Math.max(0.4, launchSkill);
+    c.incident = startIncidents.get(c.driver.name) || 0;
   });
 
-  // ── Snapshots for Replay Data ─────────────────────────────────────────────
   const snapshots = [];
-
-  // ── Run lap-by-lap simulation ─────────────────────────────────────────────
-  finishers.forEach((f) => {
-    f.lapTimes = []; // individual lap times
-    f.cumulativeTimes = []; // Store cumulative time for snapshots
-    if (f.retired) return;
-
-    // DNF processing via new Engineering System
-    // We roll for failures once per race based on overall stress, 
-    // and assign a random failure lap if they DNF.
-    const stressMod = f.isHighRisk ? 1.2 : 1.0;
-    const failures = rollForFailures(state, f.driver.name, stressMod * f.objDnfMod * failureMultiplier);
-    const dnfLap = failures.length > 0 ? Math.floor(Math.random() * laps) + 1 : -1;
-
-    for (let lap = 1; lap <= laps; lap++) {
-      if (f.retired) break;
-
-      let prevTime = f.time;
-
-      // Check Engineering DNF
-      if (lap === dnfLap) {
-        f.retired = true;
-        f.time = 99999 - (Math.random() * 1000); // slight spread among DNFs
-        f.dnfReason = `PU Failure: ${failures[0].type}`;
-        break;
-      }
-
-      // Lap time with variance
-      const lapVar = lapVariance(f.driver, track, isWet, lap, laps)
-        * f.riskVarianceMultiplier;
-      const tyreHealth = clamp(1 - ((lap / laps) * 0.45), 0.2, 1);
-      const fuelLoad = clamp(1 - (lap / laps) * 0.15, 0.45, 1);
-      const dirtyAirPenalty = lap > 1 && lap < 8 ? 0.08 : 0;
-      const trafficPenalty = lap <= 3 ? 0.04 : 0;
-      const drsActive = lap > 8 && lap < laps - 4 && Math.random() < 0.55;
-      const ersActive = lap > 4 && lap < 20 && Math.random() < 0.35;
-      const driverMistake = lap > 1 && Math.random() < 0.025 ? 0.25 : 0;
-      const safetyCar = hasSafetyCar && lap === safetyCarLap;
-      const weatherDelta = isWet ? (f.driver.wet - 85) * 0.003 : 0;
-      const dynamicLapTime = calculateRacePaceLapTime({
-        team: f.team,
-        driver: f.driver,
-        trackBaseTime: track.baseTime + (f.circuitSuitabilityDelta || 0),
-        weekendPerformanceScore: weekendContext?.drivers?.[f.driver.name]?.weekendPerformanceScore ?? null,
-        tyreHealth,
-        fuelLoad,
-        trackGrip: 1 - (lap / laps) * 0.005,
-        isWet,
-        randomVariation: (Math.random() - 0.5) * 0.12,
-        trafficPenalty,
-        drsActive,
-        ersActive,
-        dirtyAirPenalty,
-        driverMistake,
-        safetyCar,
-        weatherDelta,
-        lap,
-        totalLaps: laps,
-      });
-
-      f.time += dynamicLapTime + lapVar;
-
-      // Pit stop: first stop
-      if (lap === f.plannedPitLap) {
-        f.time += pitStopLoss(f.driver, lap, laps);
-      }
-
-      // Pit stop: second stop (if two-stopper)
-      if (f.secondPitLap && lap === f.secondPitLap) {
-        f.time += pitStopLoss(f.driver, lap, laps);
-      }
-
-      // Safety car: compresses the field
-      if (safetyCarLap && lap === safetyCarLap) {
-        // SC compression: leaders lose more time (field bunches)
-        // We approximate this by adding a fixed time to everyone
-        f.time += SAFETY_CAR_COMPRESSION + Math.random() * 2.0;
-      }
-
-      // Virtual safety car: smaller compression
-      if (vscLap && lap === vscLap) {
-        f.time += 1.5 + Math.random() * 1.0;
-      }
-
-      let lapTime = f.time - prevTime;
-      f.lapTimes.push(lapTime);
-      f.cumulativeTimes.push(f.time);
-    }
-
-    // Post-race: risk strategy time penalty (collision damage, stop-go, etc.)
-    if (!f.retired && f.riskPenaltyApplied === "+35s") {
-      f.time += 35 + Math.random() * 10;
-    }
-  });
-
-  // Generate Replay Snapshots and populate Events (approximated for Quick Sim)
   const events = [];
-  
+
+  // ── Lap loop ──────────────────────────────────────────────────────────────
   for (let lap = 1; lap <= laps; lap++) {
-    const lapSnapshot = { lap, time: lap * track.baseTime, cars: [] };
-    finishers.forEach(f => {
-      const isRetiredLap = f.retired && (!f.cumulativeTimes || lap > f.cumulativeTimes.length);
-      const cTime = f.cumulativeTimes && f.cumulativeTimes[lap - 1] ? f.cumulativeTimes[lap - 1] : (f.cumulativeTimes && f.cumulativeTimes.length > 0 ? f.cumulativeTimes[f.cumulativeTimes.length - 1] : lap * track.baseTime);
-      
-      if (isRetiredLap) {
-        lapSnapshot.cars.push({ id: f.driver.name, team: f.team.name, distance: f.cumulativeTimes ? f.cumulativeTimes.length : 0, cumulativeTime: cTime, retired: true });
-      } else {
-        lapSnapshot.cars.push({ id: f.driver.name, team: f.team.name, distance: lap, cumulativeTime: cTime, retired: false });
+    const sc = inRange(scRange, lap);
+    const vsc = inRange(vscRange, lap);
+    const posBefore = positionsOf(cars);
+
+    // Retirements at the start of the lap
+    cars.forEach((c) => {
+      if (!c.retired && c.dnfLap === lap) {
+        c.retired = true;
+        c.stints[c.stints.length - 1].endLap = lap - 1;
       }
     });
-    
-    // Sort cars to get exact positions at the end of this lap
-    lapSnapshot.cars.sort((a, b) => {
-      if (a.retired && !b.retired) return 1;
-      if (!a.retired && b.retired) return -1;
-      return a.cumulativeTime - b.cumulativeTime;
+
+    const order = cars.filter((c) => !c.retired).sort((a, b) => a.cum - b.cum);
+    const lapsLeft = laps - lap;
+
+    // 1. Each car's intended lap (pace, tyres, fuel, noise, mistakes, pit)
+    order.forEach((c) => {
+      const life = tyreLife(c.profile, c.compound);
+      const planned = c.pitLaps[0] === lap;
+      const forced = c.tyreAge > life * 1.25 && lapsLeft > 3;
+      // Under a safety car, stops are cheap: take them if one is due soon
+      const nextPlanned = c.pitLaps[0];
+      const scOpportunity = (sc || vsc) && lapsLeft > 5 && c.tyreAge >= 6 && (
+        (nextPlanned && nextPlanned - lap <= 10) ||
+        (!nextPlanned && c.tyreAge > life * 0.6 && lapsLeft > 8)
+      );
+      c.pitting = (planned || forced || scOpportunity) && lapsLeft > 1;
+
+      let t = expectedLapTime(c.profile, { compound: c.compound, tyreAge: c.tyreAge, lap, totalLaps: laps }) + c.stratPace;
+      c.expT = t; // underlying pace this lap, before noise — what decides a pass
+      t += clamp(gaussian() * c.profile.noiseSigma * c.varianceMult, -3 * c.profile.noiseSigma, 3 * c.profile.noiseSigma);
+      if (!sc && !vsc && Math.random() < c.profile.mistakeChance * c.varianceMult) {
+        t += 0.6 + Math.random() * 1.9;
+        c.mistakes++;
+      }
+      if (lap === 1) t += c.launch + c.incident + 1.5;
+      if (sc) t = Math.max(t, c.profile.baseTime * 1.35);
+      if (vsc) t *= 1.3;
+      if (c.pitting) {
+        c.pitLoss = PIT_LOSS_BASE * (sc ? SC_PIT_FACTOR : vsc ? VSC_PIT_FACTOR : 1) + Math.random() * 1.2;
+        t += c.pitLoss;
+      }
+      c.t = t;
+      c.startCum = c.cum;
+      c.newCum = c.cum + t;
     });
-    
-    // Inject position into cars array
-    lapSnapshot.cars.forEach((c, i) => { c.pos = i + 1; });
-    
+
+    // 2. Traffic: dirty air and overtakes (not under neutralisation)
+    if (!sc && !vsc) {
+      for (let i = 1; i < order.length; i++) {
+        const c = order[i];
+        if (c.pitting) continue;
+        const ahead = order[i - 1];
+        const gapStart = c.startCum - ahead.startCum;
+        if (!ahead.pitting) {
+          c.t += dirtyAirPenalty(gapStart, difficulty);
+          c.newCum = c.startCum + c.t;
+        }
+        // Try to pass each car we'd otherwise run into, nearest first
+        for (let j = i - 1; j >= 0; j--) {
+          const a = order[j];
+          if (a.pitting) continue;
+          if (c.newCum >= a.newCum + 0.2) break;
+          const p = overtakeChance({
+            paceAdvantage: a.expT - c.expT,
+            attackerRacecraft: c.profile.racecraft,
+            defenderRacecraft: a.profile.racecraft,
+            difficulty: lap === 1 ? difficulty * 0.6 : difficulty,
+            drs: lap > 2 && (c.startCum - a.startCum) < 1.0,
+            tyreAgeDelta: a.tyreAge - c.tyreAge,
+          });
+          if (Math.random() < p) {
+            if (c.newCum > a.newCum - 0.1) c.newCum = a.newCum - 0.1 - Math.random() * 0.2;
+            if (lap > 1) c.overtakes++;
+          } else {
+            c.newCum = a.newCum + 0.25 + Math.random() * 0.3;
+            break;
+          }
+        }
+        c.t = c.newCum - c.startCum;
+      }
+    }
+
+    // 3. Safety car bunches the field (gaps shrink but order is kept)
+    if (sc) {
+      const byNew = [...order].sort((a, b) => a.newCum - b.newCum);
+      for (let i = 1; i < byNew.length; i++) {
+        const gap = byNew[i].newCum - byNew[i - 1].newCum;
+        byNew[i].newCum = byNew[i - 1].newCum + Math.max(0.6, gap * 0.35);
+      }
+      byNew.forEach((c) => { c.t = c.newCum - c.startCum; });
+    }
+
+    // 4. Commit the lap
+    order.forEach((c) => {
+      c.cum = c.newCum;
+      c.lapTimes.push(c.t);
+      c.cumulativeTimes.push(c.cum);
+      c.tyreAge += 1;
+      if (c.pitting) {
+        const from = c.compound;
+        // This stop replaces the next planned one (even if we came in early)
+        if (c.pitLaps.length && c.pitLaps[0] <= lap + 10) c.pitLaps.shift();
+        c.pitLaps = c.pitLaps.filter((l) => l > lap + 3);
+        const planned = c.plan[c.planIdx + 1];
+        const plannedOk = planned && (c.pitLaps.length > 0 || tyreLife(c.profile, planned) * 1.15 >= laps - lap);
+        const next = plannedOk
+          ? planned
+          : chooseNextCompound(c.profile, laps - lap, c.usedCompounds, { lap, totalLaps: laps });
+        c.planIdx++;
+        c.stints[c.stints.length - 1].endLap = lap;
+        c.stints.push({ compound: next, startLap: lap + 1, endLap: null });
+        c.compound = next;
+        c.usedCompounds.push(next);
+        c.tyreAge = 0;
+        c.stops++;
+        // Stopped early (SC or forced) and the new set can't make the flag: plan another stop
+        if (c.pitLaps.length === 0 && tyreLife(c.profile, next) * 1.2 < laps - lap) {
+          c.pitLaps = [lap + Math.round(tyreLife(c.profile, next))];
+        }
+        if (sc || vsc) c.scStop = true;
+        c.lastPit = { lap, from, to: next };
+      }
+    });
+
+    // 5. Snapshot + pit events
+    const posAfter = positionsOf(cars);
+    const lapSnapshot = { lap, time: lap * track.baseTime, cars: [] };
+    cars.forEach((c) => {
+      lapSnapshot.cars.push({
+        id: c.driver.name,
+        team: c.team.name,
+        distance: c.retired ? c.lapTimes.length : lap,
+        cumulativeTime: c.cum,
+        retired: c.retired,
+        pos: posAfter.get(c.driver.name),
+        compound: c.compound,
+      });
+      if (c.lastPit && c.lastPit.lap === lap) {
+        events.push({
+          type: 'PIT_STOP',
+          driver: c.driver.name,
+          team: c.team.name,
+          lap,
+          time: (2.0 + Math.random() * 0.9).toFixed(2),
+          oldPos: posBefore.get(c.driver.name),
+          newPos: posAfter.get(c.driver.name),
+          strategy: `${c.lastPit.from} → ${c.lastPit.to}${sc ? ' (SC)' : vsc ? ' (VSC)' : ''}`,
+        });
+      }
+    });
+    lapSnapshot.cars.sort((a, b) => a.pos - b.pos);
     snapshots.push(lapSnapshot);
   }
 
-  // Now identify pit stops by looking at position drops across pit laps
-  finishers.forEach(f => {
-    if (f.plannedPitLap) {
-      const preLapSnapshot = snapshots[f.plannedPitLap - 2]?.cars.find(c => c.id === f.driver.name);
-      const postLapSnapshot = snapshots[f.plannedPitLap - 1]?.cars.find(c => c.id === f.driver.name);
-      if (preLapSnapshot && postLapSnapshot) {
-        events.push({
-          type: 'PIT_STOP',
-          driver: f.driver.name,
-          team: f.team.name,
-          lap: f.plannedPitLap,
-          time: (2.0 + Math.random() * 0.8).toFixed(2), // simulated stationary time
-          oldPos: preLapSnapshot.pos,
-          newPos: postLapSnapshot.pos,
-          strategy: 'Change Tyres'
-        });
-      }
+  // ── Post-race ─────────────────────────────────────────────────────────────
+  cars.forEach((c) => {
+    const last = c.stints[c.stints.length - 1];
+    if (last.endLap == null) last.endLap = c.lapTimes.length;
+    if (!c.retired && c.riskOutcome === "+35s") {
+      c.cum += 35 + Math.random() * 10;
+      c.penalty = true;
     }
-    
-    if (f.secondPitLap) {
-      const preLapSnapshot = snapshots[f.secondPitLap - 2]?.cars.find(c => c.id === f.driver.name);
-      const postLapSnapshot = snapshots[f.secondPitLap - 1]?.cars.find(c => c.id === f.driver.name);
-      if (preLapSnapshot && postLapSnapshot) {
-        events.push({
-          type: 'PIT_STOP',
-          driver: f.driver.name,
-          team: f.team.name,
-          lap: f.secondPitLap,
-          time: (2.0 + Math.random() * 0.8).toFixed(2),
-          oldPos: preLapSnapshot.pos,
-          newPos: postLapSnapshot.pos,
-          strategy: 'Change Tyres'
-        });
-      }
-    }
+    c.time = c.retired ? 99999 - c.lapTimes.length * 10 - Math.random() : c.cum;
   });
 
-  // Sort events chronologically
-  events.sort((a, b) => a.lap - b.lap);
+  const finalFinishers = cars
+    .sort((a, b) => {
+      if (a.retired !== b.retired) return a.retired ? 1 : -1;
+      return a.time - b.time;
+    })
+    .map((c) => {
+      const pits = c.stints.slice(1).map((s) => s.startLap - 1);
+      const explanation = c.narrative
+        || (c.penalty ? 'Time penalty' : null)
+        || (c.incident ? 'Lap 1 incident' : null)
+        || (c.scStop ? 'Cheap stop under the safety car' : null)
+        || (c.mistakes >= 2 ? `${c.mistakes} driver errors` : null)
+        || (c.overtakes >= 4 ? `${c.overtakes} overtakes` : null);
+      return {
+        driver: c.driver,
+        team: c.team,
+        isPlayer: c.isPlayer,
+        gridPos: c.gridPos,
+        time: c.time,
+        retired: c.retired,
+        dnfReason: c.retired ? c.dnfReason : null,
+        lapTimes: c.lapTimes,
+        cumulativeTimes: c.cumulativeTimes,
+        stops: c.stops,
+        stints: c.stints,
+        plannedPitLap: pits[0] ?? null,
+        secondPitLap: pits[1] ?? null,
+        tyreCompound: c.compound,
+        overtakes: c.overtakes,
+        mistakes: c.mistakes,
+        explanation,
+      };
+    });
 
-  // ── Sort: finishers first (by time), DNFs last ────────────────────────────
-  const finalFinishers = finishers.sort((a, b) => {
-    if (a.retired && !b.retired) return 1;
-    if (!a.retired && b.retired) return -1;
-    if (a.retired && b.retired) return a.time - b.time;
-    return a.time - b.time;
+  // ── Component wear ────────────────────────────────────────────────────────
+  finalFinishers.forEach((f) => {
+    const aggression = f.isPlayer && (selectedObjective === 'win' || selectedObjective === 'gamble') ? 1.2 : 0.9;
+    applySessionWear(state, f.driver.name, track.speed || 1.0, aggression, true);
   });
 
-  // ── Apply Component Wear ──────────────────────────────────────────────────
-  finishers.forEach(f => {
-    const aggression = f.isHighRisk ? 1.2 : 0.9;
-    const trackIntensity = track.speed || 1.0;
-    applySessionWear(state, f.driver.name, trackIntensity, aggression, true);
-  });
-
-  return { finishers: finalFinishers, replayData: { totalLaps: laps, snapshots, events, scLaps: safetyCarLap ? [safetyCarLap, safetyCarLap + 3] : [], vscLaps: vscLap ? [vscLap, vscLap + 1] : [] } };
+  return {
+    finishers: finalFinishers,
+    replayData: {
+      totalLaps: laps,
+      weather: isWet ? 'wet' : 'dry',
+      snapshots,
+      events,
+      scLaps: scRange || [],
+      vscLaps: vscRange || [],
+    },
+  };
 }

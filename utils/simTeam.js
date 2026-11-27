@@ -42,7 +42,7 @@ function getTeamBonusFactors(appState) {
   };
 }
 
-function getCarSpecs(team) {
+export function getCarSpecs(team) {
   // Check if this is the player team and we have engineering.carSpecs
   if (team.isPlayerTeam && state.engineering?.carSpecs) {
     const cs = state.engineering.carSpecs;

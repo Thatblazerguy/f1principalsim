@@ -2,12 +2,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { getTrackPath } from '../../data/realTrackLayouts.js';
 import { HUB } from '../HubLayout.tsx';
 
-const TIRE_COLORS = {
-  "Soft": "#ef4444",
-  "Medium": "#facc15",
-  "Hard": "#ffffff",
-  "Intermediate": "#22c55e",
-  "Wet": "#3b82f6"
+const TIRE_COLORS: Record<string, string> = {
+  Soft: HUB.tyre.soft, Medium: HUB.tyre.medium, Hard: HUB.tyre.hard, Intermediate: HUB.tyre.inter, Wet: HUB.tyre.wet
 };
 
 export function TrackMap({ cars, trackName }) {
@@ -115,9 +111,9 @@ export function TrackMap({ cars, trackName }) {
               const glow = glowRefs.current[car.id];
               if (glow) {
                  if (inBattle) {
-                    glow.setAttribute('opacity', '0.6');
+                    glow.setAttribute('opacity', '0.25');
                     glow.setAttribute('r', '8');
-                    glow.setAttribute('fill', HUB.accent);
+                    glow.setAttribute('fill', HUB.textPrimary);
                  } else {
                     glow.setAttribute('opacity', '0');
                     glow.setAttribute('r', '3');
@@ -212,20 +208,20 @@ export function TrackMap({ cars, trackName }) {
                 r="3" 
                 fill="transparent" 
                 opacity="0" 
-                style={{ transition: 'all 0.3s ease' }} 
+                style={{ transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, opacity 0.3s ease, transform 0.3s ease' }} 
               />
               
               {/* Outer ring for tire compound */}
               <circle r="4" fill={TIRE_COLORS[car.tireCompound]} opacity={isPlayer ? 1 : 0.8} />
               
               {/* Inner dot */}
-              <circle r="2.5" fill={isPlayer ? HUB.accent : "#111"} />
+              <circle r="2.5" fill={isPlayer ? HUB.accent : HUB.sidebar} />
               
               {/* DRS Indicator */}
               <rect 
                 ref={el => drsRefs.current[car.id] = el}
                 x="-4" y="-8" width="8" height="2" 
-                fill="#22c55e" 
+                fill={HUB.positive} 
                 rx="1"
                 opacity="0"
                 style={{ transition: 'opacity 0.2s ease' }}
@@ -237,7 +233,6 @@ export function TrackMap({ cars, trackName }) {
                 x="8" y="3" 
                 fill={isPlayer ? "#fff" : "rgba(255,255,255,0.7)"} 
                 fontSize="7px" 
-                fontWeight="bold" 
                 fontFamily={HUB.fontMono}
                 style={{ display: isPlayer ? 'block' : 'none' }}
               >

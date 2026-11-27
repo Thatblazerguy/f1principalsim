@@ -6,22 +6,21 @@ import { motion, AnimatePresence, useSpring, useTransform, useMotionValue } from
 // ----------------------------------------------------------------------
 
 // 1. Fast, precise, zero-bounce spring. Ideal for layout animations and snappy interactions.
-export const springTransition = { 
-  type: "spring", 
-  bounce: 0, 
-  duration: 0.3 
+export const springTransition = {
+  duration: 0.3,
+  ease: [0.22, 1, 0.36, 1]
 };
 
 // 2. Smooth ease-out. Ideal for simple fades and subtle entrances.
 export const easeTransition = {
   duration: 0.2,
-  ease: [0.32, 0.72, 0, 1] // Custom ease-out curve
+  ease: [0.22, 1, 0.36, 1]
 };
 
 // 3. Ultra-fast transition for micro-interactions (e.g., hover states)
 export const microTransition = {
   duration: 0.15,
-  ease: "easeOut"
+  ease: [0.22, 1, 0.36, 1]
 };
 
 // ----------------------------------------------------------------------
@@ -36,10 +35,10 @@ export const PageTransition = ({ children, id }: { children: React.ReactNode, id
   return (
     <motion.div
       key={id}
-      initial={{ opacity: 0, filter: "blur(4px)" }}
-      animate={{ opacity: 1, filter: "blur(0px)" }}
-      exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.15 } }}
-      transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.12 } }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
     >
       {children}

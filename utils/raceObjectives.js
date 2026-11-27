@@ -239,46 +239,46 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
   const makeRange = (best, worst) => best === worst ? `P${best}` : `P${best}–P${worst}`;
 
   if (tier.id === 'championship-favourite') {
-    objectives.push({ id: 'win-race', label: 'Win the Race', type: 'primary', emoji: '🏆',
+    objectives.push({ id: 'win-race', label: 'Win the race', type: 'primary', emoji: '🏆',
       rationale: generateAIRationale('win', ctx), expectedFinishRange: makeRange(1,2),
       successProbability: pct(finishDist.win), riskLevel: weather.isWet ? 'High' : 'Medium',
       sponsorRewardM: sponsorM(1), boardImpact: 'Critical', championshipImpact: '+25 pts', targetPosition: 1 });
-    objectives.push({ id: 'secure-one-two', label: 'One-Two Finish', type: 'primary', emoji: '🥇',
+    objectives.push({ id: 'secure-one-two', label: 'One-two finish', type: 'primary', emoji: '🥇',
       rationale: generateAIRationale('one-two', ctx), expectedFinishRange: '1 & 2',
       successProbability: pct(finishDist.win * 0.65), riskLevel: 'High',
       sponsorRewardM: 6.0, boardImpact: 'Critical', championshipImpact: '+43 pts combined', targetPosition: 2 });
     if (championship.leadingConstructors) {
-      objectives.push({ id: 'extend-lead', label: 'Extend Championship Lead', type: 'championship', emoji: '📈',
+      objectives.push({ id: 'extend-lead', label: 'Extend championship lead', type: 'championship', emoji: '📈',
         rationale: generateAIRationale('championship-extend', ctx), expectedFinishRange: makeRange(1,3),
         successProbability: pct(finishDist.podium), riskLevel: 'Medium',
         sponsorRewardM: sponsorM(2), boardImpact: 'Critical', championshipImpact: 'Extend lead', targetPosition: 3 });
     }
   } else if (tier.id === 'front-running') {
-    objectives.push({ id: 'fight-for-victory', label: 'Fight for Victory', type: 'primary', emoji: '⚔️',
+    objectives.push({ id: 'fight-for-victory', label: 'Fight for victory', type: 'primary', emoji: '⚔️',
       rationale: generateAIRationale('win', ctx), expectedFinishRange: makeRange(1,3),
       successProbability: pct(finishDist.win), riskLevel: weather.isWet ? 'Very High' : 'High',
       sponsorRewardM: sponsorM(1), boardImpact: 'High', championshipImpact: '+25 pts potential', targetPosition: 1 });
-    objectives.push({ id: 'secure-podium', label: 'Secure Podium', type: 'primary', emoji: '🥈',
+    objectives.push({ id: 'secure-podium', label: 'Secure podium', type: 'primary', emoji: '🥈',
       rationale: generateAIRationale('podium', ctx), expectedFinishRange: makeRange(2,4),
       successProbability: pct(finishDist.podium), riskLevel: 'Medium',
       sponsorRewardM: sponsorM(3), boardImpact: 'High', championshipImpact: champImpact(3), targetPosition: 3 });
-    objectives.push({ id: 'maximise-constructor', label: 'Maximise Constructor Points', type: 'points', emoji: '📊',
+    objectives.push({ id: 'maximise-constructor', label: 'Maximise constructor points', type: 'points', emoji: '📊',
       rationale: `Bringing both cars into the points scores maximum constructor value and applies pressure on rivals.`,
       expectedFinishRange: 'Both Top 10', successProbability: pct(finishDist.top10 * 0.8), riskLevel: 'Low',
       sponsorRewardM: 2.0, boardImpact: 'High', championshipImpact: 'Double points swing', targetPosition: 8 });
   } else if (tier.id === 'upper-midfield') {
-    objectives.push({ id: 'top-6', label: 'Finish Inside Top 6', type: 'primary', emoji: '🎯',
+    objectives.push({ id: 'top-6', label: 'Finish inside top 6', type: 'primary', emoji: '🎯',
       rationale: generateAIRationale('score-points', ctx), expectedFinishRange: makeRange(5,7),
       successProbability: pct(finishDist.top5 + 10), riskLevel: 'Medium',
       sponsorRewardM: sponsorM(6), boardImpact: 'High', championshipImpact: champImpact(6), targetPosition: 6 });
     if (weather.isWet || (circuitHistory?.safetyCarFrequency || 0) > 50) {
-      objectives.push({ id: 'opportunistic-podium', label: 'Opportunistic Podium', type: 'opportunistic', emoji: '🌟',
+      objectives.push({ id: 'opportunistic-podium', label: 'Opportunistic podium', type: 'opportunistic', emoji: '🌟',
         rationale: weather.isWet ? `Wet conditions greatly improve our odds of a podium overperformance.` : `High Safety Car frequency means strategic positioning can yield a surprise podium.`,
         expectedFinishRange: makeRange(2,5), successProbability: pct(finishDist.podium), riskLevel: 'High',
         sponsorRewardM: sponsorM(3), boardImpact: 'High', championshipImpact: champImpact(3), targetPosition: 3 });
     }
   } else if (tier.id === 'midfield') {
-    objectives.push({ id: 'score-points', label: 'Score Points', type: 'primary', emoji: '✅',
+    objectives.push({ id: 'score-points', label: 'Score points', type: 'primary', emoji: '✅',
       rationale: generateAIRationale('score-points', ctx),
       expectedFinishRange: makeRange(finishDist.expectedFinish, Math.min(10, finishDist.expectedFinish + 2)),
       successProbability: pct(finishDist.top10), riskLevel: riskLevel(finishDist.top10),
@@ -288,7 +288,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
       successProbability: pct(finishDist.top10 * 0.85), riskLevel: 'Low',
       sponsorRewardM: 0.8, boardImpact: 'Medium', championshipImpact: 'Improved grid', targetPosition: 10 });
   } else if (tier.id === 'lower-midfield') {
-    objectives.push({ id: 'fight-for-points', label: 'Fight for Points', type: 'primary', emoji: '🎯',
+    objectives.push({ id: 'fight-for-points', label: 'Fight for points', type: 'primary', emoji: '🎯',
       rationale: generateAIRationale('score-points', ctx), expectedFinishRange: makeRange(9, 12),
       successProbability: pct(finishDist.top10 - 5), riskLevel: riskLevel(finishDist.top10),
       sponsorRewardM: sponsorM(10), boardImpact: 'High', championshipImpact: champImpact(10), targetPosition: 10 });
@@ -296,7 +296,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
       rationale: generateAIRationale('reach-q2', ctx), expectedFinishRange: 'Top 15 grid',
       successProbability: pct(finishDist.top10 + 20), riskLevel: 'Low',
       sponsorRewardM: 0.6, boardImpact: 'Low', championshipImpact: 'Grid improvement', targetPosition: 15 });
-    objectives.push({ id: 'gain-positions', label: 'Gain Positions From Grid', type: 'progress', emoji: '📈',
+    objectives.push({ id: 'gain-positions', label: 'Gain positions from grid', type: 'progress', emoji: '📈',
       rationale: generateAIRationale('gain-positions', ctx), expectedFinishRange: '+3–5 positions',
       successProbability: pct(55), riskLevel: 'Low', sponsorRewardM: 0.8, boardImpact: 'Low', championshipImpact: 'No direct impact', targetPosition: null });
   } else {
@@ -304,15 +304,15 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
       rationale: generateAIRationale('reach-q2', ctx), expectedFinishRange: 'Top 15 grid',
       successProbability: pct(30 + (weather.isWet ? 15 : 0)), riskLevel: 'High',
       sponsorRewardM: 1.0, boardImpact: 'Medium', championshipImpact: 'Positional improvement', targetPosition: 15 });
-    objectives.push({ id: 'capitalise-safety-car', label: 'Capitalise on Safety Car', type: 'opportunistic', emoji: '🚗',
+    objectives.push({ id: 'capitalise-safety-car', label: 'Capitalise on safety car', type: 'opportunistic', emoji: '🚗',
       rationale: `Safety Cars are the backmarker's greatest ally. Staying out under SC while rivals pit earns positions pace alone cannot provide.`,
       expectedFinishRange: 'Any', successProbability: pct(40), riskLevel: 'Medium',
       sponsorRewardM: 0.5, boardImpact: 'Low', championshipImpact: 'No direct impact', targetPosition: null });
-    objectives.push({ id: 'gain-positions-backmarker', label: 'Gain Positions From Grid', type: 'progress', emoji: '📈',
+    objectives.push({ id: 'gain-positions-backmarker', label: 'Gain positions from grid', type: 'progress', emoji: '📈',
       rationale: generateAIRationale('gain-positions', ctx), expectedFinishRange: '+2–4 positions',
       successProbability: pct(55), riskLevel: 'Low', sponsorRewardM: 0.6, boardImpact: 'Low', championshipImpact: 'No direct impact', targetPosition: null });
     if (weather.isWet) {
-      objectives.push({ id: 'top-10-backmarker', label: 'Finish in Top 10', type: 'opportunistic', emoji: '🌟',
+      objectives.push({ id: 'top-10-backmarker', label: 'Finish in top 10', type: 'opportunistic', emoji: '🌟',
         rationale: `Wet weather collapses the competitive order. A tactical SC gamble or tyre advantage could produce a historic result.`,
         expectedFinishRange: 'P8–P12', successProbability: pct(finishDist.top10), riskLevel: 'Very High',
         sponsorRewardM: sponsorM(10), boardImpact: 'High', championshipImpact: champImpact(10), targetPosition: 10 });
@@ -330,7 +330,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
 
   // Street circuit: protect position
   if (isStreet && !objectives.find(o => o.id === 'protect-position')) {
-    objectives.push({ id: 'protect-position', label: 'Protect Track Position', type: 'track', emoji: '🛡️',
+    objectives.push({ id: 'protect-position', label: 'Protect track position', type: 'track', emoji: '🛡️',
       rationale: generateAIRationale('protect-position', ctx), expectedFinishRange: 'Hold grid',
       successProbability: pct(65), riskLevel: 'Low', sponsorRewardM: 1.0, boardImpact: 'Medium',
       championshipImpact: 'Defensive points', targetPosition: null });
@@ -338,7 +338,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
 
   // Power circuit: top speed
   if (isPower && !objectives.find(o => o.id === 'top-speed-assault')) {
-    objectives.push({ id: 'top-speed-assault', label: 'Exploit Top Speed', type: 'track', emoji: '🔥',
+    objectives.push({ id: 'top-speed-assault', label: 'Exploit top speed', type: 'track', emoji: '🔥',
       rationale: generateAIRationale('top-speed', ctx),
       expectedFinishRange: makeRange(Math.max(1, finishDist.expectedFinish - 1), finishDist.expectedFinish + 2),
       successProbability: pct(55), riskLevel: 'Medium', sponsorRewardM: 1.1, boardImpact: 'Medium',
@@ -347,7 +347,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
 
   // High SC frequency: SC gamble
   if ((circuitHistory?.safetyCarFrequency > 60 || isStreet) && !objectives.find(o => o.id === 'sc-strategy')) {
-    objectives.push({ id: 'sc-strategy', label: 'Safety Car Gamble', type: 'opportunistic', emoji: '🚗',
+    objectives.push({ id: 'sc-strategy', label: 'Safety car gamble', type: 'opportunistic', emoji: '🚗',
       rationale: `SC frequency at this venue is historically high. Staying out while rivals pit can vault us several positions instantly.`,
       expectedFinishRange: 'Opportunistic', successProbability: pct(35 + (weather.isWet ? 15 : 0)),
       riskLevel: 'High', sponsorRewardM: 2.0, boardImpact: 'Medium', championshipImpact: 'Opportunity dependent', targetPosition: null });
@@ -355,7 +355,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
 
   // Reliability concern
   if (highDnfRisk && !objectives.find(o => o.id === 'finish-race')) {
-    objectives.push({ id: 'finish-race', label: 'Classified Finish', type: 'reliability', emoji: '🔧',
+    objectives.push({ id: 'finish-race', label: 'Classified finish', type: 'reliability', emoji: '🔧',
       rationale: generateAIRationale('reliability', ctx), expectedFinishRange: 'Any finish',
       successProbability: pct(100 - (circuitHistory?.dnfRate || 25)), riskLevel: 'Low',
       sponsorRewardM: 0.5, boardImpact: 'Low', championshipImpact: 'Prevents zero-point round', targetPosition: 20 });
@@ -363,7 +363,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
 
   // Wet opportunity
   if (weather.isWet && !objectives.find(o => o.id === 'wet-opportunity')) {
-    objectives.push({ id: 'wet-opportunity', label: 'Wet Race Opportunity', type: 'weather', emoji: '🌧️',
+    objectives.push({ id: 'wet-opportunity', label: 'Wet race opportunity', type: 'weather', emoji: '🌧️',
       rationale: `Safety Car probability is elevated in wet conditions. Staying on track and managing tyre transitions will be critical.`,
       expectedFinishRange: 'Any', successProbability: pct(40 + (100 - finishDist.expectedFinish * 4)),
       riskLevel: 'High', sponsorRewardM: 2.2, boardImpact: 'Medium', championshipImpact: 'Weather-dependent', targetPosition: null });
@@ -371,7 +371,7 @@ function generateTrackAwareObjectives(tier, championship, weather, finishDist, c
 
   // Championship closing push
   if (championship.trailingConstructors && championship.gapToNearest > 0 && championship.remainingRounds <= 6) {
-    objectives.push({ id: 'championship-push', label: 'Championship Rescue Push', type: 'championship', emoji: '🏁',
+    objectives.push({ id: 'championship-push', label: 'Championship rescue push', type: 'championship', emoji: '🏁',
       rationale: generateAIRationale('championship-close', ctx),
       expectedFinishRange: makeRange(Math.max(1, finishDist.expectedFinish - 2), finishDist.expectedFinish),
       successProbability: pct(finishDist.top5), riskLevel: 'High', sponsorRewardM: 2.5, boardImpact: 'Critical',
@@ -499,7 +499,7 @@ export function generateUnifiedRaceWeekend(team, currentRound = state.season.rou
     circuit: round.circuit, laps: round.laps, circuitType,
     weather: { isWet, rainProbability: Math.round(wetProbability * 100), trackTemperature: trackTemp, airTemperature: Math.floor(trackTemp - 4 + Math.random() * 6) },
     objectives, recommendedObjective, championshipContext, standingsImpact,
-    countdown: daysUntilRace > 0 ? `${daysUntilRace} Days Until Race` : 'Race Weekend Open!',
+    countdown: daysUntilRace > 0 ? `${daysUntilRace} days until race` : 'Race weekend open',
     raceStatus, expectationScore, tier, circuitProfile, circuitHistory, finishDistribution,
   };
 }
@@ -508,9 +508,9 @@ export function generateUnifiedRaceWeekend(team, currentRound = state.season.rou
 // 13. LEGACY COMPATIBILITY
 // ============================================
 export const RACE_OBJECTIVES = [
-  { id: 'win',          label: '🏆 Push For Win',       risk: 'High',    targetPosition: 1 },
-  { id: 'podium',       label: '🥈 Fight For Podium',    risk: 'Medium',  targetPosition: 3 },
-  { id: 'points',       label: '🎯 Finish In Points',    risk: 'Low',     targetPosition: 10 },
-  { id: 'conservative', label: '💰 Conservative Points', risk: 'Minimal', targetPosition: 12 },
-  { id: 'gamble',       label: '🌧 Strategy Gamble',     risk: 'Extreme', targetPosition: 5 },
+  { id: 'win',          label: 'Push for win',       risk: 'High',    targetPosition: 1 },
+  { id: 'podium',       label: 'Fight for podium',    risk: 'Medium',  targetPosition: 3 },
+  { id: 'points',       label: 'Finish in points',    risk: 'Low',     targetPosition: 10 },
+  { id: 'conservative', label: 'Conservative points', risk: 'Minimal', targetPosition: 12 },
+  { id: 'gamble',       label: 'Strategy gamble',     risk: 'Extreme', targetPosition: 5 },
 ];

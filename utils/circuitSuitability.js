@@ -1,7 +1,7 @@
 /**
  * circuitSuitability.js
  * ─────────────────────
- * Circuit-specific performance modifier for the F1 Principal Simulator.
+ * Circuit-specific performance modifier for F1P.
  *
  * Computes a per-team suitability score and lap-time delta based on
  * how well the team's car attributes match a circuit's performance demands.

@@ -1,11 +1,74 @@
 import React, { useState } from 'react';
-import { HUB, glassCard, actionBtn } from '../HubLayout.tsx';
+import { HUB, btn, btnClass, tyreDot } from '../HubLayout.tsx';
+
+// tyreDot keys: soft / medium / hard / inter / wet
+const dotKey = (compound) => (compound === 'Intermediate' ? 'inter' : compound);
+
+const PACE_MODES = [
+  { value: 'Attack', label: 'Atk' },
+  { value: 'Push', label: 'Push' },
+  { value: 'Balanced', label: 'Bal' },
+  { value: 'Conserve', label: 'Cons' },
+  { value: 'Defend', label: 'Def' },
+];
+const FUEL_MODES = [
+  { value: 'Rich', label: 'Rich' },
+  { value: 'Standard', label: 'Std' },
+  { value: 'Lean', label: 'Lean' },
+];
+const ERS_MODES = [
+  { value: 'Overtake', label: 'OT' },
+  { value: 'Deploy', label: 'Dep' },
+  { value: 'Balanced', label: 'Bal' },
+  { value: 'Harvest', label: 'Harv' },
+];
+const COMPOUNDS = ['Soft', 'Medium', 'Hard', 'Intermediate', 'Wet'];
+
+const controlLabel = {
+  fontSize: '11px', color: HUB.textFaint, marginBottom: '4px', fontFamily: HUB.fontRegular,
+};
+
+function Segmented({ options, value, onSelect }) {
+  return (
+    <div
+      role="radiogroup"
+      style={{
+        display: 'flex', gap: '2px', padding: '2px', height: '28px', boxSizing: 'border-box',
+        backgroundColor: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px',
+      }}
+    >
+      {options.map(o => {
+        const selected = value === o.value;
+        return (
+          <button
+            key={o.value}
+            role="radio"
+            aria-checked={selected}
+            title={o.value}
+            onClick={() => onSelect(o.value)}
+            style={{
+              flex: 1, minWidth: 0, padding: 0,
+              fontSize: '11px', fontWeight: 400, fontFamily: HUB.fontBold,
+              backgroundColor: selected ? HUB.accentSoft : 'transparent',
+              color: selected ? HUB.textPrimary : HUB.textMuted,
+              boxShadow: selected ? `inset 0 0 0 1px ${HUB.accent}` : 'none',
+              border: 'none', borderRadius: '6px', cursor: 'pointer',
+              transition: `background-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function PlayerStrategyPanel({ engine, onCommand }) {
   const playerCars = engine.cars.filter(c => c.isPlayer);
 
   if (playerCars.length === 0) {
-    return <div style={{ padding: '16px', color: HUB.textMuted }}>No active drivers.</div>;
+    return <div style={{ padding: '16px', fontSize: '12px', color: HUB.textMuted }}>No active drivers</div>;
   }
 
   return (
@@ -24,90 +87,70 @@ function DriverControls({ car, engine, onCommand }) {
   const handleCommand = (cmd, val) => onCommand(car.id, cmd, val);
 
   return (
-    <div style={{ backgroundColor: 'rgba(10,10,10,0.8)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden', opacity: isRetired ? 0.5 : 1 }}>
-      
+    <div style={{ backgroundColor: HUB.surface, border: `1px solid ${HUB.border}`, borderRadius: '8px', overflow: 'hidden', opacity: isRetired ? 0.5 : 1 }}>
+
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '3px', height: '14px', backgroundColor: HUB.accent }}></div>
-          <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{car.driver.name.substring(0,3).toUpperCase()}</span>
-          <span style={{ fontSize: '10px', color: HUB.textMuted }}>L{car.lap}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${HUB.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>{car.driver.name.substring(0,3).toUpperCase()}</span>
+          <span style={{ fontSize: '11px', color: HUB.textFaint }}>Lap {car.lap}</span>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#fff' }}>{car.tireCompound.substring(0,1)}</span>
-          <span style={{ fontSize: '10px', color: car.tireWear > 70 ? '#ef4444' : HUB.textMuted }}>Wear: {Math.round(car.tireWear)}%</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontFamily: HUB.fontBold, color: HUB.textPrimary }} title={car.tireCompound}>
+            {tyreDot(dotKey(car.tireCompound))}
+            {car.tireCompound.substring(0,1)}
+          </span>
+          <span style={{ fontSize: '11px', color: car.tireWear > 70 ? HUB.negative : HUB.textMuted }}>Wear {Math.round(car.tireWear)}%</span>
         </div>
       </div>
 
       {/* Controls */}
       {!isRetired && (
-        <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          
-          {/* PACE */}
+        <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
           <div>
-            <div style={{ fontSize: '9px', color: HUB.textMuted, marginBottom: '4px', textTransform: 'uppercase' }}>Pace</div>
-            <div style={{ display: 'flex', gap: '2px', backgroundColor: '#000', padding: '2px', borderRadius: '4px' }}>
-              {["Attack", "Push", "Balanced", "Conserve", "Defend"].map(m => (
-                <button
-                  key={m}
-                  onClick={() => handleCommand("MODE", m)}
-                  style={{
-                    flex: 1, padding: '4px 0', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase',
-                    backgroundColor: car.driverMode === m ? HUB.accent : 'transparent',
-                    color: car.driverMode === m ? '#fff' : HUB.textMuted,
-                    border: 'none', borderRadius: '2px', cursor: 'pointer'
-                  }}
-                >
-                  {m.substring(0,3)}
-                </button>
-              ))}
-            </div>
+            <div style={controlLabel}>Pace</div>
+            <Segmented options={PACE_MODES} value={car.driverMode} onSelect={m => handleCommand("MODE", m)} />
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
-            {/* FUEL */}
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '9px', color: HUB.textMuted, marginBottom: '4px', textTransform: 'uppercase' }}>Fuel</div>
-              <div style={{ display: 'flex', gap: '2px', backgroundColor: '#000', padding: '2px', borderRadius: '4px' }}>
-                {["Rich", "Standard", "Lean"].map(m => (
-                  <button key={m} onClick={() => handleCommand("FUEL", m)} style={{ flex: 1, padding: '4px 0', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', backgroundColor: car.fuelMode === m ? HUB.accent : 'transparent', color: car.fuelMode === m ? '#fff' : HUB.textMuted, border: 'none', borderRadius: '2px', cursor: 'pointer' }}>
-                    {m.substring(0,1)}
-                  </button>
-                ))}
-              </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={controlLabel}>Fuel</div>
+              <Segmented options={FUEL_MODES} value={car.fuelMode} onSelect={m => handleCommand("FUEL", m)} />
             </div>
-            {/* ERS */}
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '9px', color: HUB.textMuted, marginBottom: '4px', textTransform: 'uppercase' }}>ERS</div>
-              <div style={{ display: 'flex', gap: '2px', backgroundColor: '#000', padding: '2px', borderRadius: '4px' }}>
-                {["Overtake", "Deploy", "Balanced", "Harvest"].map(m => (
-                  <button key={m} onClick={() => handleCommand("ERS", m)} style={{ flex: 1, padding: '4px 0', fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', backgroundColor: car.ersMode === m ? HUB.accent : 'transparent', color: car.ersMode === m ? '#fff' : HUB.textMuted, border: 'none', borderRadius: '2px', cursor: 'pointer' }}>
-                    {m.substring(0,3)}
-                  </button>
-                ))}
-              </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={controlLabel}>ERS</div>
+              <Segmented options={ERS_MODES} value={car.ersMode} onSelect={m => handleCommand("ERS", m)} />
             </div>
           </div>
 
-          {/* PIT STOP */}
+          {/* Pit stop */}
           <div>
             {car.pitStopStatus === "InLap" ? (
-               <button onClick={() => handleCommand("CANCEL_PIT")} style={{ ...actionBtn({ padding: '6px' }), width: '100%', fontSize: '10px', backgroundColor: '#ef4444' }}>CANCEL PIT</button>
+               <button onClick={() => handleCommand("CANCEL_PIT")} className={btnClass('danger')} style={btn('danger', 'sm', { width: '100%' })}>Cancel pit</button>
             ) : car.pitStopStatus === "Pitting" ? (
-               <button disabled style={{ ...actionBtn({ padding: '6px' }), width: '100%', fontSize: '10px', opacity: 0.5 }}>PITTING...</button>
+               <button disabled className={btnClass('secondary')} style={btn('secondary', 'sm', { width: '100%' })}>Pitting…</button>
             ) : pitPanelOpen ? (
-               <div style={{ backgroundColor: '#000', padding: '4px', borderRadius: '4px' }}>
-                 <div style={{ display: 'flex', gap: '2px', marginBottom: '2px' }}>
-                    <button onClick={() => { handleCommand("PIT", "Soft"); setPitPanelOpen(false); }} style={{...actionBtn(), flex: 1, fontSize: '9px', padding: '4px', backgroundColor: '#ef4444', border: 'none'}}>S</button>
-                    <button onClick={() => { handleCommand("PIT", "Medium"); setPitPanelOpen(false); }} style={{...actionBtn(), flex: 1, fontSize: '9px', padding: '4px', backgroundColor: '#facc15', color: '#000', border: 'none'}}>M</button>
-                    <button onClick={() => { handleCommand("PIT", "Hard"); setPitPanelOpen(false); }} style={{...actionBtn(), flex: 1, fontSize: '9px', padding: '4px', backgroundColor: '#ffffff', color: '#000', border: 'none'}}>H</button>
-                    <button onClick={() => { handleCommand("PIT", "Intermediate"); setPitPanelOpen(false); }} style={{...actionBtn(), flex: 1, fontSize: '9px', padding: '4px', backgroundColor: '#22c55e', border: 'none'}}>I</button>
-                    <button onClick={() => { handleCommand("PIT", "Wet"); setPitPanelOpen(false); }} style={{...actionBtn(), flex: 1, fontSize: '9px', padding: '4px', backgroundColor: '#3b82f6', border: 'none'}}>W</button>
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                 <div style={controlLabel}>Fit compound</div>
+                 <div style={{ display: 'flex', gap: '4px' }}>
+                    {COMPOUNDS.map(c => (
+                      <button
+                        key={c}
+                        title={c}
+                        onClick={() => { handleCommand("PIT", c); setPitPanelOpen(false); }}
+                        className={btnClass('secondary')}
+                        style={btn('secondary', 'sm', { flex: 1, minWidth: 0, padding: 0 })}
+                      >
+                        {tyreDot(dotKey(c))}
+                        {c.substring(0,1)}
+                      </button>
+                    ))}
                  </div>
-                 <button onClick={() => setPitPanelOpen(false)} style={{ ...actionBtn({ padding: '4px' }), width: '100%', fontSize: '9px', backgroundColor: 'transparent', border: 'none', color: HUB.textMuted }}>Cancel</button>
+                 <button onClick={() => setPitPanelOpen(false)} className={btnClass('ghost')} style={btn('ghost', 'sm', { width: '100%' })}>Cancel</button>
                </div>
             ) : (
-               <button onClick={() => setPitPanelOpen(true)} style={{ ...actionBtn({ padding: '6px' }), width: '100%', fontSize: '10px' }}>BOX THIS LAP</button>
+               <button onClick={() => setPitPanelOpen(true)} className={btnClass('primary')} style={btn('primary', 'sm', { width: '100%' })}>Box this lap</button>
             )}
           </div>
         </div>

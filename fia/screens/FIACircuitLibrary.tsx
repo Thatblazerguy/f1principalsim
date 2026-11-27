@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Map, Plus, Globe, BarChart2, X, ChevronDown, ArrowLeftRight, Zap, Shield, Flame, Droplets, Wind, Cpu, Activity } from 'lucide-react';
+import { Search, Filter, Map, Plus, Globe, BarChart2, X, ChevronDown, ArrowLeftRight, Zap, Shield, Flame, Droplets, Wind, Cpu, Activity, ArrowLeft } from 'lucide-react';
 import { renderToAppRoot } from '../../utils/reactRoot.tsx';
-import { HUB, glassCard, actionBtn } from '../../components/HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass, iconBtn, pageTitle, sectionLabel } from '../../components/HubLayout.tsx';
 import {
   CIRCUIT_LIBRARY, searchCircuits, REGIONS, TYPES,
   getCircuitById, CALENDAR_STATUSES, CALENDAR_STATUS_META
@@ -15,24 +15,26 @@ import { renderFIACircuitDesigner } from './FIACircuitDesigner.tsx';
 function CalendarStatusBadge({ status }: { status?: string }) {
   const meta = status && (CALENDAR_STATUS_META as any)[status];
   if (!meta) return null;
-  const color = meta.color || '#94A3B8';
   return (
     <span style={{
-      fontFamily: HUB.fontBold, fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase',
-      padding: '2px 6px', borderRadius: 999, border: `1px solid ${color}44`, color, background: `${color}18`,
-      whiteSpace: 'nowrap',
-    }}>{meta.shortLabel}</span>
+      fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted,
+      whiteSpace: 'nowrap'
+    }}>{sentenceCase(meta.label)}</span>
   );
 }
 
+// Library labels are stored in title case ("On 2026 Calendar") — show them in sentence case.
+function sentenceCase(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+}
+
 // ── Circuit Type Badge ────────────────────────────────────────────────────────
-const TRACK_COLORS: Record<string, string> = { permanent: '#3B82F6', street: '#F59E0B', temporary: '#10B981' };
 function CircuitTypeBadge({ type }: { type: string }) {
-  const color = TRACK_COLORS[type] || '#fff';
   return (
     <span style={{
-      fontFamily: HUB.fontBold, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase',
-      padding: '2px 6px', borderRadius: 999, border: `1px solid ${color}33`, color, background: `${color}11`,
+      fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted,
+      padding: '2px 6px', borderRadius: 6, border: `1px solid ${HUB.border}`, background: HUB.raised,
+      textTransform: 'capitalize'
     }}>{type}</span>
   );
 }
@@ -40,35 +42,35 @@ function CircuitTypeBadge({ type }: { type: string }) {
 // ── License Badge ─────────────────────────────────────────────────────────────
 function LicenseBadge({ status }: { status: string | null }) {
   const map: Record<string, { label: string; color: string }> = {
-    [LICENSE_STATUS.LICENSED]: { label: 'Licensed', color: '#10B981' },
-    [LICENSE_STATUS.CONDITIONALLY_APPROVED]: { label: 'Conditional', color: '#F59E0B' },
-    [LICENSE_STATUS.AWAITING_INSPECTION]: { label: 'Awaiting', color: '#3B82F6' },
-    [LICENSE_STATUS.DRAFT]: { label: 'Draft', color: '#94A3B8' },
-    [LICENSE_STATUS.SUSPENDED]: { label: 'Suspended', color: '#EF4444' },
-    [LICENSE_STATUS.REJECTED]: { label: 'Rejected', color: '#EF4444' },
+    [LICENSE_STATUS.LICENSED]: { label: 'Licensed', color: HUB.positive },
+    [LICENSE_STATUS.CONDITIONALLY_APPROVED]: { label: 'Conditional', color: HUB.warning },
+    [LICENSE_STATUS.AWAITING_INSPECTION]: { label: 'Awaiting', color: HUB.textMuted },
+    [LICENSE_STATUS.DRAFT]: { label: 'Draft', color: HUB.textFaint },
+    [LICENSE_STATUS.SUSPENDED]: { label: 'Suspended', color: HUB.negative },
+    [LICENSE_STATUS.REJECTED]: { label: 'Rejected', color: HUB.negative },
   };
-  const { label, color } = (status && map[status]) || { label: 'Unlicensed', color: '#94A3B8' };
+  const { label, color } = (status && map[status]) || { label: 'Unlicensed', color: HUB.textFaint };
   return (
     <span style={{
-      fontFamily: HUB.fontBold, fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase',
-      padding: '2px 6px', borderRadius: 999, border: `1px solid ${color}33`, color, background: `${color}11`,
-    }}>{label}</span>
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, whiteSpace: 'nowrap'
+    }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />{label}</span>
   );
 }
 
 // ── Perf Bar ─────────────────────────────────────────────────────────────────
-function PerfBar({ label, value, icon, color = '#E10600' }: { label: string; value: number; icon?: React.ReactNode; color?: string }) {
+function PerfBar({ label, value, icon, color = 'rgba(237,237,237,0.5)' }: { label: string; value: number; icon?: React.ReactNode; color?: string }) {
   return (
     <div style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          {icon && <span style={{ color }}>{icon}</span>}
-          <span style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted }}>{label}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {icon && <span style={{ display: 'flex', color: HUB.textFaint }}>{icon}</span>}
+          <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{label}</span>
         </div>
-        <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color }}>{value}/10</span>
+        <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: HUB.textPrimary }}>{value}/10</span>
       </div>
-      <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${value * 10}%`, background: color, borderRadius: 2, transition: 'width 0.4s ease' }} />
+      <div style={{ height: 4, background: HUB.raised, borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${value * 10}%`, background: color, borderRadius: 2, transition: `width 400ms ${HUB.ease}` }} />
       </div>
     </div>
   );
@@ -77,9 +79,9 @@ function PerfBar({ label, value, icon, color = '#E10600' }: { label: string; val
 // ── Stat Row ─────────────────────────────────────────────────────────────────
 function StatRow({ label, value }: { label: string; value: string | number }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-      <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>{label}</span>
-      <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${HUB.border}` }}>
+      <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{label}</span>
+      <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: HUB.textPrimary }}>{value}</span>
     </div>
   );
 }
@@ -90,10 +92,10 @@ function CompareRow({ label, a, b }: { label: string; a: any; b: any }) {
   const bNum = typeof b === 'number' ? b : null;
   const aBetter = aNum !== null && bNum !== null ? aNum > bNum : null;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
-      <div style={{ textAlign: 'right', fontFamily: HUB.fontBold, fontSize: 11, color: aBetter === true ? '#10B981' : aBetter === false ? HUB.textMuted : '#fff' }}>{a}</div>
-      <div style={{ fontFamily: HUB.fontRegular, fontSize: 9, color: HUB.textMuted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>{label}</div>
-      <div style={{ fontFamily: HUB.fontBold, fontSize: 11, color: aBetter === false ? '#10B981' : aBetter === true ? HUB.textMuted : '#fff' }}>{b}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, padding: '6px 0', borderBottom: `1px solid ${HUB.border}`, alignItems: 'center' }}>
+      <div style={{ textAlign: 'right', fontFamily: HUB.fontBold, fontSize: 12, color: aBetter === false ? HUB.textFaint : HUB.textPrimary }}>{a}</div>
+      <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textFaint, textAlign: 'center', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ fontFamily: HUB.fontBold, fontSize: 12, color: aBetter === true ? HUB.textFaint : HUB.textPrimary }}>{b}</div>
     </div>
   );
 }
@@ -114,30 +116,30 @@ function CircuitDetailPanel({ circuit, onClose, onLicense, career }: any) {
             <CalendarStatusBadge status={circuit.calendarStatus} />
             <LicenseBadge status={license?.status || null} />
           </div>
-          <h2 style={{ fontFamily: HUB.fontWide, fontSize: 16, color: '#fff', margin: '0 0 4px', textTransform: 'uppercase', lineHeight: 1.2 }}>{circuit.name}</h2>
+          <h2 style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary, margin: '0 0 4px', lineHeight: 1.2 }}>{circuit.name}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Globe size={11} color={HUB.textMuted} />
-            <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>{circuit.country} · {circuit.region}</span>
+            <Globe size={12} strokeWidth={1.5} color={HUB.textFaint} />
+            <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{circuit.country} · {circuit.region}</span>
           </div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontSize: 18, padding: 4 }}>×</button>
+        <button onClick={onClose} aria-label="Close" title="Close" className={btnClass('ghost')} style={iconBtn('sm')}><X size={16} strokeWidth={1.5} /></button>
       </div>
 
       {/* Calendar Status Note */}
       {circuit.calendarStatusNote && (
-        <div style={{ background: `${(meta?.color || '#94A3B8')}11`, border: `1px solid ${(meta?.color || '#94A3B8')}33`, borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: meta?.color || '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Status Note</div>
-          <p style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, margin: 0, lineHeight: 1.5 }}>{circuit.calendarStatusNote}</p>
+        <div style={{ background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginBottom: 4 }}>{meta?.label ? sentenceCase(meta.label) : 'Status note'}</div>
+          <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0, lineHeight: 1.5 }}>{circuit.calendarStatusNote}</p>
         </div>
       )}
 
       {/* Key Characteristics */}
       {circuit.keyCharacteristics?.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>KEY CHARACTERISTICS</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {sectionLabel('Key characteristics')}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
             {circuit.keyCharacteristics.map((k: string) => (
-              <span key={k} style={{ fontFamily: HUB.fontRegular, fontSize: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '2px 8px', color: '#CBD5E1' }}>{k}</span>
+              <span key={k} style={{ fontFamily: HUB.fontRegular, fontSize: 12, background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 6, padding: '2px 8px', color: HUB.textMuted }}>{k}</span>
             ))}
           </div>
         </div>
@@ -145,59 +147,59 @@ function CircuitDetailPanel({ circuit, onClose, onLicense, career }: any) {
 
       {/* Stats */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>CIRCUIT SPECS</div>
-        <StatRow label="Circuit Length" value={`${circuit.lengthKm} km`} />
-        <StatRow label="Race Laps" value={circuit.laps} />
+        {sectionLabel('Circuit specs')}
+        <StatRow label="Circuit length" value={`${circuit.lengthKm} km`} />
+        <StatRow label="Race laps" value={circuit.laps} />
         <StatRow label="Corners" value={circuit.corners} />
-        <StatRow label="Longest Straight" value={`${circuit.longestStraightM}m`} />
-        <StatRow label="Elevation Change" value={`${circuit.elevationChangeM}m`} />
-        <StatRow label="Overtaking Difficulty" value={`${circuit.overtakingDifficulty}%`} />
-        <StatRow label="Tyre Severity" value={circuit.tyreSeverity} />
-        <StatRow label="Safety Rating" value={`${circuit.safetyRating}/100`} />
-        <StatRow label="Hosting Fee" value={`$${circuit.hostingFee}M/yr`} />
+        <StatRow label="Longest straight" value={`${circuit.longestStraightM}m`} />
+        <StatRow label="Elevation change" value={`${circuit.elevationChangeM}m`} />
+        <StatRow label="Overtaking difficulty" value={`${circuit.overtakingDifficulty}%`} />
+        <StatRow label="Tyre severity" value={circuit.tyreSeverity} />
+        <StatRow label="Safety rating" value={`${circuit.safetyRating}/100`} />
+        <StatRow label="Hosting fee" value={`$${circuit.hostingFee}M/yr`} />
       </div>
 
       {/* Performance Profile */}
       {Object.keys(perf).length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>PERFORMANCE DEMANDS (1–10)</div>
-          <PerfBar label="Engine / Power Unit" value={perf.engineImportance ?? 5} icon={<Zap size={10} />} color="#E10600" />
-          <PerfBar label="Downforce / Aero" value={perf.downforceRequirement ?? 5} icon={<Wind size={10} />} color="#3B82F6" />
-          <PerfBar label="Mechanical Grip" value={perf.mechanicalGripImportance ?? 5} icon={<Activity size={10} />} color="#10B981" />
-          <PerfBar label="Tyre Degradation" value={perf.tyreDegradation ?? 5} icon={<Flame size={10} />} color="#F59E0B" />
-          <PerfBar label="Braking Intensity" value={perf.brakingIntensity ?? 5} icon={<Shield size={10} />} color="#8B5CF6" />
-          <PerfBar label="Cooling Requirement" value={perf.coolingRequirement ?? 5} icon={<Cpu size={10} />} color="#EC4899" />
-          <PerfBar label="Wet Weather" value={perf.wetWeatherSensitivity ?? 3} icon={<Droplets size={10} />} color="#60A5FA" />
+          <div style={{ marginBottom: 8 }}>{sectionLabel('Performance demands (1–10)')}</div>
+          <PerfBar label="Engine / power unit" value={perf.engineImportance ?? 5} icon={<Zap size={12} strokeWidth={1.5} />} />
+          <PerfBar label="Downforce / aero" value={perf.downforceRequirement ?? 5} icon={<Wind size={12} strokeWidth={1.5} />} />
+          <PerfBar label="Mechanical grip" value={perf.mechanicalGripImportance ?? 5} icon={<Activity size={12} strokeWidth={1.5} />} />
+          <PerfBar label="Tyre degradation" value={perf.tyreDegradation ?? 5} icon={<Flame size={12} strokeWidth={1.5} />} />
+          <PerfBar label="Braking intensity" value={perf.brakingIntensity ?? 5} icon={<Shield size={12} strokeWidth={1.5} />} />
+          <PerfBar label="Cooling requirement" value={perf.coolingRequirement ?? 5} icon={<Cpu size={12} strokeWidth={1.5} />} />
+          <PerfBar label="Wet weather" value={perf.wetWeatherSensitivity ?? 3} icon={<Droplets size={12} strokeWidth={1.5} />} />
         </div>
       )}
 
       {/* Ideal Car */}
       {circuit.idealCar && (
-        <div style={{ marginBottom: 16, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, borderLeft: `3px solid ${FIA.accent}` }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: FIA.accent, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>IDEAL CAR SETUP</div>
-          <p style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: '#CBD5E1', margin: 0, lineHeight: 1.5 }}>{circuit.idealCar}</p>
+        <div style={{ marginBottom: 16, padding: '10px 12px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 8 }}>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginBottom: 4 }}>Ideal car setup</div>
+          <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary, margin: 0, lineHeight: 1.5 }}>{circuit.idealCar}</p>
         </div>
       )}
 
-      <p style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, lineHeight: 1.6, marginBottom: 16 }}>{circuit.description}</p>
+      <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, lineHeight: 1.6, marginBottom: 16 }}>{circuit.description}</p>
 
-      {/* Source */}
-      {circuit.sourceUrl && (
-        <div style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: 'rgba(255,255,255,0.25)', marginBottom: 16 }}>
-          Source: <a href={circuit.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#60A5FA' }}>Reference</a> · Verified: {circuit.lastVerified || 'N/A'}
+      {/* Verification */}
+      {circuit.lastVerified && (
+        <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textFaint, marginBottom: 16 }}>
+          Verified: {circuit.lastVerified}
         </div>
       )}
 
       {/* Actions */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(!license || license.status === LICENSE_STATUS.DRAFT) && (
-          <button onClick={() => onLicense(circuit)} style={{ ...actionBtn({ padding: '10px', fontSize: 11 }), width: '100%' }}>
-            Submit for Inspection →
+          <button onClick={() => onLicense(circuit)} className={btnClass('primary')} style={btn('primary', 'md', { width: '100%' })}>
+            Submit for inspection
           </button>
         )}
         {!license && (
-          <button onClick={() => onLicense(circuit)} style={{ padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 11, width: '100%' }}>
-            Grant License (Full Authority)
+          <button onClick={() => onLicense(circuit)} className={btnClass('secondary')} style={btn('secondary', 'md', { width: '100%' })}>
+            Grant license
           </button>
         )}
       </div>
@@ -210,50 +212,50 @@ function ComparePanel({ a, b, onClose }: { a: any; b: any; onClose: () => void }
   const perfKeys = [
     { key: 'engineImportance', label: 'Engine' },
     { key: 'downforceRequirement', label: 'Downforce' },
-    { key: 'mechanicalGripImportance', label: 'Mech Grip' },
-    { key: 'tyreDegradation', label: 'Tyre Deg' },
+    { key: 'mechanicalGripImportance', label: 'Mech grip' },
+    { key: 'tyreDegradation', label: 'Tyre deg' },
     { key: 'brakingIntensity', label: 'Braking' },
     { key: 'coolingRequirement', label: 'Cooling' },
-    { key: 'wetWeatherSensitivity', label: 'Wet Weather' },
+    { key: 'wetWeatherSensitivity', label: 'Wet weather' },
   ];
 
   return (
     <div style={{ ...glassCard({ padding: '24px' }), position: 'sticky', top: 0, maxHeight: '90vh', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ArrowLeftRight size={14} color={FIA.accent} />
-          <span style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff', textTransform: 'uppercase' }}>Circuit Comparison</span>
+          <ArrowLeftRight size={16} strokeWidth={1.5} color={HUB.textMuted} />
+          <span style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>Circuit comparison</span>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontSize: 18 }}>×</button>
+        <button onClick={onClose} aria-label="Close" title="Close" className={btnClass('ghost')} style={iconBtn('sm')}><X size={16} strokeWidth={1.5} /></button>
       </div>
 
       {/* Header row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, marginBottom: 16, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, marginBottom: 16, padding: '10px 0', borderBottom: `1px solid ${HUB.border}` }}>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>{a.name}</div>
+          <div style={{ fontFamily: HUB.fontBold, fontSize: 13, color: HUB.textPrimary }}>{a.name}</div>
           <CalendarStatusBadge status={a.calendarStatus} />
         </div>
-        <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, textAlign: 'center', alignSelf: 'center' }}>VS</div>
+        <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, textAlign: 'center', alignSelf: 'center' }}>vs</div>
         <div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>{b.name}</div>
+          <div style={{ fontFamily: HUB.fontBold, fontSize: 13, color: HUB.textPrimary }}>{b.name}</div>
           <CalendarStatusBadge status={b.calendarStatus} />
         </div>
       </div>
 
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>CIRCUIT SPECS</div>
+      <div style={{ marginBottom: 16 }}>
+        {sectionLabel('Circuit specs')}
         <CompareRow label="Length" a={`${a.lengthKm}km`} b={`${b.lengthKm}km`} />
         <CompareRow label="Corners" a={a.corners} b={b.corners} />
-        <CompareRow label="Longest Straight" a={`${a.longestStraightM}m`} b={`${b.longestStraightM}m`} />
+        <CompareRow label="Longest straight" a={`${a.longestStraightM}m`} b={`${b.longestStraightM}m`} />
         <CompareRow label="Elevation" a={`${a.elevationChangeM}m`} b={`${b.elevationChangeM}m`} />
-        <CompareRow label="Overtaking Diff%" a={a.overtakingDifficulty} b={b.overtakingDifficulty} />
-        <CompareRow label="Tyre Severity" a={a.tyreSeverity} b={b.tyreSeverity} />
-        <CompareRow label="Hosting Fee" a={`$${a.hostingFee}M`} b={`$${b.hostingFee}M`} />
+        <CompareRow label="Overtaking diff %" a={a.overtakingDifficulty} b={b.overtakingDifficulty} />
+        <CompareRow label="Tyre severity" a={a.tyreSeverity} b={b.tyreSeverity} />
+        <CompareRow label="Hosting fee" a={`$${a.hostingFee}M`} b={`$${b.hostingFee}M`} />
       </div>
 
       {(a.perf && b.perf) && (
         <div>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>PERFORMANCE DEMANDS</div>
+          {sectionLabel('Performance demands')}
           {perfKeys.map(({ key, label }) => (
             <CompareRow key={key} label={label} a={a.perf[key] ?? '—'} b={b.perf[key] ?? '—'} />
           ))}
@@ -261,15 +263,15 @@ function ComparePanel({ a, b, onClose }: { a: any; b: any; onClose: () => void }
       )}
 
       {a.idealCar && (
-        <div style={{ marginTop: 14, padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, borderLeft: `2px solid ${FIA.accent}` }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: FIA.accent, marginBottom: 3 }}>IDEAL CAR — {a.name}</div>
-          <p style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted, margin: 0 }}>{a.idealCar}</p>
+        <div style={{ marginTop: 16, padding: '10px 12px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 8 }}>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginBottom: 4 }}>Ideal car · {a.name}</div>
+          <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0 }}>{a.idealCar}</p>
         </div>
       )}
       {b.idealCar && (
-        <div style={{ marginTop: 8, padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, borderLeft: `2px solid #3B82F6` }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: '#3B82F6', marginBottom: 3 }}>IDEAL CAR — {b.name}</div>
-          <p style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted, margin: 0 }}>{b.idealCar}</p>
+        <div style={{ marginTop: 8, padding: '10px 12px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 8 }}>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginBottom: 4 }}>Ideal car · {b.name}</div>
+          <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0 }}>{b.idealCar}</p>
         </div>
       )}
     </div>
@@ -304,7 +306,7 @@ function FIACircuitLibrary({ appRoot }: any) {
     setCircuitLicense(career, circuit.circuitId, LICENSE_STATUS.LICENSED, 'Quick-licensed via Circuit Library');
     setFIACareer({ ...career });
     saveFIACareer();
-    showNotification(`${circuit.name} has been licensed!`);
+    showNotification(`${circuit.name} licensed`);
     setSelected(null);
   };
 
@@ -312,7 +314,7 @@ function FIACircuitLibrary({ appRoot }: any) {
     if (compareMode) {
       if (!compareA) {
         setCompareA(circuit);
-        showNotification(`Selected ${circuit.name} for comparison. Pick the second circuit.`);
+        showNotification(`${circuit.name} selected · pick a second circuit`);
       } else if (compareA.circuitId !== circuit.circuitId) {
         setSelected({ _compare: true, a: compareA, b: circuit });
         setCompareA(null);
@@ -326,78 +328,77 @@ function FIACircuitLibrary({ appRoot }: any) {
   const isComparePanel = selected && selected._compare;
   const isDetailPanel = selected && !selected._compare;
 
-  const selectColor = '#94A3B8';
-
   const selectStyle = {
-    padding: '9px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 8, color: '#fff', fontFamily: HUB.fontRegular, fontSize: 12, outline: 'none', cursor: 'pointer',
+    height: 36, padding: '0 12px', background: HUB.raised, border: `1px solid ${HUB.border}`,
+    borderRadius: 8, color: HUB.textPrimary, fontFamily: HUB.fontRegular, fontSize: 13, outline: 'none', cursor: 'pointer',
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#060911', color: '#fff', fontFamily: HUB.fontRegular }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
       {notification && (
-        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', padding: '12px 20px', borderRadius: 10, fontFamily: HUB.fontBold, fontSize: 12, color: '#10B981', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+        <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 200, background: HUB.raised, border: `1px solid ${HUB.borderMid}`, padding: '12px 20px', borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textPrimary, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
           {notification}
         </div>
       )}
 
       <main style={{ flex: 1, padding: '40px 48px', maxWidth: 1600, margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <button onClick={() => renderFIADashboard(appRoot)} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontRegular, fontSize: 12, marginBottom: 8, padding: 0 }}>
-              ← FIA Dashboard
+            <button onClick={() => renderFIADashboard(appRoot)} className={btnClass('ghost')} style={btn('ghost', 'sm', { marginBottom: 12, marginLeft: -12 })}>
+              <ArrowLeft size={14} strokeWidth={1.5} />Back to FIA dashboard
             </button>
-            <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>FIA Circuit Library</div>
-            <h1 style={{ fontFamily: HUB.fontWide, fontSize: 28, fontWeight: 900, color: '#fff', margin: 0, textTransform: 'uppercase' }}>Circuit Library</h1>
-            <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, marginTop: 8 }}>
+            {pageTitle('Circuit library')}
+            <p style={{ fontFamily: HUB.fontRegular, fontSize: 14, color: HUB.textMuted, margin: 0 }}>
               {CIRCUIT_LIBRARY.length} circuits · {allCircuits.length} matching filter
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => { setCompareMode(!compareMode); setCompareA(null); setSelected(null); }}
-              style={{ ...actionBtn({ padding: '10px 18px', fontSize: 11 }), display: 'flex', alignItems: 'center', gap: 8, background: compareMode ? 'rgba(59,130,246,0.2)' : 'rgba(225,6,0,0.18)', border: `1px solid ${compareMode ? '#3B82F6' : 'rgba(225,6,0,0.4)'}` }}
+              className={btnClass('secondary')}
+              style={btn('secondary', 'md')}
+              aria-pressed={compareMode}
             >
-              <ArrowLeftRight size={13} /> {compareMode ? 'Cancel Compare' : 'Compare Circuits'}
+              <ArrowLeftRight size={16} strokeWidth={1.5} />{compareMode ? 'Cancel compare' : 'Compare circuits'}
             </button>
-            <button onClick={() => renderFIACircuitDesigner(appRoot)} style={{ ...actionBtn({ padding: '10px 18px', fontSize: 11 }), display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Plus size={13} /> Design New Circuit
+            <button onClick={() => renderFIACircuitDesigner(appRoot)} className={btnClass('primary')} style={btn('primary', 'md')}>
+              <Plus size={16} strokeWidth={1.5} />Design new circuit
             </button>
           </div>
         </div>
 
         {compareMode && (
-          <div style={{ marginBottom: 18, padding: '12px 18px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.35)', borderRadius: 10, fontFamily: HUB.fontRegular, fontSize: 12, color: '#60A5FA', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ArrowLeftRight size={14} />
-            {compareA ? `Comparing ${compareA.name} with... Click a second circuit.` : 'Click any two circuits to compare them side-by-side.'}
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: HUB.surface, border: `1px solid ${HUB.border}`, borderRadius: 8, fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ArrowLeftRight size={16} strokeWidth={1.5} />
+            {compareA ? `Comparing ${compareA.name} · pick a second circuit` : 'Pick two circuits to compare them side by side'}
           </div>
         )}
 
         {/* Search & Filters */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-            <Search size={13} color={HUB.textMuted} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={16} strokeWidth={1.5} color={HUB.textFaint} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search name, country, characteristic..."
-              style={{ width: '100%', padding: '9px 12px 9px 34px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: '#fff', fontFamily: HUB.fontRegular, fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+              placeholder="Search name, country, characteristic"
+              style={{ width: '100%', height: 36, padding: '0 12px 0 36px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 8, color: HUB.textPrimary, fontFamily: HUB.fontRegular, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
           <select value={filterRegion} onChange={e => setFilterRegion(e.target.value)} style={selectStyle}>
-            <option value="">All Regions</option>
+            <option value="">All regions</option>
             {REGIONS.map((r: string) => <option key={r} value={r}>{r}</option>)}
           </select>
           <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selectStyle}>
-            <option value="">All Types</option>
+            <option value="">All types</option>
             {TYPES.map((t: string) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
           </select>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
-            <option value="">All Status</option>
+            <option value="">All statuses</option>
             {CALENDAR_STATUSES.map((s: string) => {
               const m = (CALENDAR_STATUS_META as any)[s];
-              return <option key={s} value={s}>{m?.label || s}</option>;
+              return <option key={s} value={s}>{m?.label ? sentenceCase(m.label) : s}</option>;
             })}
           </select>
         </div>
@@ -405,12 +406,10 @@ function FIACircuitLibrary({ appRoot }: any) {
         {/* Content */}
         <div style={{ display: 'grid', gridTemplateColumns: (isDetailPanel || isComparePanel) ? '1fr 400px' : '1fr', gap: 24, alignItems: 'start' }}>
           {/* Circuit Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: (isDetailPanel || isComparePanel) ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: (isDetailPanel || isComparePanel) ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 16 }}>
             {allCircuits.map((circuit: any) => {
               const license = getLicenseForCircuit(career, circuit.circuitId);
               const isSelected = selected?.circuitId === circuit.circuitId || compareA?.circuitId === circuit.circuitId;
-              const meta = circuit.calendarStatus && (CALENDAR_STATUS_META as any)[circuit.calendarStatus];
-              const statusColor = meta?.color || '#94A3B8';
               return (
                 <button
                   key={circuit.circuitId}
@@ -418,12 +417,12 @@ function FIACircuitLibrary({ appRoot }: any) {
                   style={{
                     ...glassCard({ padding: '16px' }),
                     cursor: 'pointer', textAlign: 'left', width: '100%',
-                    border: isSelected ? `1px solid ${statusColor}` : '1px solid rgba(255,255,255,0.06)',
-                    background: isSelected ? `${statusColor}11` : 'rgba(26,30,46,0.5)',
-                    transition: 'all 0.15s',
+                    border: isSelected ? '1px solid rgba(225,6,0,0.4)' : `1px solid ${HUB.border}`,
+                    background: isSelected ? HUB.accentSoft : HUB.surface,
+                    transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}, transform 150ms ${HUB.ease}`
                   }}
-                  onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
-                  onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(0)'; } }}
+                  onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = HUB.borderMid; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+                  onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = HUB.border; e.currentTarget.style.transform = 'translateY(0)'; } }}
                 >
                   {/* Top badges */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 4 }}>
@@ -434,31 +433,31 @@ function FIACircuitLibrary({ appRoot }: any) {
                     <LicenseBadge status={license?.status || null} />
                   </div>
 
-                  <h3 style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff', margin: '0 0 3px', lineHeight: 1.3 }}>{circuit.name}</h3>
-                  <p style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted, margin: '0 0 10px' }}>
+                  <h3 style={{ fontFamily: HUB.fontBold, fontSize: 14, color: HUB.textPrimary, margin: '0 0 4px', lineHeight: 1.3 }}>{circuit.name}</h3>
+                  <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: '0 0 12px' }}>
                     {circuit.country} · {circuit.region}
                   </p>
 
                   {/* Key characteristics tags */}
                   {circuit.keyCharacteristics && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
                       {circuit.keyCharacteristics.slice(0, 3).map((k: string) => (
-                        <span key={k} style={{ fontSize: 8, fontFamily: HUB.fontRegular, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 999, padding: '1px 6px', color: HUB.textMuted }}>{k}</span>
+                        <span key={k} style={{ fontSize: 11, fontFamily: HUB.fontRegular, background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 6, padding: '2px 6px', color: HUB.textMuted }}>{k}</span>
                       ))}
                     </div>
                   )}
 
                   {/* Quick stats */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                     {[
                       { label: 'Length', value: `${circuit.lengthKm}km` },
                       { label: 'Corners', value: circuit.corners },
                       { label: 'Overtaking', value: `${circuit.overtakingDifficulty}%` },
                       { label: 'Fee', value: `$${circuit.hostingFee}M` },
                     ].map((s, i) => (
-                      <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 5, padding: '5px 7px' }}>
-                        <div style={{ fontFamily: HUB.fontRegular, fontSize: 8, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
-                        <div style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>{s.value}</div>
+                      <div key={i} style={{ background: HUB.raised, borderRadius: 6, padding: '4px 8px' }}>
+                        <div style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textFaint }}>{s.label}</div>
+                        <div style={{ fontFamily: HUB.fontBold, fontSize: 12, color: HUB.textPrimary }}>{s.value}</div>
                       </div>
                     ))}
                   </div>
@@ -468,8 +467,8 @@ function FIACircuitLibrary({ appRoot }: any) {
 
             {allCircuits.length === 0 && (
               <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: HUB.textMuted }}>
-                <Map size={40} color="rgba(255,255,255,0.1)" style={{ marginBottom: 12 }} />
-                <p style={{ fontFamily: HUB.fontRegular, fontSize: 14 }}>No circuits match your search.</p>
+                <Map size={40} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: 12 }} />
+                <p style={{ fontFamily: HUB.fontRegular, fontSize: 14 }}>No circuits match your search</p>
               </div>
             )}
           </div>

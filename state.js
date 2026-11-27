@@ -1,4 +1,4 @@
-import { createAiTeams } from "./data/teams.js";
+import { createAiTeams, reconcileRosters } from "./data/teams.js";
 import { Team } from "./game/team.js";
 import { Driver } from "./game/driver.js";
 import { ensureFinanceState } from "./utils/financeSystem.js";
@@ -81,7 +81,8 @@ function hydrateClass(obj, clazz) {
 export function hydrateState(payload) {
   try {
     const rawData = typeof payload === 'string' ? JSON.parse(payload) : payload;
-    
+    state.isDemo = false; // a real save is loaded — saving is allowed again
+
     // Check if team exists to hydrate the native Team and Driver methods
     if (rawData.team) {
       hydrateClass(rawData.team, Team);
@@ -156,6 +157,17 @@ export function hydrateState(payload) {
         if (s.prospect) hydrateClass(s.prospect, Driver);
       });
     }
+    // Restore every other saved system (engineering, setup lab, ...) that the
+    // explicit assignments above don't cover, so a reload doesn't wipe it.
+    const HANDLED = new Set(['team', 'aiTeams', 'season', 'standings', 'bestFinishes', 'driverWins', 'driverPodiums',
+      'raceHistory', 'signedSponsors', 'notifications', 'sponsorOffers', 'raceWeekend', 'weekendProgress', 'finance', 'academy', 'isDemo']);
+    for (const [key, value] of Object.entries(rawData)) {
+      if (!HANDLED.has(key) && value !== undefined) state[key] = value;
+    }
+
+    // Repair saves where a driver ended up on two teams.
+    reconcileRosters(state.team, state.aiTeams);
+
     ensureFinanceState(state);
     ensureEngineeringState(state);
 

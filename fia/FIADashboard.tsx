@@ -6,7 +6,7 @@ import {
   Settings, LogOut
 } from 'lucide-react';
 import { renderToAppRoot } from '../utils/reactRoot.tsx';
-import { HUB, glassCard, actionBtn } from '../components/HubLayout.tsx';
+import { HUB, glassCard, btn, btnClass, statCell, sectionLabel, pageTitle, pageSubtitle } from '../components/HubLayout.tsx';
 import {
   fiaCareer, saveFIACareer, setFIACareer, loadFIACareer, createDefaultFIACareer, generateRandomEvent,
   validateCalendar, calculateCalendarScorecard, LICENSE_STATUS
@@ -24,38 +24,41 @@ import { renderFIAContracts } from './screens/FIAContracts.tsx';
 import { renderLanding } from '../screens/landing.tsx';
 
 // ── FIA Design tokens (extends HUB) ──────────────────────────────────────────
+// FIA mode shares the team-side graphite ramp and red accent. The extra keys are
+// kept for the FIA screens: green/gold map to semantic positive/warning, blue/purple
+// are neutral (no decorative hues).
 export const FIA = {
   ...HUB,
-  accent: '#E10600',
-  gold: '#F59E0B',
-  blue: '#3B82F6',
-  green: '#10B981',
-  purple: '#8B5CF6',
-  sidebar: '#06080F',
+  accent: HUB.accent,
+  gold: HUB.warning,
+  blue: HUB.textMuted,
+  green: HUB.positive,
+  purple: HUB.textMuted,
+  sidebar: HUB.sidebar,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function ApprovalMeter({ value }: { value: number }) {
-  const color = value >= 70 ? FIA.green : value >= 50 ? FIA.gold : FIA.accent;
+  const color = value >= 70 ? HUB.positive : value >= 50 ? HUB.warning : HUB.negative;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: 999, transition: 'width 0.5s ease' }} />
+      <div style={{ flex: 1, height: 6, background: HUB.raised, borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: 3, transition: `width 400ms ${HUB.ease}` }} />
       </div>
-      <span style={{ fontFamily: HUB.fontBold, fontSize: 14, color, minWidth: 36 }}>{value}%</span>
+      <span style={{ fontFamily: HUB.fontBold, fontSize: 14, color: HUB.textPrimary, minWidth: 36 }}>{value}%</span>
     </div>
   );
 }
 
-function StatCard({ icon, label, value, sub, color = '#fff' }: any) {
+function StatCard({ icon, label, value, sub, color = HUB.textPrimary }: any) {
   return (
-    <div style={{ ...glassCard({ padding: '20px' }), display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ ...glassCard({ padding: '24px' }), display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <div style={{ color: FIA.accent }}>{icon}</div>
-        <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, letterSpacing: '0.15em', textTransform: 'uppercase' }}>{label}</span>
+        <div style={{ color: HUB.textFaint, display: 'flex' }}>{icon}</div>
+        <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{label}</span>
       </div>
       <span style={{ fontFamily: HUB.fontBold, fontSize: 26, color, lineHeight: 1 }}>{value}</span>
-      {sub && <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted }}>{sub}</span>}
+      {sub && <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint }}>{sub}</span>}
     </div>
   );
 }
@@ -70,19 +73,19 @@ function NavItem({ icon, label, active, onClick }: any) {
       onMouseLeave={() => setHovered(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 14px', borderRadius: 8,
-        color: isActive ? '#fff' : hovered ? '#fff' : HUB.textMuted,
+        padding: '10px 12px', borderRadius: 8,
+        color: isActive || hovered ? HUB.textPrimary : HUB.textMuted,
         border: 'none',
-        background: isActive ? 'rgba(225,6,0,0.12)' : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
-        cursor: 'pointer', fontSize: 13, fontFamily: HUB.fontBold,
-        width: '100%', textAlign: 'left', transition: 'all 0.15s',
-        position: 'relative',
+        background: isActive ? HUB.accentSoft : hovered ? HUB.raised : 'transparent',
+        cursor: 'pointer', fontSize: 13, fontFamily: isActive ? HUB.fontBold : HUB.fontRegular,
+        width: '100%', textAlign: 'left', transition: `background-color 150ms ${HUB.ease}, color 150ms ${HUB.ease}`,
+        position: 'relative'
       }}
     >
       {isActive && (
-        <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: 3, background: FIA.accent, borderRadius: '0 3px 3px 0' }} />
+        <div style={{ position: 'absolute', left: 0, top: '20%', bottom: '20%', width: 3, background: HUB.accent, borderRadius: '0 3px 3px 0' }} />
       )}
-      <span style={{ color: isActive ? FIA.accent : hovered ? '#fff' : HUB.textMuted }}>{icon}</span>
+      <span style={{ display: 'flex', color: isActive ? HUB.accentInk : hovered ? HUB.textPrimary : HUB.textMuted }}>{icon}</span>
       {label}
     </button>
   );
@@ -138,20 +141,21 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
     (l: any) => l.status === LICENSE_STATUS.LICENSED
   ).length;
 
+  const navIcon = { size: 16, strokeWidth: 1.5 };
   const navItems = [
-    { id: 'dashboard', icon: <Shield size={17} />, label: 'FIA Dashboard' },
+    { id: 'dashboard', icon: <Shield {...navIcon} />, label: 'FIA dashboard' },
     null,
-    { id: 'circuits', icon: <Map size={17} />, label: 'Circuit Library' },
-    { id: 'designer', icon: <Zap size={17} />, label: 'Circuit Designer' },
-    { id: 'licensing', icon: <CheckCircle size={17} />, label: 'Circuit Inspection' },
+    { id: 'circuits', icon: <Map {...navIcon} />, label: 'Circuit library' },
+    { id: 'designer', icon: <Zap {...navIcon} />, label: 'Circuit designer' },
+    { id: 'licensing', icon: <CheckCircle {...navIcon} />, label: 'Circuit inspection' },
     null,
-    { id: 'calendar', icon: <CalendarDays size={17} />, label: 'Calendar Board' },
-    { id: 'contracts', icon: <DollarSign size={17} />, label: 'Hosting Contracts' },
+    { id: 'calendar', icon: <CalendarDays {...navIcon} />, label: 'Calendar board' },
+    { id: 'contracts', icon: <DollarSign {...navIcon} />, label: 'Hosting contracts' },
     null,
-    { id: 'regulations', icon: <FileText size={17} />, label: 'Regulations' },
-    { id: 'entries', icon: <Users size={17} />, label: 'Team Entries' },
-    { id: 'decisions', icon: <AlertTriangle size={17} />, label: 'FIA Decisions' },
-    { id: 'review', icon: <Trophy size={17} />, label: 'Season Review' },
+    { id: 'regulations', icon: <FileText {...navIcon} />, label: 'Regulations' },
+    { id: 'entries', icon: <Users {...navIcon} />, label: 'Team entries' },
+    { id: 'decisions', icon: <AlertTriangle {...navIcon} />, label: 'FIA decisions' },
+    { id: 'review', icon: <Trophy {...navIcon} />, label: 'Season review' },
   ];
 
   const navHandlers: Record<string, () => void> = {
@@ -168,51 +172,51 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#060911', color: '#fff', fontFamily: HUB.fontRegular }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: HUB.bg, color: HUB.textPrimary, fontFamily: HUB.fontRegular }}>
       {/* Sidebar */}
       <aside style={{
         width: 240, flexShrink: 0, background: FIA.sidebar,
-        borderRight: '1px solid rgba(255,255,255,0.05)',
+        borderRight: `1px solid ${HUB.border}`,
         display: 'flex', flexDirection: 'column', padding: '28px 0', position: 'fixed',
-        left: 0, top: 0, height: '100vh', zIndex: 50,
+        left: 0, top: 0, height: '100vh', zIndex: 50
       }}>
         {/* Logo */}
         <div style={{ padding: '0 24px', marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <div style={{
-              background: FIA.accent, borderRadius: 8, padding: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: 8, padding: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
-              <Shield size={18} color="#fff" />
+              <Shield size={16} strokeWidth={1.5} color={HUB.textPrimary} />
             </div>
             <div>
-              <div style={{ fontFamily: HUB.fontWide, fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+              <div style={{ fontFamily: HUB.fontBold, fontSize: 14, color: HUB.textPrimary }}>
                 FIA
               </div>
-              <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: FIA.accent, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-                Organization
+              <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint }}>
+                Governing body
               </div>
             </div>
           </div>
-          <div style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted, marginTop: 4 }}>
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, marginTop: 4 }}>
             {career.careerName}
           </div>
         </div>
 
         {/* Approval Rating */}
         <div style={{ padding: '0 24px', marginBottom: 24 }}>
-          <div style={{ fontFamily: HUB.fontBold, fontSize: 9, color: HUB.textMuted, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>
-            Approval Rating
+          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, marginBottom: 8 }}>
+            Approval rating
           </div>
           <ApprovalMeter value={career.approvalRating} />
         </div>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '0 16px 16px' }} />
+        <div style={{ height: 1, background: HUB.border, margin: '0 16px 16px' }} />
 
         {/* Navigation */}
         <nav style={{ flex: 1, padding: '0 12px', overflowY: 'auto', scrollbarWidth: 'none' }}>
           {navItems.map((item, i) => {
-            if (!item) return <div key={`d-${i}`} style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '6px 4px' }} />;
+            if (!item) return <div key={`d-${i}`} style={{ height: 1, background: HUB.border, margin: '6px 4px' }} />;
             return (
               <NavItem
                 key={item.id}
@@ -227,10 +231,10 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
 
         {/* Bottom: Exit FIA */}
         <div style={{ padding: '16px 12px 0' }}>
-          <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '0 4px 12px' }} />
+          <div style={{ height: 1, background: HUB.border, margin: '0 4px 12px' }} />
           <NavItem
-            icon={<LogOut size={17} />}
-            label="Exit FIA Mode"
+            icon={<LogOut size={16} strokeWidth={1.5} />}
+            label="Exit FIA mode"
             active={false}
             onClick={() => renderLanding(appRoot)}
           />
@@ -239,41 +243,25 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
 
       {/* Main Content */}
       <main style={{ marginLeft: 240, flex: 1, padding: '40px 48px', overflowY: 'auto', minHeight: '100vh' }}>
-        {/* Background grid */}
-        <div style={{
-          position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-        }} />
-
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 1200 }}>
+        <div style={{ position: 'relative', maxWidth: 1200 }}>
           {/* Header */}
           <div style={{ marginBottom: 40 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: FIA.accent, animation: 'pulse 2s infinite' }} />
-              <span style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-                Season {career.currentYear} · FIA Operations
-              </span>
-            </div>
-            <h1 style={{ fontFamily: HUB.fontWide, fontSize: 32, fontWeight: 900, color: '#fff', margin: 0, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
-              FIA Dashboard
-            </h1>
-            <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, marginTop: 8 }}>
-              Govern the championship. Shape the calendar. Set the rules.
-            </p>
+            {sectionLabel(`Season ${career.currentYear}`)}
+            {pageTitle('FIA dashboard')}
+            {pageSubtitle('Govern the championship, shape the calendar and set the rules.')}
           </div>
 
           {/* Stat Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-            <StatCard icon={<CalendarDays size={16} />} label="Calendar" value={scorecard.totalRaces} sub={scorecard.totalRaces > 0 ? 'Races approved' : 'No calendar set'} />
-            <StatCard icon={<Map size={16} />} label="Licensed" value={licensedCount} sub={`of ${CIRCUIT_LIBRARY.length} circuits`} color={FIA.green} />
-            <StatCard icon={<DollarSign size={16} />} label="Budget" value={`$${career.finances.budget}M`} sub="FIA operating funds" color={FIA.gold} />
+            <StatCard icon={<CalendarDays size={16} strokeWidth={1.5} />} label="Calendar" value={scorecard.totalRaces} sub={scorecard.totalRaces > 0 ? 'Races approved' : 'No calendar set'} />
+            <StatCard icon={<Map size={16} strokeWidth={1.5} />} label="Licensed" value={licensedCount} sub={`of ${CIRCUIT_LIBRARY.length} circuits`} />
+            <StatCard icon={<DollarSign size={16} strokeWidth={1.5} />} label="Budget" value={`$${career.finances.budget}M`} sub="FIA operating funds" />
             <StatCard
-              icon={<AlertTriangle size={16} />}
+              icon={<AlertTriangle size={16} strokeWidth={1.5} />}
               label="Decisions"
               value={career.pendingDecisions.length}
               sub="Awaiting resolution"
-              color={career.pendingDecisions.length > 0 ? FIA.accent : FIA.green}
+              color={career.pendingDecisions.length > 0 ? HUB.warning : HUB.textPrimary}
             />
           </div>
 
@@ -285,14 +273,15 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
               <div style={{ ...glassCard({ padding: '24px' }) }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <div>
-                    <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4 }}>Championship Calendar</div>
-                    <h3 style={{ fontFamily: HUB.fontWide, fontSize: 18, color: '#fff', margin: 0, textTransform: 'uppercase' }}>Season {career.currentYear}</h3>
+                    {sectionLabel('Championship calendar')}
+                    <h3 style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary, margin: 0 }}>Season {career.currentYear}</h3>
                   </div>
                   <button
                     onClick={() => navigate('calendar', renderFIACalendarBoard)}
-                    style={{ ...actionBtn({ padding: '8px 16px', fontSize: 10 }) }}
+                    className={btnClass('secondary')}
+                    style={btn('secondary', 'sm')}
                   >
-                    Open Calendar →
+                    Open calendar
                   </button>
                 </div>
 
@@ -303,29 +292,29 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
                         { label: 'Races', value: scorecard.totalRaces },
                         { label: 'Sprints', value: scorecard.sprintWeekends },
                         { label: 'Continents', value: scorecard.continentsRepresented },
-                        { label: 'Est. Revenue', value: `$${scorecard.estimatedRevenue}M` },
-                        { label: 'European Races', value: scorecard.europeanRaces },
+                        { label: 'Est. revenue', value: `$${scorecard.estimatedRevenue}M` },
+                        { label: 'European races', value: scorecard.europeanRaces },
                         { label: 'Regions', value: scorecard.regionsRepresented },
                       ].map((item, i) => (
-                        <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '10px 14px' }}>
-                          <div style={{ fontFamily: HUB.fontRegular, fontSize: 9, color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{item.label}</div>
-                          <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: '#fff', marginTop: 2 }}>{item.value}</div>
+                        <div key={i} style={statCell()}>
+                          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint }}>{item.label}</div>
+                          <div style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary, marginTop: 4 }}>{item.value}</div>
                         </div>
                       ))}
                     </div>
 
                     {/* Validation Status */}
                     <div style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
-                      background: calendarValidation.isValid ? 'rgba(16,185,129,0.08)' : 'rgba(225,6,0,0.08)',
-                      border: `1px solid ${calendarValidation.isValid ? 'rgba(16,185,129,0.2)' : 'rgba(225,6,0,0.2)'}`,
-                      borderRadius: 8,
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+                      background: HUB.raised,
+                      border: `1px solid ${HUB.border}`,
+                      borderRadius: 8
                     }}>
                       {calendarValidation.isValid
-                        ? <CheckCircle size={14} color={FIA.green} />
-                        : <AlertTriangle size={14} color={FIA.accent} />
+                        ? <CheckCircle size={16} strokeWidth={1.5} color={HUB.positive} />
+                        : <AlertTriangle size={16} strokeWidth={1.5} color={HUB.negative} />
                       }
-                      <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: calendarValidation.isValid ? FIA.green : FIA.accent }}>
+                      <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textPrimary }}>
                         {calendarValidation.isValid
                           ? 'Calendar passes all validation checks'
                           : `${calendarValidation.errors.length} error(s), ${calendarValidation.warnings.length} warning(s)`
@@ -335,11 +324,11 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '32px 0', color: HUB.textMuted }}>
-                    <CalendarDays size={32} color="rgba(255,255,255,0.15)" style={{ marginBottom: 12 }} />
-                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, margin: 0 }}>No calendar approved yet.</p>
-                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 11, margin: '4px 0 16px', opacity: 0.7 }}>Open the Calendar Board to build your season.</p>
-                    <button onClick={() => navigate('calendar', renderFIACalendarBoard)} style={{ ...actionBtn({ padding: '10px 20px', fontSize: 11 }) }}>
-                      Build Calendar
+                    <CalendarDays size={32} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: 12 }} />
+                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 14, margin: 0 }}>No calendar approved yet</p>
+                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textFaint, margin: '4px 0 16px' }}>Open the calendar board to build your season.</p>
+                    <button onClick={() => navigate('calendar', renderFIACalendarBoard)} className={btnClass('primary')} style={btn('primary', 'md')}>
+                      Build calendar
                     </button>
                   </div>
                 )}
@@ -347,31 +336,23 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
 
               {/* Quick Actions */}
               <div style={{ ...glassCard({ padding: '24px' }) }}>
-                <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 16 }}>Quick Actions</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                <div style={{ marginBottom: 12 }}>{sectionLabel('Quick actions')}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                   {[
-                    { label: 'License a Circuit', icon: <CheckCircle size={14} />, action: () => navigate('licensing', renderFIALicensing) },
-                    { label: 'Design New Circuit', icon: <Map size={14} />, action: () => navigate('designer', renderFIACircuitDesigner) },
-                    { label: 'Edit Regulations', icon: <FileText size={14} />, action: () => navigate('regulations', renderFIARegulations) },
-                    { label: 'Resolve Decisions', icon: <AlertTriangle size={14} />, action: () => navigate('decisions', renderFIADecisions) },
-                    { label: 'Team Entries', icon: <Users size={14} />, action: () => navigate('entries', renderFIAEntries) },
-                    { label: 'Hosting Contracts', icon: <DollarSign size={14} />, action: () => navigate('contracts', renderFIAContracts) },
+                    { label: 'License a circuit', icon: <CheckCircle size={16} strokeWidth={1.5} />, action: () => navigate('licensing', renderFIALicensing) },
+                    { label: 'Design new circuit', icon: <Map size={16} strokeWidth={1.5} />, action: () => navigate('designer', renderFIACircuitDesigner) },
+                    { label: 'Edit regulations', icon: <FileText size={16} strokeWidth={1.5} />, action: () => navigate('regulations', renderFIARegulations) },
+                    { label: 'Resolve decisions', icon: <AlertTriangle size={16} strokeWidth={1.5} />, action: () => navigate('decisions', renderFIADecisions) },
+                    { label: 'Team entries', icon: <Users size={16} strokeWidth={1.5} />, action: () => navigate('entries', renderFIAEntries) },
+                    { label: 'Hosting contracts', icon: <DollarSign size={16} strokeWidth={1.5} />, action: () => navigate('contracts', renderFIAContracts) },
                   ].map((item, i) => (
                     <button
                       key={i}
                       onClick={item.action}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '12px 16px', borderRadius: 8,
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        color: '#fff', cursor: 'pointer', fontFamily: HUB.fontBold,
-                        fontSize: 12, transition: 'all 0.15s', width: '100%',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(225,6,0,0.08)'; e.currentTarget.style.borderColor = 'rgba(225,6,0,0.2)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}
+                      className={btnClass('secondary')}
+                      style={btn('secondary', 'md', { width: '100%', justifyContent: 'flex-start' })}
                     >
-                      <span style={{ color: FIA.accent }}>{item.icon}</span>
+                      <span style={{ display: 'flex', color: HUB.textMuted }}>{item.icon}</span>
                       {item.label}
                     </button>
                   ))}
@@ -380,31 +361,23 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
 
               {/* Approve Season button */}
               {calendarValidation.isValid && (
-                <div style={{
-                  ...glassCard({ padding: '24px' }),
-                  background: 'linear-gradient(135deg, rgba(225,6,0,0.1), rgba(225,6,0,0.05))',
-                  border: '1px solid rgba(225,6,0,0.3)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ ...glassCard({ padding: '24px' }) }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                     <div>
-                      <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: FIA.accent, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4 }}>
-                        Season Ready
-                      </div>
-                      <h3 style={{ fontFamily: HUB.fontWide, fontSize: 18, color: '#fff', margin: '0 0 6px' }}>
-                        Approve Season {career.currentYear}
+                      {sectionLabel('Season ready')}
+                      <h3 style={{ fontFamily: HUB.fontBold, fontSize: 18, color: HUB.textPrimary, margin: '0 0 4px' }}>
+                        Approve season {career.currentYear}
                       </h3>
-                      <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: 0 }}>
-                        Calendar validated · Regulations set · Ready to race
+                      <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, margin: 0 }}>
+                        Calendar validated · Regulations set
                       </p>
                     </div>
                     <button
                       onClick={() => navigate('review', renderFIASeasonReview)}
-                      style={{
-                        ...actionBtn({ padding: '14px 28px', fontSize: 12 }),
-                        background: 'linear-gradient(135deg, #E10600, #FF4040)',
-                      }}
+                      className={btnClass('primary')}
+                      style={btn('primary', 'md')}
                     >
-                      APPROVE SEASON →
+                      Approve season
                     </button>
                   </div>
                 </div>
@@ -416,35 +389,36 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
               {/* Pending Decisions */}
               <div style={{ ...glassCard({ padding: '24px' }) }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-                    Pending Decisions
+                  <div style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary }}>
+                    Pending decisions
                   </div>
                   <button
                     onClick={handleAddEvent}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: HUB.textMuted, cursor: 'pointer', fontFamily: HUB.fontBold, fontSize: 10 }}
+                    className={btnClass('ghost')}
+                    style={btn('ghost', 'sm')}
                   >
-                    <Plus size={12} /> New
+                    <Plus size={14} strokeWidth={1.5} />New decision
                   </button>
                 </div>
 
                 {career.pendingDecisions.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '24px 0', color: HUB.textMuted }}>
-                    <CheckCircle size={28} color="rgba(16,185,129,0.4)" style={{ marginBottom: 8 }} />
-                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, margin: 0 }}>No pending decisions.</p>
+                    <CheckCircle size={28} strokeWidth={1.5} color={HUB.textFaint} style={{ marginBottom: 8 }} />
+                    <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, margin: 0 }}>No pending decisions</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {career.pendingDecisions.slice(0, 3).map(event => (
                       <div key={event.instanceId} style={{
-                        background: 'rgba(225,6,0,0.06)', border: '1px solid rgba(225,6,0,0.15)',
-                        borderRadius: 10, padding: '14px',
+                        background: HUB.raised, border: `1px solid ${HUB.border}`,
+                        borderRadius: 8, padding: '16px'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                          <AlertTriangle size={12} color={FIA.accent} />
-                          <span style={{ fontFamily: HUB.fontBold, fontSize: 11, color: FIA.accent }}>Decision Required</span>
+                          <AlertTriangle size={12} strokeWidth={1.5} color={HUB.warning} />
+                          <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>Decision required</span>
                         </div>
-                        <p style={{ fontFamily: HUB.fontBold, fontSize: 13, color: '#fff', margin: '0 0 6px' }}>{event.title}</p>
-                        <p style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, margin: '0 0 12px', lineHeight: 1.5 }}>
+                        <p style={{ fontFamily: HUB.fontBold, fontSize: 14, color: HUB.textPrimary, margin: '0 0 6px' }}>{event.title}</p>
+                        <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, margin: '0 0 12px', lineHeight: 1.5 }}>
                           {event.description}
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -452,17 +426,12 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
                             <button
                               key={choice.id}
                               onClick={() => handleResolveEvent(event.instanceId, choice.id)}
-                              style={{
-                                padding: '8px 12px', borderRadius: 6, textAlign: 'left',
-                                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                                color: '#fff', cursor: 'pointer', fontFamily: HUB.fontRegular, fontSize: 11,
-                                transition: 'all 0.15s',
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(225,6,0,0.1)'; e.currentTarget.style.borderColor = 'rgba(225,6,0,0.3)'; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                              className={btnClass('secondary')}
+                              style={btn('secondary', 'sm', { width: '100%', justifyContent: 'space-between' })}
+                              title={choice.label}
                             >
-                              {choice.label}
-                              <span style={{ float: 'right', fontFamily: HUB.fontBold, fontSize: 10, color: choice.approvalDelta >= 0 ? FIA.green : FIA.accent }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{choice.label}</span>
+                              <span style={{ flexShrink: 0, fontFamily: HUB.fontBold, fontSize: 11, color: choice.approvalDelta >= 0 ? HUB.positive : HUB.negative }}>
                                 {choice.approvalDelta >= 0 ? '+' : ''}{choice.approvalDelta}% approval
                               </span>
                             </button>
@@ -473,9 +442,10 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
                     {career.pendingDecisions.length > 3 && (
                       <button
                         onClick={() => navigate('decisions', renderFIADecisions)}
-                        style={{ padding: '8px', color: HUB.textMuted, background: 'none', border: 'none', cursor: 'pointer', fontFamily: HUB.fontRegular, fontSize: 11, textAlign: 'center' }}
+                        className={btnClass('ghost')}
+                        style={btn('ghost', 'sm', { width: '100%' })}
                       >
-                        + {career.pendingDecisions.length - 3} more decisions →
+                        View {career.pendingDecisions.length - 3} more decisions
                       </button>
                     )}
                   </div>
@@ -484,22 +454,22 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
 
               {/* Season History */}
               <div style={{ ...glassCard({ padding: '24px' }) }}>
-                <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 16 }}>
-                  Season History
+                <div style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary, marginBottom: 16 }}>
+                  Season history
                 </div>
                 {career.seasonHistory.length === 0 ? (
-                  <p style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, textAlign: 'center', padding: '16px 0' }}>
-                    No completed seasons yet.
+                  <p style={{ fontFamily: HUB.fontRegular, fontSize: 13, color: HUB.textMuted, textAlign: 'center', padding: '16px 0', margin: 0 }}>
+                    No completed seasons yet
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {career.seasonHistory.slice(-5).reverse().map((season: any, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: HUB.raised, borderRadius: 8 }}>
                         <div>
-                          <div style={{ fontFamily: HUB.fontBold, fontSize: 12, color: '#fff' }}>Season {season.year}</div>
-                          <div style={{ fontFamily: HUB.fontRegular, fontSize: 10, color: HUB.textMuted }}>{season.races} races · Champion: {season.champion || 'TBD'}</div>
+                          <div style={{ fontFamily: HUB.fontBold, fontSize: 13, color: HUB.textPrimary }}>Season {season.year}</div>
+                          <div style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted }}>{season.races} races · Champion: {season.champion || 'TBD'}</div>
                         </div>
-                        <Trophy size={14} color={FIA.gold} />
+                        <Trophy size={16} strokeWidth={1.5} color={HUB.textFaint} />
                       </div>
                     ))}
                   </div>
@@ -508,15 +478,15 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
 
               {/* Notifications */}
               {career.notifications.length > 0 && (
-                <div style={{ ...glassCard({ padding: '20px' }) }}>
-                  <div style={{ fontFamily: HUB.fontBold, fontSize: 10, color: HUB.textMuted, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>
-                    Recent Notifications
+                <div style={{ ...glassCard({ padding: '24px' }) }}>
+                  <div style={{ fontFamily: HUB.fontBold, fontSize: 16, color: HUB.textPrimary, marginBottom: 12 }}>
+                    Recent notifications
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {career.notifications.slice(0, 4).map((n: any, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 0', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                        <Activity size={11} color={HUB.textMuted} style={{ marginTop: 2, flexShrink: 0 }} />
-                        <span style={{ fontFamily: HUB.fontRegular, fontSize: 11, color: HUB.textMuted, lineHeight: 1.4 }}>{n.message}</span>
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 0', borderBottom: i < 3 ? `1px solid ${HUB.border}` : 'none' }}>
+                        <Activity size={12} strokeWidth={1.5} color={HUB.textFaint} style={{ marginTop: 2, flexShrink: 0 }} />
+                        <span style={{ fontFamily: HUB.fontRegular, fontSize: 12, color: HUB.textMuted, lineHeight: 1.4 }}>{n.message}</span>
                       </div>
                     ))}
                   </div>
@@ -526,13 +496,6 @@ function FIADashboard({ appRoot, activeScreen = 'dashboard', career: initialCare
           </div>
         </div>
       </main>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
     </div>
   );
 }

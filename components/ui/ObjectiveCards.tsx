@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { HUB, glassCard } from '../HubLayout.tsx';
+import { HUB, glassCard, pill } from '../HubLayout.tsx';
 import { Target, Zap, Shield, Trophy, Flag, TrendingUp, CloudRain, Wrench, Star } from 'lucide-react';
 
 // ── Finish Distribution Bar ──────────────────────────────────────────────────
@@ -8,10 +8,10 @@ export const FinishDistributionBar = ({ finishDist, compact = false }) => {
   if (!finishDist) return null;
   const { win, podium, top5, top10, expectedFinish } = finishDist;
   const bars = [
-    { label: 'Win', value: win, color: '#f59e0b' },
-    { label: 'Podium', value: podium, color: '#10b981' },
-    { label: 'Top 5', value: top5, color: '#3b82f6' },
-    { label: 'Top 10', value: top10, color: '#8b5cf6' },
+    { label: 'Win', value: win, color: 'rgba(237,237,237,0.5)' },
+    { label: 'Podium', value: podium, color: 'rgba(237,237,237,0.5)' },
+    { label: 'Top 5', value: top5, color: 'rgba(237,237,237,0.5)' },
+    { label: 'Top 10', value: top10, color: 'rgba(237,237,237,0.5)' },
   ];
 
   if (compact) {
@@ -19,9 +19,8 @@ export const FinishDistributionBar = ({ finishDist, compact = false }) => {
       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         {bars.map(bar => (
           <div key={bar.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: bar.color }} />
-            <span style={{ fontSize: '10px', color: HUB.textMuted }}>{bar.label}</span>
-            <span style={{ fontSize: '12px', fontWeight: 800, color: bar.color, fontFamily: HUB.fontMono }}>{bar.value}%</span>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>{bar.label}</span>
+            <span style={{ fontSize: '12px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{bar.value}%</span>
           </div>
         ))}
       </div>
@@ -31,20 +30,20 @@ export const FinishDistributionBar = ({ finishDist, compact = false }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-        <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          AI Finish Distribution
+        <span style={{ fontSize: '12px', color: HUB.textMuted }}>
+          Finish distribution
         </span>
-        <span style={{ fontSize: '11px', color: '#fff', fontFamily: HUB.fontMono }}>
-          Expected: <strong style={{ color: HUB.accent }}>P{expectedFinish}</strong>
+        <span style={{ fontSize: '12px', color: HUB.textMuted, fontFamily: HUB.fontRegular }}>
+          Expected <strong style={{ color: HUB.textPrimary, fontFamily: HUB.fontMono, fontWeight: 400 }}>P{expectedFinish}</strong>
         </span>
       </div>
       {bars.map(bar => (
         <div key={bar.label}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-            <span style={{ fontSize: '10px', color: HUB.textMuted }}>{bar.label}</span>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: bar.color, fontFamily: HUB.fontMono }}>{bar.value}%</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>{bar.label}</span>
+            <span style={{ fontSize: '12px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{bar.value}%</span>
           </div>
-          <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ height: '4px', background: HUB.raised, borderRadius: '2px', overflow: 'hidden' }}>
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${bar.value}%` }}
@@ -60,41 +59,38 @@ export const FinishDistributionBar = ({ finishDist, compact = false }) => {
 
 // ── Objective Type Icon ──────────────────────────────────────────────────────
 const ObjectiveIcon = ({ type, size = 14 }) => {
-  const iconProps = { size, style: { flexShrink: 0 } };
+  const iconProps = { size, strokeWidth: 1.5, color: HUB.textMuted, style: { flexShrink: 0 } };
   switch (type) {
-    case 'primary': return <Trophy {...iconProps} color="#f59e0b" />;
-    case 'championship': return <TrendingUp {...iconProps} color="#10b981" />;
-    case 'rival': return <Target {...iconProps} color={HUB.accent} />;
-    case 'track': return <Flag {...iconProps} color="#3b82f6" />;
-    case 'opportunistic': return <Star {...iconProps} color="#a78bfa" />;
-    case 'qualifying': return <Zap {...iconProps} color="#60a5fa" />;
-    case 'weather': return <CloudRain {...iconProps} color="#60a5fa" />;
-    case 'reliability': return <Wrench {...iconProps} color="#94a3b8" />;
-    default: return <Target {...iconProps} color={HUB.textMuted} />;
+    case 'primary': return <Trophy {...iconProps} />;
+    case 'championship': return <TrendingUp {...iconProps} />;
+    case 'rival': return <Target {...iconProps} />;
+    case 'track': return <Flag {...iconProps} />;
+    case 'opportunistic': return <Star {...iconProps} />;
+    case 'qualifying': return <Zap {...iconProps} />;
+    case 'weather': return <CloudRain {...iconProps} />;
+    case 'reliability': return <Wrench {...iconProps} />;
+    default: return <Target {...iconProps} />;
   }
 };
 
 // ── Risk Badge ───────────────────────────────────────────────────────────────
 const RiskBadge = ({ level }) => {
-  const colors = { 'Low': '#10b981', 'Medium': '#f59e0b', 'High': '#f97316', 'Very High': '#ef4444', 'Critical': '#e11d48' };
+  const colors = { 'Low': HUB.textMuted, 'Medium': HUB.textMuted, 'High': HUB.warning, 'Very High': HUB.negative, 'Critical': HUB.negative };
   const color = colors[level] || HUB.textMuted;
+  const text = String(level || '');
   return (
-    <span style={{
-      fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-      color, border: `1px solid ${color}22`, background: `${color}11`,
-      padding: '2px 6px', borderRadius: '3px'
-    }}>
-      {level} Risk
+    <span style={{ fontSize: '12px', fontWeight: 400, fontFamily: HUB.fontRegular, color }}>
+      {text.charAt(0)}{text.slice(1).toLowerCase()} risk
     </span>
   );
 };
 
 // ── Board Impact Badge ───────────────────────────────────────────────────────
 const BoardBadge = ({ impact }) => {
-  const colors = { 'Critical': '#e11d48', 'High': '#f59e0b', 'Medium': '#3b82f6', 'Low': HUB.textMuted };
+  const colors = { 'Critical': HUB.negative, 'High': HUB.warning, 'Medium': HUB.textMuted, 'Low': HUB.textMuted };
   const color = colors[impact] || HUB.textMuted;
   return (
-    <span style={{ fontSize: '9px', fontWeight: 700, color, fontFamily: HUB.fontMono }}>
+    <span style={{ fontSize: '12px', fontWeight: 400, color, fontFamily: HUB.fontRegular }}>
       Board: {impact}
     </span>
   );
@@ -112,45 +108,43 @@ export const ObjectiveCard = ({
     riskLevel, sponsorRewardM, boardImpact, championshipImpact } = objective;
 
   const selectedBorder = `1px solid ${HUB.accent}`;
-  const defaultBorder = '1px solid rgba(255,255,255,0.06)';
-  const selectedBg = 'rgba(225,6,0,0.07)';
-  const hoverBg = 'rgba(255,255,255,0.03)';
+  const defaultBorder = `1px solid ${HUB.border}`;
+  const selectedBg = HUB.accentSoft;
+  const hoverBg = HUB.raised;
 
   // Probability bar colour
-  const probColor = successProbability >= 65 ? '#10b981' : successProbability >= 40 ? '#f59e0b' : '#ef4444';
+  const probColor = successProbability >= 65 ? HUB.positive : successProbability >= 40 ? HUB.warning : HUB.negative;
 
   if (compact) {
     return (
       <motion.button
         onClick={() => onSelect && onSelect(objective.id)}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
         style={{
           width: '100%', textAlign: 'left', cursor: onSelect ? 'pointer' : 'default',
           padding: '12px 16px',
           background: isSelected ? selectedBg : hoverBg,
           border: isSelected ? selectedBorder : defaultBorder,
-          borderRadius: '8px', transition: 'all 0.15s ease',
+          borderRadius: '8px', transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-          <ObjectiveIcon type={type} size={14} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+          <ObjectiveIcon type={type} size={16} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: isSelected ? '#fff' : 'rgba(255,255,255,0.85)' }}>
-                {emoji} {label}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>
+                {label}
               </span>
-              {isRecommended && <span style={{ fontSize: '8px', background: HUB.accent, color: '#fff', padding: '1px 5px', borderRadius: '3px', fontWeight: 800 }}>AI PICK</span>}
+              {isRecommended && <span style={{ ...pill(false), padding: '0 6px', fontSize: '11px' }}>Recommended</span>}
             </div>
-            <span style={{ fontSize: '10px', color: HUB.textMuted }}>
-              {expectedFinishRange} • {successProbability}% Success • <RiskBadge level={riskLevel} />
+            <span style={{ fontSize: '12px', color: HUB.textMuted }}>
+              {expectedFinishRange} • {successProbability}% success • <RiskBadge level={riskLevel} />
             </span>
           </div>
         </div>
         <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <div style={{ fontSize: '12px', fontWeight: 800, color: '#10b981', fontFamily: HUB.fontMono }}>+${sponsorRewardM}M</div>
-          <div style={{ fontSize: '9px', color: HUB.textMuted }}>Sponsor</div>
+          <div style={{ fontSize: '12px', fontWeight: 400, color: HUB.positive, fontFamily: HUB.fontMono }}>+${sponsorRewardM}M</div>
+          <div style={{ fontSize: '11px', color: HUB.textFaint }}>Sponsor</div>
         </div>
       </motion.button>
     );
@@ -159,41 +153,28 @@ export const ObjectiveCard = ({
   return (
     <motion.button
       onClick={() => onSelect && onSelect(objective.id)}
-      whileHover={{ scale: 1.01, y: -1 }}
-      whileTap={{ scale: 0.99 }}
       style={{
         width: '100%', textAlign: 'left', cursor: onSelect ? 'pointer' : 'default',
-        padding: '20px',
-        background: isSelected ? selectedBg : 'rgba(0,0,0,0.15)',
+        padding: '16px',
+        background: isSelected ? selectedBg : HUB.raised,
         border: isSelected ? selectedBorder : defaultBorder,
-        borderRadius: '10px', transition: 'all 0.15s ease',
+        borderRadius: '8px', transition: `background-color 150ms ${HUB.ease}, border-color 150ms ${HUB.ease}`,
         position: 'relative', overflow: 'hidden'
       }}
     >
-      {/* Recommended glow accent */}
-      {isRecommended && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-          background: 'linear-gradient(90deg, transparent, #f59e0b, transparent)'
-        }} />
-      )}
-
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '7px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+          <div style={{ background: HUB.surface, borderRadius: '8px', padding: '8px', display: 'flex', alignItems: 'center' }}>
             <ObjectiveIcon type={type} size={16} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontBold }}>
-                {emoji} {label}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontBold }}>
+                {label}
               </span>
               {isRecommended && (
-                <span style={{
-                  fontSize: '8px', background: '#f59e0b', color: '#000',
-                  padding: '2px 6px', borderRadius: '3px', fontWeight: 800, letterSpacing: '0.05em'
-                }}>AI PICK</span>
+                <span style={{ ...pill(false), padding: '2px 6px', fontSize: '11px' }}>Recommended</span>
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -207,24 +188,23 @@ export const ObjectiveCard = ({
         <div style={{ textAlign: 'center', flexShrink: 0, marginLeft: '12px' }}>
           <div style={{
             width: '48px', height: '48px', borderRadius: '50%',
-            border: `2px solid ${probColor}`,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            background: `${probColor}15`
+            border: `2px solid ${HUB.borderMid}`,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
           }}>
-            <span style={{ fontSize: '13px', fontWeight: 900, color: probColor, fontFamily: HUB.fontMono, lineHeight: 1 }}>{successProbability}%</span>
+            <span style={{ fontSize: '13px', fontWeight: 400, color: probColor, fontFamily: HUB.fontMono, lineHeight: 1 }}>{successProbability}%</span>
           </div>
-          <div style={{ fontSize: '8px', color: HUB.textMuted, marginTop: '3px' }}>SUCCESS</div>
+          <div style={{ fontSize: '11px', color: HUB.textFaint, marginTop: '4px' }}>Success</div>
         </div>
       </div>
 
-      {/* AI Rationale */}
-      <p style={{ fontSize: '12px', color: '#aaa', margin: '0 0 14px', lineHeight: '1.5', fontStyle: 'italic' }}>
-        "{rationale}"
+      {/* Rationale */}
+      <p style={{ fontSize: '13px', color: HUB.textMuted, margin: '0 0 16px', lineHeight: '1.5' }}>
+        {rationale}
       </p>
 
       {/* Success probability bar */}
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ height: '4px', background: HUB.surface, borderRadius: '2px', overflow: 'hidden' }}>
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${successProbability}%` }}
@@ -236,17 +216,17 @@ export const ObjectiveCard = ({
 
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '3px' }}>Expected</div>
-          <div style={{ fontSize: '12px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>{expectedFinishRange}</div>
+        <div style={{ background: HUB.surface, borderRadius: '8px', padding: '8px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '4px' }}>Expected</div>
+          <div style={{ fontSize: '13px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{expectedFinishRange}</div>
         </div>
-        <div style={{ background: 'rgba(16,185,129,0.08)', borderRadius: '6px', padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '3px' }}>Sponsor</div>
-          <div style={{ fontSize: '12px', fontWeight: 800, color: '#10b981', fontFamily: HUB.fontMono }}>+${sponsorRewardM}M</div>
+        <div style={{ background: HUB.surface, borderRadius: '8px', padding: '8px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '4px' }}>Sponsor</div>
+          <div style={{ fontSize: '13px', fontWeight: 400, color: HUB.positive, fontFamily: HUB.fontMono }}>+${sponsorRewardM}M</div>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: '9px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '3px' }}>Pts Impact</div>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#fff', fontFamily: HUB.fontMono }}>{championshipImpact}</div>
+        <div style={{ background: HUB.surface, borderRadius: '8px', padding: '8px 12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '4px' }}>Points impact</div>
+          <div style={{ fontSize: '12px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{championshipImpact}</div>
         </div>
       </div>
     </motion.button>
@@ -262,7 +242,7 @@ export const ObjectiveCardsList = ({
   compact = false,
 }) => {
   if (!objectives || objectives.length === 0) {
-    return <div style={{ color: HUB.textMuted, fontSize: '13px' }}>No objectives generated.</div>;
+    return <div style={{ color: HUB.textMuted, fontSize: '13px' }}>No objectives generated</div>;
   }
 
   return (

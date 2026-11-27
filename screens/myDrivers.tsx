@@ -5,11 +5,16 @@ import { syncGame } from "../lib/supabaseApi.js";
 import { getDriverHeadshotUrl, getDriverNumber } from "../data/drivers.js";
 import { calendar as ALL_CIRCUITS } from '../data/calendar.js';
 import { getCircuitProfile } from '../utils/devProjects.js';
-import { mountLayout, HUB, glassCard, statCell, actionBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue } from '../components/HubLayout.tsx';
+import { mountLayout, HUB, glassCard, statCell, btn, btnClass, iconBtn, sectionLabel, pageTitle, pageSubtitle, statLabel, statValue, pill } from '../components/HubLayout.tsx';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
 import { AnimatedNumber, AnimatedBar } from '../components/ui/motion.tsx';
 import { RadarChart } from '../components/driverComparison.tsx';
 import { DriverNegotiationModal } from '../components/DriverNegotiationModal.tsx';
+import { ContractBuilder } from '../components/ContractBuilder.tsx';
+import { DriverRadarCompare } from '../components/DriverRadarCompare.tsx';
+import { runReserveOffer } from '../utils/contractOfferModel.js';
+import { getDriverSeasonPace, formatLapTime, formatDelta } from '../utils/racePace.js';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -30,12 +35,12 @@ const ResponsiveAccordionSection = ({ title, children, gridColumn, defaultOpen =
   return (
     <div style={{ ...glassCard({ padding: 0 }), gridColumn, display: 'flex', flexDirection: 'column' }}>
       <div className="section-header-desktop" style={{ padding: '24px 24px 0', borderBottom: 'none' }}>
-        <h3 style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold, textTransform: 'uppercase', margin: 0 }}>{title}</h3>
+        <h3 style={{ fontSize: '16px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontBold, margin: 0 }}>{title}</h3>
       </div>
       <button 
         className="section-header-mobile"
         onClick={() => setIsOpen(!isOpen)}
-        style={{ width: '100%', padding: '20px 24px', background: 'transparent', border: 'none', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: '#fff', fontSize: '14px', fontFamily: HUB.fontBold, textTransform: 'uppercase' }}
+        style={{ width: '100%', padding: '20px 24px', background: 'transparent', border: 'none', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: HUB.textPrimary, fontSize: '16px', fontFamily: HUB.fontBold }}
       >
         {title}
         <span style={{ fontSize: '16px', color: HUB.textMuted }}>{isOpen ? '−' : '+'}</span>
@@ -130,8 +135,8 @@ const getTeamCarRank = (teamName: string) => {
   return rank > 0 ? rank : 5; // fallback
 };
 
-const generateAIReport = (driver: any, stats: any, extractionDelta: number) => {
-  if (!stats || stats.starts === 0) return "Not enough data to generate an AI Performance Report. Awaiting race telemetry.";
+const generateAIReport = (driver: any, stats: any, extractionDelta: number, pace?: any) => {
+  if (!stats || stats.starts === 0) return "Not enough races yet to write a performance report";
   
   const sentences = [];
   
@@ -161,7 +166,17 @@ const generateAIReport = (driver: any, stats: any, extractionDelta: number) => {
      sentences.push("A Sunday specialist, making up for lackluster qualifying performances with relentless race pace.");
   }
 
-  return sentences.join(" ");
+  if (pace) {
+    if (pace.avgPaceRank <= 3) sentences.push(`Long-run pace is front-running, averaging P${pace.avgPaceRank.toFixed(1)} on clean laps.`);
+    else sentences.push(`On clean laps the car-and-driver package averages P${pace.avgPaceRank.toFixed(1)}, ${pace.avgGapS.toFixed(2)}s a lap off the quickest.`);
+    if (pace.conversion != null && pace.conversion > 1) sentences.push("Results are running ahead of raw pace, so strategy and racecraft are adding points.");
+    else if (pace.conversion != null && pace.conversion < -1) sentences.push("Results are trailing raw pace; points are being lost to strategy, traffic or incidents.");
+    if (pace.teammateRaces >= 2 && pace.teammateMedianDelta != null) {
+      const d = pace.teammateMedianDelta;
+      sentences.push(d < 0 ? `Quicker than the teammate in ${pace.teammateAhead} of ${pace.teammateRaces} races, by ${Math.abs(d).toFixed(2)}s a lap on median.` : `Slower than the teammate in ${pace.teammateRaces - pace.teammateAhead} of ${pace.teammateRaces} races, by ${d.toFixed(2)}s a lap on median.`);
+    }
+  }
+
   return sentences.join(" ");
 };
 
@@ -175,10 +190,134 @@ const getDriverForecast = (driver: any, circuitName: string) => {
   else if (profile.type === 'Technical') score += driver.pace * 0.4 + driver.consistency * 0.3 + driver.quali * 0.3;
   else score += driver.pace * 0.3 + driver.quali * 0.3 + driver.racecraft * 0.2 + driver.consistency * 0.2;
   
-  if (score >= 88) return { label: 'Exceptional', color: '#10b981' };
-  if (score >= 80) return { label: 'Strong', color: '#3b82f6' };
-  if (score >= 70) return { label: 'Average', color: '#f59e0b' };
-  return { label: 'Weak', color: '#ef4444' };
+  if (score >= 88) return { label: 'Exceptional', color: HUB.positive };
+  if (score >= 80) return { label: 'Strong', color: HUB.textPrimary };
+  if (score >= 70) return { label: 'Average', color: HUB.warning };
+  return { label: 'Weak', color: HUB.negative };
+};
+
+// --- Race pace (from recorded lap times) ---
+const ordinalRank = (v: number | null | undefined) => (v == null ? '–' : `P${v}`);
+
+const DriverRacePaceSection = ({ driver, pace, teammate, teammatePace }: any) => {
+  const summary = pace?.summary;
+  if (!summary) {
+    return (
+      <ResponsiveAccordionSection title="Race pace" gridColumn="span 12" defaultOpen={true}>
+        <div style={{ color: HUB.textMuted, fontSize: '13px' }}>
+          No lap-time data yet. Race pace appears after a race where {driver.name} completes enough clean laps.
+        </div>
+      </ResponsiveAccordionSection>
+    );
+  }
+
+  const conv = summary.conversion;
+  const trendTxt = summary.avgTrend == null ? '–' : `${formatDelta(summary.avgTrend, 3)}s`;
+  const kpis = [
+    { label: 'Avg pace rank', val: `P${summary.avgPaceRank.toFixed(1)}`, sub: `Best P${summary.bestPaceRank} · fastest ${summary.fastestPaceCount}×` },
+    { label: 'Gap to fastest', val: `+${summary.avgGapS.toFixed(3)}s`, sub: `${summary.avgGapPct.toFixed(2)}% per lap` },
+    {
+      label: 'Pace to result',
+      val: conv == null ? '–' : `${conv > 0 ? '+' : ''}${conv.toFixed(1)}`,
+      sub: conv == null ? 'No finishes yet' : conv > 0.5 ? 'Finishing above pace' : conv < -0.5 ? 'Finishing below pace' : 'Results match pace',
+      color: conv == null ? HUB.textPrimary : conv > 0.5 ? HUB.positive : conv < -0.5 ? HUB.negative : HUB.textPrimary,
+    },
+    { label: 'Consistency', val: `${summary.avgConsistency}`, sub: 'Lap scatter score / 100' },
+    { label: 'Tyre drop-off', val: trendTxt, sub: 'Avg lap-time trend per stint lap' },
+    {
+      label: 'vs teammate',
+      val: summary.teammateRaces ? `${summary.teammateAhead}–${summary.teammateRaces - summary.teammateAhead}` : '–',
+      sub: summary.teammateMedianDelta == null ? 'No teammate data' : `${formatDelta(summary.teammateMedianDelta)}s/lap median`,
+      color: summary.teammateRaces ? (summary.teammateAhead * 2 > summary.teammateRaces ? HUB.positive : summary.teammateAhead * 2 < summary.teammateRaces ? HUB.negative : HUB.textPrimary) : HUB.textPrimary,
+    },
+  ];
+
+  const rounds = pace.races.filter((r: any) => r.rankable);
+  const mateByRound = new Map((teammatePace?.races || []).filter((r: any) => r.rankable).map((r: any) => [r.round, r]));
+  const chartData = {
+    labels: rounds.map((r: any) => `R${r.round}`),
+    datasets: [
+      {
+        label: driver.name,
+        data: rounds.map((r: any) => r.gapToFastest),
+        borderColor: HUB.accent,
+        backgroundColor: HUB.accent,
+        borderWidth: 2,
+        pointRadius: 4,
+        tension: 0.25,
+      },
+      ...(teammate ? [{
+        label: teammate.name,
+        data: rounds.map((r: any) => (mateByRound.get(r.round) as any)?.gapToFastest ?? null),
+        borderColor: 'rgba(237,237,237,0.5)',
+        backgroundColor: 'rgba(237,237,237,0.5)',
+        borderDash: [5, 5],
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.25,
+        spanGaps: true,
+      }] : []),
+    ],
+  };
+  const maxGap = Math.max(0, ...chartData.datasets.flatMap((d: any) => d.data.filter((v: any) => v != null)));
+  const chartOptions: any = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: { min: 0, grid: { color: HUB.border }, ticks: { color: HUB.textFaint, callback: (v: any) => `+${Number(v).toFixed(maxGap < 1 ? 2 : 1)}s` }, title: { display: true, text: 'Gap to fastest race pace (s/lap)', color: HUB.textFaint, font: { size: 11 } } },
+      x: { grid: { color: HUB.border }, ticks: { color: HUB.textFaint } },
+    },
+    plugins: {
+      legend: { position: 'top', labels: { color: HUB.textMuted } },
+      tooltip: { mode: 'index', intersect: false, callbacks: { label: (c: any) => c.parsed.y == null ? null : `${c.dataset.label}: +${c.parsed.y.toFixed(3)}s/lap` } },
+    },
+  };
+
+  const cols = '48px minmax(150px, 1.6fr) 64px 56px 84px 84px 84px 84px 48px';
+  return (
+    <ResponsiveAccordionSection title="Race pace" gridColumn="span 12" defaultOpen={true}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+        {kpis.map(k => (
+          <div key={k.label} style={statCell({ padding: '16px' })}>
+            <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>{k.label}</span>
+            <span style={{ display: 'block', fontSize: '20px', color: k.color || HUB.textPrimary, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums' }}>{k.val}</span>
+            <span style={{ display: 'block', fontSize: '11px', color: HUB.textMuted, marginTop: '4px' }}>{k.sub}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ height: '260px', marginBottom: '24px' }}>
+        <Line data={chartData as any} options={chartOptions} />
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ minWidth: '760px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '12px', padding: '8px 12px', fontSize: '12px', color: HUB.textFaint, background: HUB.bg, borderRadius: '8px 8px 0 0' }}>
+            <div>Round</div><div>Race</div><div>Pace</div><div>Finish</div><div>Median lap</div><div>Gap/lap</div><div>vs mate</div><div>Drop-off</div><div>Cons.</div>
+          </div>
+          {[...pace.races].reverse().map((r: any) => {
+            const conv = r.paceRank && r.finishPos ? r.paceRank - r.finishPos : null;
+            return (
+              <div key={r.round} style={{ display: 'grid', gridTemplateColumns: cols, gap: '12px', padding: '10px 12px', fontSize: '12px', alignItems: 'center', borderBottom: `1px solid ${HUB.border}`, fontFamily: HUB.fontMono, color: HUB.textPrimary }}>
+                <div style={{ color: HUB.textMuted }}>R{r.round}</div>
+                <div style={{ fontFamily: HUB.fontRegular, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.name}>{r.name}</div>
+                <div>{r.rankable ? <>{ordinalRank(r.paceRank)}<span style={{ color: HUB.textFaint }}>/{r.fieldSize}</span></> : <span style={{ color: HUB.textFaint }}>–</span>}</div>
+                <div style={{ color: r.retired ? HUB.negative : conv == null ? HUB.textPrimary : conv > 0 ? HUB.positive : conv < 0 ? HUB.negative : HUB.textPrimary }}>{r.retired ? 'DNF' : ordinalRank(r.finishPos)}</div>
+                <div>{formatLapTime(r.median)}</div>
+                <div style={{ color: HUB.textMuted }}>{r.rankable ? (r.gapToFastest < 0.0005 ? 'Fastest' : `+${r.gapToFastest.toFixed(3)}s`) : '–'}</div>
+                <div style={{ color: r.teammate ? (r.teammate.delta < 0 ? HUB.positive : HUB.negative) : HUB.textFaint }}>{r.teammate ? `${formatDelta(r.teammate.delta)}s` : '–'}</div>
+                <div style={{ color: HUB.textMuted }}>{r.trend == null ? '–' : `${formatDelta(r.trend)}s`}</div>
+                <div style={{ color: r.consistency >= 75 ? HUB.positive : r.consistency >= 50 ? HUB.warning : HUB.negative }}>{r.consistency}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <span style={{ display: 'block', marginTop: '12px', fontSize: '11px', color: HUB.textFaint }}>
+        Race pace is the median of clean laps: lap 1, in- and out-laps, safety car laps and laps over 107% are removed. Drop-off is the lap-time trend within each stint (seconds per lap).
+      </span>
+    </ResponsiveAccordionSection>
+  );
 };
 
 export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement, initialFlashMessage: string }) => {
@@ -188,11 +327,13 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
   const [selectedTab, setSelectedTab] = useState(0); // 0 = Driver 1, 1 = Driver 2, 2 = Reserve
   const [promotionModalOpen, setPromotionModalOpen] = useState(false);
   const [negotiatingDriver, setNegotiatingDriver] = useState<any>(null);
+  const [contractDriver, setContractDriver] = useState<any>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   // --- Handlers ---
   const handleAction = async (action: string, driverName: string) => {
     if (action === 'release') {
-      if(confirm(`Are you sure you want to release ${driverName}? This action cannot be undone.`)) {
+      if(confirm(`Release ${driverName}? This cannot be undone.`)) {
         if ((state as any).team.reserveDriver?.name === driverName) {
           (state as any).team.reserveDriver = null;
           setSelectedTab(0);
@@ -202,7 +343,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
         }
         setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
         await syncGame();
-        setFlashMessage(`Released ${driverName} from their contract.`);
+        setFlashMessage(`Released ${driverName} from their contract`);
       }
     } else if (action === 'demote') {
        if (!(state as any).team.reserveDriver) {
@@ -217,7 +358,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                setSelectedTab(2);
                setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
                await syncGame();
-               setFlashMessage(`Demoted ${driverName} to Reserve Driver.`);
+               setFlashMessage(`Demoted ${driverName} to reserve driver`);
            }
        }
     } else if (action === 'promote') {
@@ -233,7 +374,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                setSelectedTab((state as any).team.drivers.length - 1);
                setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
                await syncGame();
-               setFlashMessage(`Promoted ${driverName} to Race Seat.`);
+               setFlashMessage(`Promoted ${driverName} to a race seat`);
            } else {
                setPromotionModalOpen(true);
            }
@@ -244,9 +385,38 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
   const startNegotiation = (replaceDriverName: string) => {
     const d = (state as any).team.drivers.find((dr: any) => dr.name === replaceDriverName);
     if (d) {
-      setNegotiatingDriver(d);
+      // Opens the contract builder; "Talk it through instead" falls back to the dialogue negotiation.
+      setContractDriver(d);
       setPromotionModalOpen(false);
     }
+  };
+
+  // Applies a finished NegotiationSession outcome. `terms` (optional, from the
+  // contract builder) replaces the default +20% salary bump with the offered terms.
+  const applyNegotiationOutcome = async (driver: any, status: string, terms?: { salary: number; seasons: number }) => {
+    if (status === 'CANCELLED') return null;
+    const replaceDriverName = driver.name;
+    const reserve = (state as any).team.reserveDriver;
+    if (!(state as any).team.promoteReserveToSeat(replaceDriverName, state)) return null;
+    let message;
+    if (status === 'ACCEPTED_RESERVE' || status === 'ACCEPTED_RESERVE_MONEY') {
+        driver.contractType = 'reserve';
+        driver.driverRole = 'reserve';
+        driver.roleLabel = 'Reserve Driver';
+        if (terms) {
+          driver.salary = terms.salary;
+          driver.contractYearsRemaining = terms.seasons;
+        } else if (status === 'ACCEPTED_RESERVE_MONEY') {
+          driver.salary = Math.round(driver.salary * 1.2);
+        }
+        (state as any).team.reserveDriver = driver;
+        message = `Promoted ${reserve.name} and moved ${replaceDriverName} to reserve`;
+    } else {
+        message = `Promoted ${reserve.name}. ${replaceDriverName} has left the team`;
+    }
+    setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
+    await syncGame();
+    return message;
   };
 
   const handleNegotiationComplete = async (status: string) => {
@@ -254,28 +424,24 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
       setNegotiatingDriver(null);
       return;
     }
-
-    const replaceDriverName = negotiatingDriver.name;
-    const reserve = (state as any).team.reserveDriver;
-
-    if ((state as any).team.promoteReserveToSeat(replaceDriverName, state)) {
-        if (status === 'ACCEPTED_RESERVE' || status === 'ACCEPTED_RESERVE_MONEY') {
-            negotiatingDriver.contractType = 'reserve';
-            negotiatingDriver.driverRole = 'reserve';
-            negotiatingDriver.roleLabel = 'Reserve Driver';
-            if (status === 'ACCEPTED_RESERVE_MONEY') {
-              negotiatingDriver.salary = Math.round(negotiatingDriver.salary * 1.2);
-            }
-            (state as any).team.reserveDriver = negotiatingDriver;
-            setFlashMessage(`Promoted ${reserve.name} and moved ${replaceDriverName} to Reserve.`);
-        } else {
-            setFlashMessage(`Promoted ${reserve.name}. ${replaceDriverName} has left the team.`);
-        }
-        setTeamActiveDrivers((state as any).team, (state as any).team.drivers.map((d: any) => d.name));
-        await syncGame();
+    const message = await applyNegotiationOutcome(negotiatingDriver, status);
+    if (message) {
+        setFlashMessage(message);
         setNegotiatingDriver(null);
         setSelectedTab(0);
     }
+  };
+
+  const sendReserveOffer = async (driver: any, terms: { salary: number; seasons: number }) => {
+    const session = runReserveOffer(driver, (state as any).team, terms);
+    const accepted = session.status === 'ACCEPTED_RESERVE' || session.status === 'ACCEPTED_RESERVE_MONEY';
+    const message = await applyNegotiationOutcome(driver, session.status, terms);
+    if (message) setFlashMessage(message);
+    return {
+      accepted,
+      headline: accepted ? `${driver.name} accepted the reserve role.` : `${driver.name} refused and left the team.`,
+      reply: session.currentDialogue,
+    };
   };
 
   // --- Data aggregation ---
@@ -301,16 +467,18 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
     return computeDriverAnalytics(teammate.name, (state as any).team.name, (state as any).raceHistory || [], (state as any).season?.year || 1);
   }, [teammate, (state as any).raceHistory]);
 
+  const seasonYear = (state as any).season?.year || 1;
+  const driverPace = useMemo(() => currentDriver ? getDriverSeasonPace(currentDriver.name, (state as any).raceHistory || [], seasonYear) : null, [currentDriver, (state as any).raceHistory, seasonYear]);
+  const teammatePace = useMemo(() => teammate ? getDriverSeasonPace(teammate.name, (state as any).raceHistory || [], seasonYear) : null, [teammate, (state as any).raceHistory, seasonYear]);
+
   if (!currentDriver) {
     return (
       <div>
         <div style={{ marginBottom: '32px' }}>
-          {sectionLabel('Personnel Management')}
-          {pageTitle('Driver Intelligence Center')}
-          {pageSubtitle('Comprehensive telemetry and performance evaluation.')}
+          {pageTitle('My drivers')}
         </div>
         <div style={{...glassCard({padding: '48px'}), textAlign: 'center'}}>
-          <h3 style={{color: '#fff', margin: 0}}>No drivers found on the roster.</h3>
+          <h3 style={{color: HUB.textPrimary, fontFamily: HUB.fontBold, fontWeight: 400, fontSize: '18px', margin: 0}}>No drivers on the roster</h3>
         </div>
       </div>
     );
@@ -323,22 +491,22 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
   // Positive delta = outperforming (e.g. expected 9.5, actual 5.0 -> +4.5)
 
   let extractionStatus = "Average";
-  let extractionColor = "#eab308";
-  if (extractionDelta > 1.5) { extractionStatus = "Overperforming"; extractionColor = "#10b981"; }
-  else if (extractionDelta < -1.5) { extractionStatus = "Underperforming"; extractionColor = "#f87171"; }
+  let extractionColor = HUB.warning;
+  if (extractionDelta > 1.5) { extractionStatus = "Overperforming"; extractionColor = HUB.positive; }
+  else if (extractionDelta < -1.5) { extractionStatus = "Underperforming"; extractionColor = HUB.negative; }
 
-  const aiReport = generateAIReport(currentDriver, stats, extractionDelta);
+  const aiReport = generateAIReport(currentDriver, stats, extractionDelta, driverPace?.summary);
 
   // Chart data
   const chartOptions: any = {
     responsive: true,
     maintainAspectRatio: false,
     scales: { 
-      y: { reverse: true, min: 1, max: 20, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } },
-      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } }
+      y: { reverse: true, min: 1, max: 20, grid: { color: HUB.border }, ticks: { color: HUB.textFaint } },
+      x: { grid: { color: HUB.border }, ticks: { color: HUB.textFaint } }
     },
     plugins: { 
-      legend: { position: 'top', labels: { color: '#fff' } },
+      legend: { position: 'top', labels: { color: HUB.textMuted } },
       tooltip: { mode: 'index', intersect: false }
     }
   };
@@ -351,19 +519,20 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
     labels: stats.historyData.map(d => `R${d.round}`),
     datasets: [
       {
-        label: 'Race Finish',
+        label: 'Race finish',
         data: stats.historyData.map(d => d.finishPos),
         borderColor: HUB.accent,
-        backgroundColor: 'rgba(225, 6, 0, 0.1)',
-        borderWidth: 3,
+        backgroundColor: HUB.accent,
+        borderWidth: 2,
         pointRadius: 4,
         tension: 0.3,
-        fill: true,
+        fill: false,
       },
       {
-        label: 'Grid Position',
+        label: 'Grid position',
         data: stats.historyData.map(d => d.gridPos || null),
-        borderColor: '#f59e0b',
+        borderColor: 'rgba(237,237,237,0.5)',
+        backgroundColor: 'rgba(237,237,237,0.5)',
         borderDash: [5, 5],
         borderWidth: 2,
         pointRadius: 3,
@@ -379,11 +548,10 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
       {/* --- HEADER --- */}
       <div className="mobile-stack" style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          {sectionLabel('Personnel Management')}
-          {pageTitle('Driver Intelligence Center')}
-          {pageSubtitle('Comprehensive telemetry, seasonal analytics, and contract evaluation.')}
+          {pageTitle('My drivers')}
+          {pageSubtitle('Season form, contracts and how each driver compares to the car.')}
         </div>
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.4)', padding: '6px', borderRadius: '8px', border: `1px solid ${HUB.border}`, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: '4px', background: HUB.sidebar, padding: '4px', borderRadius: '10px', border: `1px solid ${HUB.border}`, position: 'relative' }}>
           {allDrivers.map((d, idx) => {
             const isActive = selectedTab === idx;
             return (
@@ -393,16 +561,17 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                 style={{
                   position: 'relative',
                   background: 'transparent',
-                  color: isActive ? '#fff' : HUB.textMuted,
+                  color: isActive ? HUB.textPrimary : HUB.textMuted,
                   border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '4px',
+                  height: '28px',
+                  padding: '0 16px',
+                  borderRadius: '8px',
                   cursor: 'pointer',
                   fontFamily: HUB.fontBold,
                   fontSize: '13px',
                   outline: 'none',
                   zIndex: 1,
-                  transition: 'color 0.2s ease'
+                  transition: `color 150ms ${HUB.ease}`
                 }}
               >
                 {isActive && (
@@ -411,9 +580,10 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      background: HUB.accent,
-                      borderRadius: '4px',
-                      zIndex: -1,
+                      background: HUB.raised,
+                      border: `1px solid ${HUB.borderMid}`,
+                      borderRadius: '8px',
+                      zIndex: -1
                     }}
                     transition={{
                       type: 'spring',
@@ -422,7 +592,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                     }}
                   />
                 )}
-                {d.name.split(' ').pop()} {d.driverRole === 'reserve' ? '(RES)' : ''}
+                {d.name.split(' ').pop()} {d.driverRole === 'reserve' ? '(reserve)' : ''}
               </button>
             );
           })}
@@ -430,7 +600,7 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
       </div>
 
       {flashMessage && (
-        <div style={{ padding: '16px', background: 'rgba(225,6,0,0.1)', border: `1px solid ${HUB.accent}`, borderRadius: '4px', color: '#fff', fontSize: '13px', marginBottom: '24px' }}>
+        <div style={{ padding: '12px 16px', background: HUB.raised, border: `1px solid ${HUB.border}`, borderRadius: '8px', color: HUB.textPrimary, fontSize: '13px', marginBottom: '24px' }}>
           {flashMessage}
         </div>
       )}
@@ -445,49 +615,50 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
         >
           {/* --- SECTION 1: DRIVER OVERVIEW --- */}
           <div className="mobile-stack" style={{ ...glassCard({ padding: 0 }), marginBottom: '24px', display: 'flex', overflow: 'hidden' }}>
-        <div style={{ flex: '0 0 240px', background: 'rgba(0,0,0,0.3)', borderRight: `1px solid ${HUB.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
-           <img src={getDriverHeadshotUrl(currentDriver)} alt={currentDriver.name} style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: `3px solid ${HUB.accent}`, marginBottom: '16px' }} loading="lazy" />
-           <h2 style={{ fontSize: '24px', color: '#fff', fontFamily: HUB.fontBold, margin: '0 0 4px', textAlign: 'center' }}>{currentDriver.name}</h2>
+        <div style={{ flex: '0 0 240px', background: HUB.bg, borderRight: `1px solid ${HUB.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px' }}>
+           <img src={getDriverHeadshotUrl(currentDriver)} alt={currentDriver.name} style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: `1px solid ${HUB.borderMid}`, marginBottom: '16px' }} loading="lazy" />
+           <h2 style={{ fontSize: '24px', fontWeight: 400, color: HUB.textPrimary, fontFamily: HUB.fontBold, margin: '0 0 4px', textAlign: 'center' }}>{currentDriver.name}</h2>
            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-             <span style={{ fontSize: '18px', color: HUB.accent, fontFamily: HUB.fontMono, fontWeight: 800 }}>#{getDriverNumber(currentDriver)}</span>
-             <span style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '10px', color: '#fff' }}>{currentDriver.category}</span>
+             <span style={{ fontSize: '18px', color: HUB.accentInk, fontFamily: HUB.fontMono, fontWeight: 400 }}>#{getDriverNumber(currentDriver)}</span>
+             <span style={pill(false)}>{currentDriver.category}</span>
            </div>
         </div>
 
-        <div style={{ flex: 1, padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '24px' }}>
              <div>
-               <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Age</span>
-               <span style={{ fontSize: '18px', color: '#fff', fontFamily: HUB.fontMono }}>{currentDriver.age || 25}</span>
+               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Age</span>
+               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.age || 25}</span>
              </div>
              <div>
-               <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Salary</span>
-               <span style={{ fontSize: '18px', color: '#fff', fontFamily: HUB.fontMono }}>${currentDriver.salary || 0}M</span>
+               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Salary</span>
+               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>${currentDriver.salary || 0}M</span>
              </div>
              <div>
-               <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Contract</span>
-               <span style={{ fontSize: '18px', color: '#fff', fontFamily: HUB.fontMono }}>{currentDriver.contractDuration || 1} Yrs</span>
+               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Contract</span>
+               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.contractYearsRemaining ?? currentDriver.contractDuration ?? 1} yrs</span>
              </div>
              <div>
-               <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Morale</span>
+               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Morale</span>
                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 <span style={{ fontSize: '18px', color: '#fff', fontFamily: HUB.fontMono }}>{currentDriver.morale || 90}%</span>
-                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (currentDriver.morale || 90) > 70 ? '#10b981' : '#f87171' }}></div>
+                 <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.morale || 90}%</span>
+                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (currentDriver.morale || 90) > 70 ? HUB.positive : HUB.negative }}></div>
                </div>
              </div>
              <div>
-               <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>Potential</span>
-               <span style={{ fontSize: '18px', color: '#a855f7', fontFamily: HUB.fontMono }}>{currentDriver.potentialCeiling || 90}</span>
+               <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Potential</span>
+               <span style={{ fontSize: '18px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{currentDriver.potentialCeiling || 90}</span>
              </div>
           </div>
 
           <div style={{ display: 'flex', gap: '16px', marginTop: '32px', borderTop: `1px solid ${HUB.border}`, paddingTop: '24px' }}>
-            <button onClick={() => handleAction('release', currentDriver.name)} style={{ ...actionBtn({ backgroundColor: 'transparent', border: `1px solid ${HUB.border}`, color: '#f87171', padding: '8px 16px', fontSize: '12px' }) }}>Release Contract</button>
+            <button onClick={() => handleAction('release', currentDriver.name)} className={btnClass('danger')} style={btn('danger', 'md')}>Release contract</button>
             {(state as any).team.reserveDriver?.name !== currentDriver.name ? (
-              <button onClick={() => handleAction('demote', currentDriver.name)} disabled={!!(state as any).team.reserveDriver} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px' }), opacity: (state as any).team.reserveDriver ? 0.5 : 1 }}>Demote to Reserve</button>
+              <button onClick={() => handleAction('demote', currentDriver.name)} disabled={!!(state as any).team.reserveDriver} className={btnClass('secondary')} style={btn('secondary', 'md')}>Demote to reserve</button>
             ) : (
-              <button onClick={() => handleAction('promote', currentDriver.name)} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '12px' }) }}>Promote to Seat</button>
+              <button onClick={() => handleAction('promote', currentDriver.name)} className={btnClass('primary')} style={btn('primary', 'md')}>Promote to race seat</button>
             )}
+            <button onClick={() => setCompareOpen(true)} className={btnClass('secondary')} style={btn('secondary', 'md')}>Compare</button>
           </div>
         </div>
       </div>
@@ -496,98 +667,100 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
         <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '24px' }}>
           
           {/* --- SECTION 3: CAR EXTRACTION INDEX --- */}
-          <ResponsiveAccordionSection title="Car Extraction Index" gridColumn="span 4" defaultOpen={true}>
+          <ResponsiveAccordionSection title="Car extraction" gridColumn="span 4" defaultOpen={true}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ position: 'relative', width: '160px', height: '160px', borderRadius: '50%', border: `8px solid rgba(255,255,255,0.05)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `inset 0 0 20px ${extractionColor}40` }}>
-                 <div style={{ position: 'absolute', inset: -8, borderRadius: '50%', border: `8px solid ${extractionColor}`, clipPath: `polygon(0 0, 100% 0, 100% ${Math.max(0, 100 - ((extractionDelta + 5) / 10) * 100)}%, 0 ${Math.max(0, 100 - ((extractionDelta + 5) / 10) * 100)}%)`, transition: 'all 1s ease-out' }}></div>
+              <div style={{ position: 'relative', width: '160px', height: '160px', borderRadius: '50%', border: `8px solid ${HUB.raised}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                 <div style={{ position: 'absolute', inset: -8, borderRadius: '50%', border: `8px solid ${extractionColor}`, clipPath: `polygon(0 0, 100% 0, 100% ${Math.max(0, 100 - ((extractionDelta + 5) / 10) * 100)}%, 0 ${Math.max(0, 100 - ((extractionDelta + 5) / 10) * 100)}%)`, transition: `border-color 400ms ${HUB.ease}, clip-path 400ms ${HUB.ease}` }}></div>
                  <div style={{ textAlign: 'center', zIndex: 2 }}>
-                   <span style={{ display: 'block', fontSize: '32px', color: extractionColor, fontFamily: HUB.fontMono, fontWeight: 800 }}>{extractionDelta > 0 ? '+' : ''}{extractionDelta.toFixed(1)}</span>
-                   <span style={{ fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase' }}>Positions</span>
+                   <span style={{ display: 'block', fontSize: '32px', color: extractionColor, fontFamily: HUB.fontMono, fontWeight: 400 }}>{extractionDelta > 0 ? '+' : ''}{extractionDelta.toFixed(1)}</span>
+                   <span style={{ fontSize: '12px', color: HUB.textMuted }}>positions vs car</span>
                  </div>
               </div>
               
               <div style={{ marginTop: '24px', width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: `1px solid ${HUB.border}` }}>
-                  <span style={{ fontSize: '12px', color: HUB.textMuted }}>Est. Car Capability</span>
-                  <span style={{ fontSize: '12px', color: '#fff', fontFamily: HUB.fontMono }}>P{expectedFinish.toFixed(1)}</span>
+                  <span style={{ fontSize: '12px', color: HUB.textMuted }}>Car's expected finish</span>
+                  <span style={{ fontSize: '12px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>P{expectedFinish.toFixed(1)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: `1px solid ${HUB.border}` }}>
-                  <span style={{ fontSize: '12px', color: HUB.textMuted }}>Driver Avg Finish</span>
-                  <span style={{ fontSize: '12px', color: '#fff', fontFamily: HUB.fontMono }}>P{stats.avgFinish.toFixed(1)}</span>
+                  <span style={{ fontSize: '12px', color: HUB.textMuted }}>Driver avg finish</span>
+                  <span style={{ fontSize: '12px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>P{stats.avgFinish.toFixed(1)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '12px', color: HUB.textMuted }}>Status</span>
-                  <span style={{ fontSize: '12px', color: extractionColor, fontWeight: 700 }}>{extractionStatus}</span>
+                  <span style={{ fontSize: '12px', color: extractionColor, fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif" }}>{extractionStatus}</span>
                 </div>
               </div>
             </div>
           </ResponsiveAccordionSection>
 
           {/* --- SECTION 2: SEASON PERFORMANCE --- */}
-          <ResponsiveAccordionSection title="Season Performance" gridColumn="span 8" defaultOpen={true}>
+          <ResponsiveAccordionSection title="Season performance" gridColumn="span 8" defaultOpen={true}>
              <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                {[
-                 { label: 'Championship Pts', val: stats.totalPoints },
-                 { label: 'Avg Finish', val: `P${stats.avgFinish.toFixed(1)}` },
-                 { label: 'Avg Grid', val: stats.avgGrid > 0 ? `P${stats.avgGrid.toFixed(1)}` : 'N/A' },
-                 { label: 'Pos Gained/Lost', val: stats.avgGrid > 0 ? (stats.positionsGainedAvg > 0 ? `+${stats.positionsGainedAvg.toFixed(1)}` : stats.positionsGainedAvg.toFixed(1)) : 'N/A' },
-                 { label: 'Best Finish', val: `P${stats.bestFinish}` },
+                 { label: 'Championship pts', val: stats.totalPoints },
+                 { label: 'Avg finish', val: `P${stats.avgFinish.toFixed(1)}` },
+                 { label: 'Avg grid', val: stats.avgGrid > 0 ? `P${stats.avgGrid.toFixed(1)}` : 'N/A' },
+                 { label: 'Places gained / lost', val: stats.avgGrid > 0 ? (stats.positionsGainedAvg > 0 ? `+${stats.positionsGainedAvg.toFixed(1)}` : stats.positionsGainedAvg.toFixed(1)) : 'N/A' },
+                 { label: 'Best finish', val: `P${stats.bestFinish}` },
                  { label: 'Podiums', val: stats.podiums },
                  { label: 'Wins', val: stats.wins },
-                 { label: 'Fastest Laps', val: stats.fastestLaps },
-                 { label: 'Points Finishes', val: stats.pointsFinishes },
+                 { label: 'Fastest laps', val: stats.fastestLaps },
+                 { label: 'Points finishes', val: stats.pointsFinishes },
                  { label: 'DNFs', val: stats.dnfs }
                ].map((item, i) => (
-                 <div key={i} style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px', border: `1px solid rgba(255,255,255,0.02)` }}>
-                   <span style={{ display: 'block', fontSize: '10px', color: HUB.textMuted, textTransform: 'uppercase', marginBottom: '8px' }}>{item.label}</span>
-                   <span style={{ fontSize: '20px', color: '#fff', fontFamily: HUB.fontMono }}>{item.val}</span>
+                 <div key={i} style={statCell({ padding: '16px' })}>
+                   <span style={{ display: 'block', fontSize: '12px', color: HUB.textFaint, marginBottom: '8px' }}>{item.label}</span>
+                   <span style={{ fontSize: '22px', color: HUB.textPrimary, fontFamily: HUB.fontMono, fontVariantNumeric: 'tabular-nums' }}>{item.val}</span>
                  </div>
                ))}
              </div>
-             {stats.avgGrid === 0 && <span style={{display: 'block', marginTop: '16px', fontSize: '10px', color: HUB.textMuted}}>* Grid positions unavailable for historical simulation data.</span>}
+             {stats.avgGrid === 0 && <span style={{display: 'block', marginTop: '16px', fontSize: '11px', color: HUB.textFaint}}>Grid positions aren't recorded for older simulated races</span>}
           </ResponsiveAccordionSection>
 
+          <DriverRacePaceSection driver={currentDriver} pace={driverPace} teammate={teammate} teammatePace={teammatePace} />
+
           {/* --- SECTION 8: AI PERFORMANCE REPORT --- */}
-          <ResponsiveAccordionSection title="AI Performance Report" gridColumn="span 12" defaultOpen={true}>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', background: 'rgba(225,6,0,0.05)', padding: '16px', borderRadius: '8px', borderLeft: `4px solid ${HUB.accent}` }}>
-               <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(225,6,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.accent, flexShrink: 0 }}>
-                 <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <ResponsiveAccordionSection title="Performance report" gridColumn="span 12" defaultOpen={true}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', background: HUB.raised, padding: '16px', borderRadius: '8px', border: `1px solid ${HUB.border}` }}>
+               <div style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.textMuted, flexShrink: 0 }}>
+                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                </div>
                <div>
-                 <h4 style={{ fontSize: '12px', color: HUB.accent, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>Performance Dept. Summary</h4>
-                 <p style={{ margin: 0, fontSize: '14px', color: '#e2e8f0', lineHeight: 1.6 }}>{aiReport}</p>
+                 <h4 style={{ fontSize: '12px', fontWeight: 400, color: HUB.textFaint, margin: '0 0 8px' }}>Performance department summary</h4>
+                 <p style={{ margin: 0, fontSize: '14px', color: HUB.textPrimary, lineHeight: 1.6 }}>{aiReport}</p>
                </div>
             </div>
           </ResponsiveAccordionSection>
 
           {/* --- SECTION 5: PERFORMANCE TIMELINE --- */}
-          <ResponsiveAccordionSection title="Performance Timeline" gridColumn="span 12">
+          <ResponsiveAccordionSection title="Grid and finish by round" gridColumn="span 12">
             <div style={{ height: '300px' }}>
-              {chartData ? <Line data={chartData} options={chartOptions} /> : <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.textMuted}}>No race data available.</div>}
+              {chartData ? <Line data={chartData} options={chartOptions} /> : <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: HUB.textMuted}}>No race data yet</div>}
             </div>
           </ResponsiveAccordionSection>
 
           {/* --- SECTION 4 & 9: ATTRIBUTES --- */}
-          <ResponsiveAccordionSection title="Telemetry Attributes" gridColumn="span 4">
+          <ResponsiveAccordionSection title="Attributes" gridColumn="span 4">
             <div style={{ marginBottom: '24px' }}>
               <RadarChart pace={currentDriver.pace} quali={currentDriver.quali} racecraft={currentDriver.racecraft} consistency={currentDriver.consistency} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                {[
-                 { label: 'Race Pace', val: currentDriver.pace },
+                 { label: 'Race pace', val: currentDriver.pace },
                  { label: 'Qualifying', val: currentDriver.quali },
                  { label: 'Racecraft', val: currentDriver.racecraft },
                  { label: 'Consistency', val: currentDriver.consistency },
-                 { label: 'Tyre Management', val: Math.round((currentDriver.pace + currentDriver.consistency) / 2) },
-                 { label: 'Pressure Handling', val: Math.round((currentDriver.quali + currentDriver.racecraft) / 2) }
+                 { label: 'Tyre management', val: Math.round((currentDriver.pace + currentDriver.consistency) / 2) },
+                 { label: 'Pressure handling', val: Math.round((currentDriver.quali + currentDriver.racecraft) / 2) }
                ].map(attr => (
                  <div key={attr.label}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                     <span style={{ fontSize: '11px', color: HUB.textMuted }}>{attr.label}</span>
-                     <span style={{ fontSize: '11px', color: '#fff', fontFamily: HUB.fontMono }}>{attr.val.toFixed(1)}</span>
+                     <span style={{ fontSize: '12px', color: HUB.textMuted }}>{attr.label}</span>
+                     <span style={{ fontSize: '12px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{attr.val.toFixed(1)}</span>
                    </div>
-                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                     <div style={{ height: '100%', width: `${(attr.val / 100) * 100}%`, background: HUB.accent }}></div>
+                   <div style={{ height: '4px', background: HUB.raised, borderRadius: '2px', overflow: 'hidden' }}>
+                     <div style={{ height: '100%', width: `${(attr.val / 100) * 100}%`, background: 'rgba(237,237,237,0.5)' }}></div>
                    </div>
                  </div>
                ))}
@@ -595,27 +768,27 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
           </ResponsiveAccordionSection>
 
           {/* --- SECTION 7: HEAD TO HEAD --- */}
-          <ResponsiveAccordionSection title="Teammate Comparison" gridColumn="span 8">
+          <ResponsiveAccordionSection title="Teammate comparison" gridColumn="span 8">
             {teammate && teammateStats ? (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', paddingBottom: '16px', borderBottom: `1px solid ${HUB.border}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img src={getDriverHeadshotUrl(currentDriver)} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                    <span style={{ color: '#fff', fontSize: '16px', fontFamily: HUB.fontBold }}>{currentDriver.name}</span>
+                    <span style={{ color: HUB.textPrimary, fontSize: '16px', fontFamily: HUB.fontBold }}>{currentDriver.name}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ color: '#fff', fontSize: '16px', fontFamily: HUB.fontBold }}>{teammate.name}</span>
+                    <span style={{ color: HUB.textPrimary, fontSize: '16px', fontFamily: HUB.fontBold }}>{teammate.name}</span>
                     <img src={getDriverHeadshotUrl(teammate)} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
                   </div>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {[
-                    { label: 'Championship Points', v1: stats.totalPoints, v2: teammateStats.totalPoints, inv: false },
-                    { label: 'Average Finish', v1: stats.avgFinish.toFixed(1), v2: teammateStats.avgFinish.toFixed(1), inv: true },
-                    { label: 'Race Wins', v1: stats.wins, v2: teammateStats.wins, inv: false },
+                    { label: 'Championship points', v1: stats.totalPoints, v2: teammateStats.totalPoints, inv: false },
+                    { label: 'Average finish', v1: stats.avgFinish.toFixed(1), v2: teammateStats.avgFinish.toFixed(1), inv: true },
+                    { label: 'Race wins', v1: stats.wins, v2: teammateStats.wins, inv: false },
                     { label: 'Podiums', v1: stats.podiums, v2: teammateStats.podiums, inv: false },
-                    { label: 'Average Grid', v1: stats.avgGrid.toFixed(1), v2: teammateStats.avgGrid.toFixed(1), inv: true },
+                    { label: 'Average grid', v1: stats.avgGrid.toFixed(1), v2: teammateStats.avgGrid.toFixed(1), inv: true },
                     { label: 'DNFs', v1: stats.dnfs, v2: teammateStats.dnfs, inv: true }
                   ].map(stat => {
                      let winner = 0;
@@ -626,21 +799,21 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                      
                      return (
                        <div key={stat.label} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 80px', gap: '16px', alignItems: 'center' }}>
-                         <span style={{ fontSize: '16px', fontFamily: HUB.fontMono, color: winner === 1 ? '#fff' : HUB.textMuted, textAlign: 'right' }}>{stat.v1}</span>
-                         <span style={{ fontSize: '11px', color: HUB.textMuted, textTransform: 'uppercase', textAlign: 'center' }}>{stat.label}</span>
-                         <span style={{ fontSize: '16px', fontFamily: HUB.fontMono, color: winner === 2 ? '#fff' : HUB.textMuted, textAlign: 'left' }}>{stat.v2}</span>
+                         <span style={{ fontSize: '16px', fontFamily: HUB.fontMono, color: winner === 1 ? HUB.textPrimary : HUB.textMuted, textAlign: 'right' }}>{stat.v1}</span>
+                         <span style={{ fontSize: '12px', color: HUB.textFaint, textAlign: 'center' }}>{stat.label}</span>
+                         <span style={{ fontSize: '16px', fontFamily: HUB.fontMono, color: winner === 2 ? HUB.textPrimary : HUB.textMuted, textAlign: 'left' }}>{stat.v2}</span>
                        </div>
                      );
                   })}
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: HUB.textMuted }}>No active teammate available for comparison.</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: HUB.textMuted }}>No teammate to compare with</div>
             )}
           </ResponsiveAccordionSection>
 
           {/* --- SECTION 10: UPCOMING RACES FORECAST --- */}
-          <ResponsiveAccordionSection title="Upcoming Races Forecast" gridColumn="span 12">
+          <ResponsiveAccordionSection title="Upcoming races" gridColumn="span 12">
             {upcomingRaces.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${upcomingRaces.length}, 1fr)`, gap: '16px' }}>
                 {upcomingRaces.map((entry: any, i: number) => {
@@ -652,18 +825,18 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                   const forecast = getDriverForecast(currentDriver, raceObj?.circuit || '');
                   
                   return (
-                    <div key={i} style={{ padding: '16px', background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: `1px solid rgba(255,255,255,0.05)` }}>
+                    <div key={i} style={statCell({ padding: '16px' })}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '10px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {currentRound + i}</span>
-                        <span style={{ fontSize: '10px', color: HUB.textMuted }}>{raceObj?.country}</span>
+                        <span style={{ fontSize: '11px', color: HUB.textMuted, fontFamily: HUB.fontMono }}>Round {currentRound + i}</span>
+                        <span style={{ fontSize: '11px', color: HUB.textMuted }}>{raceObj?.country}</span>
                       </div>
-                      <h4 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 4px', color: '#fff' }}>{raceObj?.name}</h4>
+                      <h4 style={{ fontSize: '14px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", margin: '0 0 8px', color: HUB.textPrimary }}>{raceObj?.name}</h4>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '9px', padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', color: '#fff' }}>{profile.type}</span>
+                        <span style={pill(false)}>{profile.type}</span>
                       </div>
-                      <div style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, paddingTop: '12px' }}>
-                        <div style={{ fontSize: '11px', color: HUB.textMuted, marginBottom: '2px' }}>Driver Suitability</div>
-                        <div style={{ fontSize: '16px', fontWeight: 800, color: forecast.color }}>
+                      <div style={{ borderTop: `1px solid ${HUB.border}`, paddingTop: '12px' }}>
+                        <div style={{ fontSize: '12px', color: HUB.textFaint, marginBottom: '4px' }}>Driver suitability</div>
+                        <div style={{ fontSize: '16px', fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif", color: forecast.color }}>
                           {forecast.label}
                         </div>
                       </div>
@@ -671,35 +844,34 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
                   );
                 })}
               </div>
-            ) : <div style={{ color: HUB.textMuted }}>No upcoming races found.</div>}
+            ) : <div style={{ color: HUB.textMuted }}>No upcoming races</div>}
           </ResponsiveAccordionSection>
 
           {/* --- SECTION 11: SEASON HEATMAP --- */}
-          <ResponsiveAccordionSection title="Season Heatmap" gridColumn="span 12">
+          <ResponsiveAccordionSection title="Season results" gridColumn="span 12">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                {stats.historyData.length > 0 ? stats.historyData.map((d, i) => {
-                 let bg = '#1e293b'; // default dark
-                 if (d.retired) bg = '#7f1d1d'; // dark red
-                 else if (d.finishPos <= 3) bg = '#059669'; // emerald
-                 else if (d.finishPos <= 10) bg = '#65a30d'; // lime green
-                 else if (d.finishPos <= 15) bg = '#ca8a04'; // yellow
+                 let bg = HUB.raised; // outside the points
+                 if (d.retired) bg = 'rgba(229,72,77,0.22)'; // DNF
+                 else if (d.finishPos <= 3) bg = 'rgba(76,195,138,0.28)'; // podium
+                 else if (d.finishPos <= 10) bg = 'rgba(237,237,237,0.14)'; // points
                  
                  return (
                    <div key={i} title={`${d.name}: ${d.retired ? 'DNF' : 'P' + d.finishPos}`} style={{
-                     width: '40px', height: '40px', borderRadius: '4px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                     border: `1px solid rgba(255,255,255,0.1)`
+                     width: '40px', height: '40px', borderRadius: '8px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                     border: `1px solid ${HUB.border}`
                    }}>
-                     <span style={{ fontSize: '11px', color: '#fff', fontFamily: HUB.fontMono }}>{d.retired ? 'DNF' : d.finishPos}</span>
+                     <span style={{ fontSize: '11px', color: HUB.textPrimary, fontFamily: HUB.fontMono }}>{d.retired ? 'DNF' : d.finishPos}</span>
                    </div>
                  );
-               }) : <div style={{ color: HUB.textMuted }}>No race data.</div>}
+               }) : <div style={{ color: HUB.textMuted }}>No race data yet</div>}
             </div>
           </ResponsiveAccordionSection>
 
         </div>
       ) : (
         <div style={{...glassCard({padding: '48px'}), textAlign: 'center', color: HUB.textMuted}}>
-          Complete at least one race to generate Intelligence Center analytics.
+          Complete at least one race to see driver analytics
         </div>
       )}
         </motion.div>
@@ -707,24 +879,23 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
 
       {/* Promotion Modal */}
       {promotionModalOpen && (state as any).team.reserveDriver && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
           <div style={{ ...glassCard({ padding: '0', maxWidth: '600px', width: '100%' }), overflow: 'hidden' }}>
             <div style={{ padding: '24px', borderBottom: `1px solid ${HUB.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                {sectionLabel('Seat Allocation')}
-                <h3 style={{ fontSize: '20px', fontFamily: HUB.fontWide, color: '#fff', margin: 0, textTransform: 'uppercase' }}>Replace a Race Driver</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary, margin: 0 }}>Replace a race driver</h3>
               </div>
-              <button onClick={() => setPromotionModalOpen(false)} style={{ background: 'none', border: 'none', color: HUB.textMuted, cursor: 'pointer', fontSize: '24px' }}>&times;</button>
+              <button onClick={() => setPromotionModalOpen(false)} className={btnClass('ghost')} style={iconBtn('md')} aria-label="Close" title="Close"><X size={16} strokeWidth={1.5} /></button>
             </div>
             <div style={{ padding: '24px' }}>
-              <p style={{ color: HUB.textMuted, marginBottom: '16px', fontSize: '13px' }}>Select which race driver to replace with <strong style={{ color: '#fff' }}>{(state as any).team.reserveDriver.name}</strong>. The replaced driver will be released.</p>
+              <p style={{ color: HUB.textMuted, margin: '0 0 16px', fontSize: '13px' }}>Select which race driver to replace with <strong style={{ color: HUB.textPrimary, fontWeight: 400, fontFamily: HUB.fontBold }}>{(state as any).team.reserveDriver.name}</strong>. The replaced driver will be released.</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {(state as any).team.drivers.map((d: any) => (
                   <div key={d.name} style={{ ...glassCard({ padding: '16px' }), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '14px', color: '#fff', fontFamily: HUB.fontBold }}>{d.name}</span>
+                      <span style={{ fontSize: '14px', color: HUB.textPrimary, fontFamily: HUB.fontBold }}>{d.name}</span>
                     </div>
-                    <button onClick={() => startNegotiation(d.name)} style={{ ...actionBtn({ padding: '8px 16px', fontSize: '11px' }) }}>Replace</button>
+                    <button onClick={() => startNegotiation(d.name)} className={btnClass('secondary')} style={btn('secondary', 'sm')}>Replace driver</button>
                   </div>
                 ))}
               </div>
@@ -738,7 +909,27 @@ export const MyDriversPage = ({ root, initialFlashMessage }: { root: HTMLElement
         <DriverNegotiationModal 
           driver={negotiatingDriver} 
           team={(state as any).team} 
-          onComplete={handleNegotiationComplete} 
+          onComplete={handleNegotiationComplete}
+        />
+      )}
+
+      {/* Contract builder for the reserve-role offer */}
+      {contractDriver && (
+        <ContractBuilder
+          driver={contractDriver}
+          mode="reserve"
+          onSend={(terms) => sendReserveOffer(contractDriver, terms)}
+          onClose={() => setContractDriver(null)}
+          onDone={() => setSelectedTab(0)}
+          onTalk={() => { setNegotiatingDriver(contractDriver); setContractDriver(null); }}
+        />
+      )}
+
+      {compareOpen && (
+        <DriverRadarCompare
+          leftName={currentDriver.name}
+          rightName={teammate?.name || (state as any).team.reserveDriver?.name}
+          onClose={() => setCompareOpen(false)}
         />
       )}
     </div>

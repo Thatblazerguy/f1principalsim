@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { HUB, glassCard, sectionLabel, actionBtn } from '../components/HubLayout.tsx';
+import { HUB, glassCard, sectionLabel, btn, btnClass, tyreDot } from '../components/HubLayout.tsx';
+import { ArrowLeft } from 'lucide-react';
 import { TrackMap } from '../components/ui/TrackMap.tsx';
 
 export function RaceReplay({ race, onClose }) {
@@ -7,9 +8,9 @@ export function RaceReplay({ race, onClose }) {
   if (!replay || !replay.snapshots || replay.snapshots.length === 0) {
     return (
       <div style={{ ...glassCard({ padding: '48px' }), textAlign: 'center' }}>
-        <h2 style={{ color: '#fff' }}>No Replay Data Available</h2>
+        <h2 style={{ color: HUB.textPrimary, fontFamily: HUB.fontBold, fontWeight: 400, fontSize: '18px' }}>No replay data available</h2>
         <p style={{ color: HUB.textMuted }}>This race was simulated before the replay system was implemented.</p>
-        <button onClick={onClose} style={actionBtn()}>Back to History</button>
+        <button onClick={onClose} className={btnClass('secondary')} style={btn('secondary', 'md')}><ArrowLeft size={16} strokeWidth={1.5} /> Back to history</button>
       </div>
     );
   }
@@ -33,13 +34,13 @@ export function RaceReplay({ race, onClose }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          {sectionLabel('RACE ARCHIVE')}
-          <h2 style={{ margin: 0, fontSize: '24px', fontFamily: HUB.fontBold, color: '#fff', textTransform: 'uppercase' }}>
+          {sectionLabel('Race archive')}
+          <h2 style={{ margin: 0, fontSize: '24px', fontFamily: HUB.fontBold, fontWeight: 400, color: HUB.textPrimary }}>
             {race.name} Replay
           </h2>
         </div>
-        <button onClick={onClose} style={{ ...actionBtn({ backgroundColor: 'transparent', border: `1px solid ${HUB.borderMid}` }) }}>
-          Exit Replay
+        <button onClick={onClose} className={btnClass('secondary')} style={btn('secondary', 'md')}>
+          Exit replay
         </button>
       </div>
 
@@ -53,9 +54,9 @@ export function RaceReplay({ race, onClose }) {
           {/* Timeline Controls */}
           <div style={{ ...glassCard({ padding: '16px' }), display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: HUB.textMuted, fontFamily: HUB.fontBold }}>
-              <span>LAP 1</span>
-              <span style={{ color: '#fff' }}>LAP {snapshot.lap}</span>
-              <span>LAP {replay.totalLaps}</span>
+              <span>Lap 1</span>
+              <span style={{ color: HUB.textPrimary }}>Lap {snapshot.lap}</span>
+              <span>Lap {replay.totalLaps}</span>
             </div>
             <input 
               type="range" 
@@ -63,30 +64,31 @@ export function RaceReplay({ race, onClose }) {
               max={replay.snapshots.length - 1} 
               value={snapIndex} 
               onChange={handleSlider}
-              style={{ width: '100%', cursor: 'pointer' }}
+              style={{ width: '100%', cursor: 'pointer', accentColor: HUB.accent }}
             />
           </div>
         </div>
 
         {/* Replay Standings */}
         <div style={{ ...glassCard({ padding: 0 }), overflowY: 'auto' }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, backgroundColor: 'rgba(15,15,15,0.95)', zIndex: 10 }}>
-            <h3 style={{ margin: 0, fontSize: '12px', color: '#fff', textTransform: 'uppercase' }}>Standings - Lap {snapshot.lap}</h3>
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${HUB.border}`, position: 'sticky', top: 0, backgroundColor: HUB.surface, zIndex: 10 }}>
+            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 400, fontFamily: HUB.fontBold, color: HUB.textPrimary }}>Standings · Lap {snapshot.lap}</h3>
           </div>
-          <table style={{ width: '100%', fontSize: '11px', textAlign: 'left', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', fontSize: '12px', textAlign: 'left', borderCollapse: 'collapse' }}>
             <tbody>
               {mappedCars.sort((a,b) => {
                  if (a.retired !== b.retired) return a.retired ? 1 : -1;
                  return b.distance - a.distance;
               }).map((car, i) => (
-                <tr key={car.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '8px', color: HUB.textMuted, fontWeight: 'bold' }}>{i + 1}</td>
-                  <td style={{ padding: '8px', color: '#fff', fontWeight: 'bold' }}>{car.id}</td>
-                  <td style={{ padding: '8px', color: car.retired ? '#ef4444' : HUB.textMuted }}>
-                    {car.retired ? 'OUT' : car.pitStopStatus !== 'None' ? 'PIT' : ''}
+                <tr key={car.id} style={{ borderBottom: `1px solid ${HUB.border}` }}>
+                  <td style={{ padding: '8px', color: HUB.textMuted, fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif" }}>{i + 1}</td>
+                  <td style={{ padding: '8px', color: HUB.textPrimary, fontWeight: 400, fontFamily: "'Formula1-Bold', sans-serif" }}>{car.id}</td>
+                  <td style={{ padding: '8px', color: car.retired ? HUB.negative : HUB.textMuted }}>
+                    {car.retired ? 'Out' : car.pitStopStatus !== 'None' ? 'Pit' : ''}
                   </td>
                   <td style={{ padding: '8px' }}>
-                    <span style={{ color: car.tireCompound === 'Soft' ? '#ef4444' : car.tireCompound === 'Medium' ? '#facc15' : '#fff' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: HUB.textMuted }}>
+                      {car.tireCompound ? tyreDot(car.tireCompound) : null}
                       {car.tireCompound?.substring(0,1) || '—'}
                     </span>
                   </td>
